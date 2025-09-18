@@ -141,7 +141,7 @@ const DisplayRegistration: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setDeviceStatus({
-          id: 0, // Will be updated when we check status
+          id: data.device_id,
           device_token: data.device_token,
           status: data.status,
           last_seen: new Date().toISOString(),

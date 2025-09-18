@@ -20,6 +20,7 @@ class DeviceRegistrationRequest(BaseModel):
     user_agent: Optional[str] = None
 
 class DeviceRegistrationResponse(BaseModel):
+    device_id: int
     device_token: str
     status: str
     message: str
@@ -76,6 +77,7 @@ async def register_device(
         logger.info(f"Device registered: {device.device_token[:8]}...")
         
         return DeviceRegistrationResponse(
+            device_id=device.id,
             device_token=device.device_token,
             status=device.status.value,
             message="Device registered successfully. Waiting for authorization."

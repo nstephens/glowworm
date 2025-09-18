@@ -144,21 +144,39 @@ const DisplayView: React.FC = () => {
         });
 
         if (registerResponse.ok) {
-          const data = await registerResponse.json();
-          console.log('Device registered:', data);
+          const registrationData = await registerResponse.json();
+          console.log('Device registered:', registrationData);
           
-          // After registration, check status to get full device info
-          const statusResponse = await fetch(urlResolver.getApiUrl('/display-devices/status'), {
-            credentials: 'include',
-          });
+          // Create a temporary device status object from registration response
+          const tempDeviceStatus: DeviceStatus = {
+            id: registrationData.device_id,
+            device_token: registrationData.device_token,
+            status: registrationData.status,
+            last_seen: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
           
-          if (statusResponse.ok) {
-            const statusData = await statusResponse.json();
-            setDeviceStatus(statusData);
-            setIsRegistered(true);
-            console.log('Device status after registration:', statusData);
-          } else {
-            throw new Error('Failed to get device status after registration');
+          setDeviceStatus(tempDeviceStatus);
+          setIsRegistered(true);
+          setIsLoading(false);
+          
+          // Try to get full device info, but don't fail if it doesn't work immediately
+          try {
+            const statusResponse = await fetch(urlResolver.getApiUrl('/display-devices/status'), {
+              credentials: 'include',
+            });
+            
+            if (statusResponse.ok) {
+              const statusData = await statusResponse.json();
+              setDeviceStatus(statusData);
+              console.log('Full device status retrieved:', statusData);
+            } else {
+              console.log('Could not get full device status immediately, using registration data');
+            }
+          } catch (statusErr) {
+            console.log('Status check failed, using registration data:', statusErr);
+            // Continue with registration data - the periodic check will update it
           }
         } else {
           throw new Error('Failed to register device');
@@ -166,7 +184,6 @@ const DisplayView: React.FC = () => {
       } catch (err) {
         console.error('Device initialization failed:', err);
         setError('Failed to initialize device');
-      } finally {
         setIsLoading(false);
       }
     };
