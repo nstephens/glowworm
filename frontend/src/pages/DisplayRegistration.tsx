@@ -73,25 +73,43 @@ const DisplayRegistration: React.FC = () => {
       }
       setError(null);
       
-      const response = await fetch(urlResolver.getApiUrl('/display-devices/status'), {
+      // First validate any existing cookies to handle old/invalid cookies gracefully
+      const validateResponse = await fetch(urlResolver.getApiUrl('/display-devices/validate-cookie'), {
         credentials: 'include',
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setDeviceStatus(data);
+      if (validateResponse.ok) {
+        const validateData = await validateResponse.json();
+        console.log('Cookie validation result:', validateData);
         
-        // If device is authorized, redirect to its display page
-        if (data.status === 'authorized') {
-          const deviceSlug = data.device_name?.toLowerCase().replace(/\s+/g, '-') || `device-${data.id}`;
-          navigate(`/display/${deviceSlug}`);
-          return;
+        if (validateData.valid) {
+          // Cookie is valid, get device status
+          const response = await fetch(urlResolver.getApiUrl('/display-devices/status'), {
+            credentials: 'include',
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setDeviceStatus(data);
+            
+            // If device is authorized, redirect to its display page
+            if (data.status === 'authorized') {
+              const deviceSlug = data.device_name?.toLowerCase().replace(/\s+/g, '-') || `device-${data.id}`;
+              navigate(`/display/${deviceSlug}`);
+              return;
+            }
+          } else {
+            throw new Error('Failed to get device status');
+          }
+        } else if (validateData.needs_reregistration) {
+          // Cookie is invalid or device needs re-registration
+          console.log('Device cookie invalid or needs re-registration:', validateData.message);
+          setDeviceStatus(null);
         }
-      } else if (response.status === 401) {
-        // Device not registered, will show registration form
-        setDeviceStatus(null);
       } else {
-        throw new Error('Failed to check device status');
+        // Validation failed, device not registered
+        console.log('Cookie validation failed, device not registered');
+        setDeviceStatus(null);
       }
     } catch (err) {
       console.error('Error checking device status:', err);

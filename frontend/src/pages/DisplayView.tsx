@@ -86,36 +86,50 @@ const DisplayView: React.FC = () => {
   useEffect(() => {
     const initializeDevice = async () => {
       try {
-        // First, try to check if device is already registered
-        const statusResponse = await fetch(urlResolver.getApiUrl('/display-devices/status'), {
+        // First, validate any existing cookies to handle old/invalid cookies gracefully
+        const validateResponse = await fetch(urlResolver.getApiUrl('/display-devices/validate-cookie'), {
           credentials: 'include',
         });
 
-        if (statusResponse.ok) {
-          // Device is already registered, get its status
-          const data = await statusResponse.json();
-          setDeviceStatus(data);
-          setIsRegistered(true);
-          console.log('Device status retrieved:', data);
+        if (validateResponse.ok) {
+          const validateData = await validateResponse.json();
+          console.log('Cookie validation result:', validateData);
           
-          // If we're accessing via a slug, verify it matches this device
-          if (slug) {
-            const expectedSlug = data.device_name?.toLowerCase().replace(/\s+/g, '-') || `device-${data.id}`;
-            if (slug !== expectedSlug) {
-              // Wrong device, redirect to the correct URL
-              window.location.href = `/display/${expectedSlug}`;
+          if (validateData.valid) {
+            // Cookie is valid, get device status
+            const statusResponse = await fetch(urlResolver.getApiUrl('/display-devices/status'), {
+              credentials: 'include',
+            });
+
+            if (statusResponse.ok) {
+              const data = await statusResponse.json();
+              setDeviceStatus(data);
+              setIsRegistered(true);
+              console.log('Device status retrieved:', data);
+              
+              // If we're accessing via a slug, verify it matches this device
+              if (slug) {
+                const expectedSlug = data.device_name?.toLowerCase().replace(/\s+/g, '-') || `device-${data.id}`;
+                if (slug !== expectedSlug) {
+                  // Wrong device, redirect to the correct URL
+                  window.location.href = `/display/${expectedSlug}`;
+                  return;
+                }
+              }
+              
+              setIsLoading(false);
               return;
             }
+          } else if (validateData.needs_reregistration) {
+            // Cookie is invalid or device needs re-registration
+            console.log('Device cookie invalid or needs re-registration:', validateData.message);
           }
-          
-          setIsLoading(false);
-          return;
-        } else if (statusResponse.status === 401) {
-          // Device not registered, proceed to register
-          console.log('No existing device found, registering new device...');
         } else {
-          throw new Error('Failed to check device status');
+          console.log('Cookie validation failed, proceeding with registration...');
         }
+
+        // Device not registered or cookie invalid, proceed to register
+        console.log('Registering new device...');
 
         // Register new device
         const registerResponse = await fetch(urlResolver.getApiUrl('/display-devices/register'), {
@@ -257,21 +271,38 @@ const DisplayView: React.FC = () => {
 
     const checkStatus = async () => {
       try {
-        const response = await fetch(urlResolver.getApiUrl('/display-devices/status'), {
+        // First validate cookie to handle invalid cookies gracefully
+        const validateResponse = await fetch(urlResolver.getApiUrl('/display-devices/validate-cookie'), {
           credentials: 'include',
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          setDeviceStatus(data);
-          setError(null);
-        } else if (response.status === 401) {
-          // Device not registered, reset state and let initialization handle re-registration
-          console.log('Device authentication lost, will re-register on next page load');
+        if (validateResponse.ok) {
+          const validateData = await validateResponse.json();
+          
+          if (validateData.valid) {
+            // Cookie is valid, get device status
+            const response = await fetch(urlResolver.getApiUrl('/display-devices/status'), {
+              credentials: 'include',
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              setDeviceStatus(data);
+              setError(null);
+            } else {
+              throw new Error('Failed to get device status');
+            }
+          } else if (validateData.needs_reregistration) {
+            // Cookie is invalid, reset state and let initialization handle re-registration
+            console.log('Device cookie invalid, will re-register:', validateData.message);
+            setIsRegistered(false);
+            setDeviceStatus(null);
+          }
+        } else {
+          // Validation failed, reset state
+          console.log('Cookie validation failed, will re-register');
           setIsRegistered(false);
           setDeviceStatus(null);
-        } else {
-          throw new Error('Failed to get device status');
         }
       } catch (err) {
         console.error('Status check failed:', err);
