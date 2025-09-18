@@ -30,6 +30,28 @@ engine = create_database_engine()
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+def refresh_database_connection():
+    """Refresh database connection with updated settings"""
+    global engine, SessionLocal
+    try:
+        logger.info("Refreshing database connection with updated settings...")
+        
+        # Dispose of the old engine
+        if engine:
+            engine.dispose()
+        
+        # Create new engine with fresh settings
+        engine = create_database_engine()
+        
+        # Create new session factory
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        
+        logger.info("Database connection refreshed successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to refresh database connection: {e}")
+        return False
+
 # Create base class for models
 Base = declarative_base()
 

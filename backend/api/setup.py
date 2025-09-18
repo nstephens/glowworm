@@ -527,6 +527,15 @@ async def complete_setup(setup_data: SetupCompleteRequest):
         logger.info(f"Save config result: {save_result}")
         logger.info("Bootstrap configuration saved successfully")
         
+        # Refresh database connection with new settings
+        logger.info("Refreshing database connection with updated settings...")
+        from models.database import refresh_database_connection
+        refresh_success = refresh_database_connection()
+        if refresh_success:
+            logger.info("Database connection refreshed successfully")
+        else:
+            logger.warning("Database connection refresh failed, but setup completed")
+        
         return SetupCompleteResponse(
             success=True,
             message="Setup completed successfully! You can now log in with the admin credentials."
@@ -536,6 +545,25 @@ async def complete_setup(setup_data: SetupCompleteRequest):
         raise
     except Exception as e:
         logger.error(f"Error in complete_setup: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+@router.post("/refresh-database", response_model=SetupCompleteResponse)
+async def refresh_database_connection_endpoint():
+    """Refresh database connection with current settings"""
+    try:
+        logger.info("Manual database connection refresh requested...")
+        from models.database import refresh_database_connection
+        
+        refresh_success = refresh_database_connection()
+        if refresh_success:
+            return SetupCompleteResponse(
+                success=True,
+                message="Database connection refreshed successfully"
+            )
+        else:
+            raise HTTPException(status_code=500, detail="Failed to refresh database connection")
+    except Exception as e:
+        logger.error(f"Error in refresh_database_connection_endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 @router.post("/reset", response_model=SetupCompleteResponse)
