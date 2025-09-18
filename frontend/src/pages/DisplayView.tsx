@@ -288,49 +288,43 @@ const DisplayView: React.FC = () => {
 
     const checkStatus = async () => {
       try {
-        // First validate cookie to handle invalid cookies gracefully
-        const validateResponse = await fetch(urlResolver.getApiUrl('/display-devices/validate-cookie'), {
+        // For pending devices, just try to get status updates without aggressive validation
+        const response = await fetch(urlResolver.getApiUrl('/display-devices/status'), {
           credentials: 'include',
         });
 
-        if (validateResponse.ok) {
-          const validateData = await validateResponse.json();
-          
-          if (validateData.valid) {
-            // Cookie is valid, get device status
-            const response = await fetch(urlResolver.getApiUrl('/display-devices/status'), {
-              credentials: 'include',
-            });
-
-            if (response.ok) {
-              const data = await response.json();
-              setDeviceStatus(data);
-              setError(null);
-            } else {
-              throw new Error('Failed to get device status');
-            }
-          } else if (validateData.needs_reregistration) {
-            // Cookie is invalid, reset state and let initialization handle re-registration
-            console.log('Device cookie invalid, will re-register:', validateData.message);
-            setIsRegistered(false);
-            setDeviceStatus(null);
-          }
-        } else {
-          // Validation failed, reset state
-          console.log('Cookie validation failed, will re-register');
+        if (response.ok) {
+          const data = await response.json();
+          setDeviceStatus(data);
+          setError(null);
+          console.log('Status updated:', data.status);
+        } else if (response.status === 401) {
+          // Only reset if we get a 401 (device not found/invalid)
+          console.log('Device authentication lost, will re-register');
           setIsRegistered(false);
           setDeviceStatus(null);
+        } else {
+          // For other errors, just log but don't reset state
+          console.log('Status check failed, but keeping current state');
         }
       } catch (err) {
         console.error('Status check failed:', err);
-        setError('Failed to check device status');
+        // Don't reset state on network errors, just log
       }
     };
 
-    // Check every 5 seconds
-    const interval = setInterval(checkStatus, 5000);
+    // Start checking after a delay to allow device to be fully registered
+    let intervalId: NodeJS.Timeout;
+    const timeout = setTimeout(() => {
+      intervalId = setInterval(checkStatus, 10000);
+    }, 5000); // Wait 5 seconds before starting status checks
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timeout);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [isRegistered]);
 
   const loadPlaylistImagesForSequence = async (sequence: number[]) => {
