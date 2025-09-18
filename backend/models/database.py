@@ -1,0 +1,63 @@
+from sqlalchemy import create_engine, MetaData
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from config.settings import settings, get_fresh_settings
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Create database engine
+def create_database_engine():
+    """Create database engine with MySQL connection"""
+    try:
+        # Use fresh settings to get current configuration
+        fresh_settings = get_fresh_settings()
+        database_url = f"mysql+pymysql://{fresh_settings.mysql_user}:{fresh_settings.mysql_password}@{fresh_settings.mysql_host}:{fresh_settings.mysql_port}/{fresh_settings.mysql_database}"
+        engine = create_engine(
+            database_url,
+            echo=False,  # Set to True for SQL debugging
+            pool_pre_ping=True,  # Verify connections before use
+            pool_recycle=3600,   # Recycle connections every hour
+        )
+        return engine
+    except Exception as e:
+        logger.error(f"Failed to create database engine: {e}")
+        raise
+
+# Create engine
+engine = create_database_engine()
+
+# Create session factory
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Create base class for models
+Base = declarative_base()
+
+# Metadata for table creation
+metadata = MetaData()
+
+def get_db():
+    """Dependency to get database session"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def create_tables():
+    """Create all tables"""
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Failed to create database tables: {e}")
+        raise
+
+def drop_tables():
+    """Drop all tables (for development/testing)"""
+    try:
+        Base.metadata.drop_all(bind=engine)
+        logger.info("Database tables dropped successfully")
+    except Exception as e:
+        logger.error(f"Failed to drop database tables: {e}")
+        raise

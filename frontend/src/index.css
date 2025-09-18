@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles for the app */
+body {
+  @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-50 min-h-screen;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  @apply font-semibold text-gray-800 dark:text-gray-100;
+}
+
+a {
+  @apply text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-200;
+}
+
+button {
+  @apply px-4 py-2 rounded-md font-medium transition-colors duration-200;
+}
+
+.btn-primary {
+  @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 text-gray-800 hover:bg-gray-300 focus:ring-2 focus:ring-gray-300 focus:border-gray-300;
+}
+
+.input-field {
+  @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500;
+}

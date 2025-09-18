@@ -1,0 +1,10 @@
+{
+  "mysql_host": "localhost",
+  "mysql_port": 3306,
+  "mysql_root_user": "root",
+  "mysql_root_password": "your_mysql_password",
+  "app_db_user": "glowworm",
+  "app_db_password": "your_app_password",
+  "admin_password": "your_admin_password",
+  "secret_key": "your_secret_key_here"
+}

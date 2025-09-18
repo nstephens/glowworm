@@ -1,0 +1,67 @@
+# Environment and configuration files
+.env
+.env.local
+.env.production
+.env.staging
+backend/.env
+frontend/.env
+
+# Local configuration backups
+*.local
+config/settings.json.local
+backend/config/settings.json.local
+
+# Development artifacts
+backend/venv/
+frontend/node_modules/
+frontend/dist/
+uploads/
+backend/logs/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Cookies and session files
+cookies.txt
+session=*
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.backup
+
+# Task Master files
+.taskmaster/
+.cursor/
+
+# Test files
+test_*.py
+*_test.py
