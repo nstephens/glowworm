@@ -21,12 +21,22 @@ class ConfigService:
     
     def _get_database_config_service(self) -> Optional[DatabaseConfigService]:
         """Get database config service, creating session if needed"""
+        # Check if setup is complete before attempting database access
+        from config.settings import is_configured
+        if not is_configured():
+            logger.debug("Skipping database config service - setup not complete")
+            return None
+            
         if self.db:
             # Use the provided session (from API endpoints)
             return DatabaseConfigService(self.db)
         else:
             # Create a new session for this operation
             try:
+                # Ensure database is initialized before creating session
+                from models.database import ensure_database_initialized
+                ensure_database_initialized()
+                
                 db = SessionLocal()
                 try:
                     return DatabaseConfigService(db)

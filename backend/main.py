@@ -39,13 +39,15 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting GlowWorm API...")
     
-    # Create database tables if configured
+    # Initialize database if configured
     if is_configured():
         try:
+            from models.database import initialize_database
+            initialize_database()
             create_tables()
-            logger.info("Database tables created/verified successfully")
+            logger.info("Database initialized and tables created/verified successfully")
         except Exception as e:
-            logger.error(f"Failed to create database tables: {e}")
+            logger.error(f"Failed to initialize database: {e}")
     
     # Start WebSocket heartbeat cleanup task
     import asyncio

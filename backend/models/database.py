@@ -24,11 +24,38 @@ def create_database_engine():
         logger.error(f"Failed to create database engine: {e}")
         raise
 
-# Create engine
-engine = create_database_engine()
+# Global variables for lazy initialization
+engine = None
+SessionLocal = None
 
-# Create session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+def initialize_database():
+    """Initialize database connection - only call after setup is complete"""
+    global engine, SessionLocal
+    
+    if engine is not None:
+        return  # Already initialized
+    
+    from config.settings import is_configured
+    if not is_configured():
+        logger.warning("Database initialization skipped - setup not complete")
+        return
+    
+    try:
+        logger.info("Initializing database connection...")
+        engine = create_database_engine()
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        logger.info("Database connection initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database connection: {e}")
+        raise
+
+def ensure_database_initialized():
+    """Ensure database is initialized before use"""
+    if engine is None or SessionLocal is None:
+        initialize_database()
+    
+    if engine is None or SessionLocal is None:
+        raise RuntimeError("Database not initialized - setup may not be complete")
 
 def refresh_database_connection():
     """Refresh database connection with updated settings"""
@@ -40,11 +67,12 @@ def refresh_database_connection():
         if engine:
             engine.dispose()
         
-        # Create new engine with fresh settings
-        engine = create_database_engine()
+        # Reset to None to force re-initialization
+        engine = None
+        SessionLocal = None
         
-        # Create new session factory
-        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        # Initialize with fresh settings
+        initialize_database()
         
         logger.info("Database connection refreshed successfully")
         return True
@@ -60,6 +88,7 @@ metadata = MetaData()
 
 def get_db():
     """Dependency to get database session"""
+    ensure_database_initialized()
     db = SessionLocal()
     try:
         yield db
@@ -69,6 +98,7 @@ def get_db():
 def create_tables():
     """Create all tables"""
     try:
+        ensure_database_initialized()
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables created successfully")
     except Exception as e:
