@@ -7,6 +7,13 @@ echo "🔧 Setting up GlowWorm Development Environment..."
 echo "📦 Setting up backend..."
 cd backend
 
+# Copy settings template if settings.json doesn't exist
+if [ ! -f "config/settings.json" ]; then
+    echo "Creating settings.json from template..."
+    cp config/settings.json.example config/settings.json
+    echo "⚠️  Please configure config/settings.json with your database credentials before first run"
+fi
+
 # Create virtual environment
 if [ ! -d "venv" ]; then
     echo "Creating Python virtual environment..."
