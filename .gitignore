@@ -11,6 +11,9 @@ frontend/.env
 config/settings.json.local
 backend/config/settings.json.local
 
+# Sensitive configuration files
+backend/config/settings.json
+
 # Development artifacts
 backend/venv/
 frontend/node_modules/
