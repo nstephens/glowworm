@@ -516,6 +516,7 @@ async def complete_setup(setup_data: SetupCompleteRequest):
             "mysql_port": setup_data.mysql_port,
             "app_db_user": setup_data.app_db_user,
             "app_db_password": setup_data.app_db_password,
+            "admin_password": setup_data.admin_password,
             "mysql_database": settings.mysql_database,
             "secret_key": secret_key,
             "setup_completed": True
