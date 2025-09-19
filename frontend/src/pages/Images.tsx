@@ -452,146 +452,39 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
         </div>
       </div>
 
-      {/* Legacy Content Area */}
-      <div className="animate-fade-in-up">
-        <div className="flex gap-6">
-        {/* Left Sidebar - Albums */}
-        <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200 flex-shrink-0">
-          <div className="p-4">
-            {/* Sidebar Header */}
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-900">Albums</h2>
-              <p className="text-sm text-gray-500 mt-1">Filter and manage your image collections</p>
-            </div>
-
-            {/* Album Management */}
-            <div className="mb-6">
-              <AlbumManager
-                albums={albums}
-                images={images}
-                onCreateAlbum={handleCreateAlbum}
-                onUpdateAlbum={handleUpdateAlbum}
-                onDeleteAlbum={handleDeleteAlbum}
-                onSelectAlbum={setSelectedAlbum}
-                selectedAlbum={selectedAlbum}
-              />
-            </div>
-
-            {/* Album Filter */}
-            <div className="pt-4 border-t border-gray-200">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Filter by Album</h3>
-              <div className="space-y-2">
-                <button
-                  onClick={() => setSelectedAlbum(null)}
-                  onDragOver={handleSidebarDragOver}
-                  onDrop={(e) => handleSidebarDrop(e, null)}
-                  onDragEnter={() => setDragOverAlbum(null)}
-                  onDragLeave={() => setDragOverAlbum(null)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
-                    !selectedAlbum 
-                      ? 'bg-primary-100 text-primary-700' 
-                      : dragOverAlbum === null
-                      ? 'bg-blue-50 border-2 border-dashed border-blue-300 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  All Images ({images.length})
-                </button>
-                <button
-                  onClick={() => setSelectedAlbum({ id: 'no-album', name: 'Not in Album' } as any)}
-                  onDragOver={handleSidebarDragOver}
-                  onDrop={(e) => handleSidebarDrop(e, 'no-album')}
-                  onDragEnter={() => setDragOverAlbum('no-album')}
-                  onDragLeave={() => setDragOverAlbum(null)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
-                    selectedAlbum?.id === 'no-album' 
-                      ? 'bg-primary-100 text-primary-700' 
-                      : dragOverAlbum === 'no-album'
-                      ? 'bg-blue-50 border-2 border-dashed border-blue-300 text-blue-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  Not in Album ({images.filter(img => !img.album_id).length})
-                </button>
-                {albums.map(album => (
-                  <button
-                    key={album.id}
-                    onClick={() => setSelectedAlbum(album)}
-                    onDragOver={handleSidebarDragOver}
-                    onDrop={(e) => handleSidebarDrop(e, album.id)}
-                    onDragEnter={() => setDragOverAlbum(album.id)}
-                    onDragLeave={() => setDragOverAlbum(null)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
-                      selectedAlbum?.id === album.id 
-                        ? 'bg-primary-100 text-primary-700' 
-                        : dragOverAlbum === album.id
-                        ? 'bg-blue-50 border-2 border-dashed border-blue-300 text-blue-700'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    {album.name} ({images.filter(img => img.album_id === album.id).length})
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="p-6">
-            <ImageGallery
-              images={images}
-              albums={albums}
-              selectedAlbum={selectedAlbum?.id === 'no-album' ? 'no-album' : selectedAlbum?.id || null}
-              onImageSelect={handleImageSelect}
-              onImageDelete={handleImageDelete}
-              onBulkDelete={handleBulkDelete}
-              onImageMove={handleImageMove}
-              onUploadClick={() => setShowUploadModal(true)}
-            />
-          </div>
-          
-          {/* Drag Overlay */}
-          {dragOverAlbum !== null && (
-            <div className="absolute inset-0 bg-blue-500/10 border-2 border-dashed border-blue-400 flex items-center justify-center pointer-events-none">
-              <div className="bg-white rounded-lg shadow-lg p-4 flex items-center space-x-3">
-                <Folder className="w-6 h-6 text-blue-600" />
-                <span className="text-blue-700 font-medium">
-                  Drop to move to {dragOverAlbum === 'no-album' ? 'Not in Album' : 
-                    dragOverAlbum === null ? 'All Images' : 
-                    albums.find(a => a.id === dragOverAlbum)?.name || 'Album'}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-        </div>
-      </div>
 
       {/* Upload Modal */}
       {showUploadModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Upload Images</h3>
-              <button
-                onClick={() => setShowUploadModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <Plus className="w-6 h-6 rotate-45" />
-              </button>
-            </div>
-            <ImageUpload
-              onUploadComplete={(newImages) => {
-                handleUploadComplete(newImages);
-                setShowUploadModal(false);
-              }}
-              selectedAlbumId={selectedAlbum?.id}
-              albums={albums}
-              onCreateAlbum={handleCreateAlbum}
-            />
-          </div>
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto mx-4 border-0 shadow-2xl">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl">Upload Images</CardTitle>
+                  <CardDescription>Add new photos to your library</CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowUploadModal(false)}
+                  className="h-8 w-8 p-0"
+                >
+                  <Plus className="w-4 h-4 rotate-45" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ImageUpload
+                onUploadComplete={(newImages) => {
+                  handleUploadComplete(newImages);
+                  setShowUploadModal(false);
+                }}
+                selectedAlbumId={selectedAlbum?.id}
+                albums={albums}
+                onCreateAlbum={handleCreateAlbum}
+              />
+            </CardContent>
+          </Card>
         </div>
       )}
 
