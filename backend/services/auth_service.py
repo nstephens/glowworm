@@ -109,7 +109,17 @@ class AuthService:
                       ip_address: Optional[str] = None, device_name: Optional[str] = None,
                       device_type: str = "admin") -> UserSession:
         """Create a new user session"""
+        logger.info(f"create_session: Creating session for user: {user.username}, device_type: {device_type}")
+        
         # Deactivate old sessions for the same device type
+        old_sessions_count = self.db.query(UserSession).filter(
+            UserSession.user_id == user.id,
+            UserSession.device_type == device_type,
+            UserSession.is_active == True
+        ).count()
+        
+        logger.info(f"create_session: Deactivating {old_sessions_count} old sessions for user: {user.username}")
+        
         self.db.query(UserSession).filter(
             UserSession.user_id == user.id,
             UserSession.device_type == device_type,
@@ -117,6 +127,7 @@ class AuthService:
         ).update({"is_active": False})
         
         # Create new session
+        logger.info(f"create_session: Creating UserSession object...")
         session = UserSession.create_session(
             user_id=user.id,
             user_agent=user_agent,
@@ -125,11 +136,13 @@ class AuthService:
             device_type=device_type
         )
         
+        logger.info(f"create_session: Session object created - token: {session.session_token[:8]}...")
+        logger.info(f"create_session: Adding session to database...")
         self.db.add(session)
         self.db.commit()
         self.db.refresh(session)
         
-        logger.info(f"Created session for user: {user.username}, device_type: {device_type}")
+        logger.info(f"create_session: Session committed - ID: {session.id}, token: {session.session_token[:8]}...")
         return session
     
     def get_session_by_token(self, session_token: str) -> Optional[UserSession]:
