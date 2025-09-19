@@ -436,21 +436,24 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
           <ImageIcon className="w-5 h-5 text-chart-1" />
           {selectedAlbum ? selectedAlbum.name : 'All Images'}
         </h2>
-        <div className="min-h-full">{!headerContent && (
-            </div>
-            <Button
-              onClick={() => setShowUploadModal(true)}
-              className="bg-gradient-to-r from-primary to-primary/90 shadow-lg"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Upload Images</span>
-            </button>
-          </div>
+        
+        {/* Image Gallery Component */}
+        <div className="min-h-full">
+          <ImageGallery
+            images={images}
+            albums={albums}
+            selectedAlbum={selectedAlbum?.id === 'no-album' ? 'no-album' : selectedAlbum?.id || null}
+            onImageSelect={handleImageSelect}
+            onImageDelete={handleImageDelete}
+            onBulkDelete={handleBulkDelete}
+            onImageMove={handleImageMove}
+            onUploadClick={() => setShowUploadModal(true)}
+          />
         </div>
-      )}
+      </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto">
+      {/* Legacy Content Area */}
+      <div className="animate-fade-in-up">
         <div className="flex gap-6">
         {/* Left Sidebar - Albums */}
         <div className="w-80 bg-white rounded-lg shadow-sm border border-gray-200 flex-shrink-0">
