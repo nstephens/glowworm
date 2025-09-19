@@ -72,19 +72,38 @@ class AuthService:
     
     def authenticate_user(self, username: str, password: str) -> Optional[User]:
         """Authenticate user with username and password"""
-        user = self.db.query(User).filter(User.username == username).first()
+        logger.info(f"Attempting authentication for username: {username}")
         
-        if not user or not user.is_active:
+        try:
+            user = self.db.query(User).filter(User.username == username).first()
+            logger.info(f"User lookup result: {'Found' if user else 'Not found'}")
+            
+            if not user:
+                logger.warning(f"User '{username}' not found in database")
+                return None
+                
+            if not user.is_active:
+                logger.warning(f"User '{username}' is not active")
+                return None
+            
+            logger.info(f"Verifying password for user: {username}")
+            password_valid = password_manager.verify_password(password, user.hashed_password)
+            logger.info(f"Password verification result: {'Valid' if password_valid else 'Invalid'}")
+            
+            if not password_valid:
+                logger.warning(f"Invalid password for user: {username}")
+                return None
+            
+            # Update last login
+            user.last_login = datetime.utcnow()
+            self.db.commit()
+            
+            logger.info(f"Authentication successful for user: {username}")
+            return user
+            
+        except Exception as e:
+            logger.error(f"Error during authentication for user '{username}': {e}")
             return None
-        
-        if not password_manager.verify_password(password, user.hashed_password):
-            return None
-        
-        # Update last login
-        user.last_login = datetime.utcnow()
-        self.db.commit()
-        
-        return user
     
     def create_session(self, user: User, user_agent: Optional[str] = None, 
                       ip_address: Optional[str] = None, device_name: Optional[str] = None,
