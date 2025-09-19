@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Card, CardContent } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
 import { Upload, Folder, Plus, Search, Filter, Settings, ImageIcon, Grid3X3, List, FolderOpen, MoreHorizontal, Calendar, HardDrive } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
@@ -108,6 +109,10 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
   const showUploadModal = propShowUploadModal !== undefined ? propShowUploadModal : localShowUploadModal;
   const setShowUploadModal = propSetShowUploadModal || setLocalShowUploadModal;
   const [dragOverAlbum, setDragOverAlbum] = useState<number | string | null>(null);
+  
+  // Album creation modal state
+  const [showAlbumModal, setShowAlbumModal] = useState(false);
+  const [newAlbumName, setNewAlbumName] = useState('');
 
   // Load data on component mount
   useEffect(() => {
@@ -174,6 +179,21 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
     } catch (err: any) {
       showError('Create Album Failed', err.message || 'Failed to create album');
       throw new Error(err.message || 'Failed to create album');
+    }
+  };
+
+  const handleCreateAlbumFromModal = async () => {
+    if (!newAlbumName.trim()) {
+      showError('Invalid Album Name', 'Please enter a valid album name');
+      return;
+    }
+
+    try {
+      await handleCreateAlbum(newAlbumName.trim());
+      setShowAlbumModal(false);
+      setNewAlbumName('');
+    } catch (err) {
+      // Error already handled in handleCreateAlbum
     }
   };
 
@@ -390,10 +410,21 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
 
       {/* Albums Section */}
       <div className="animate-fade-in-up">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <FolderOpen className="w-5 h-5 text-chart-2" />
-          Albums
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <FolderOpen className="w-5 h-5 text-chart-2" />
+            Albums
+          </h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAlbumModal(true)}
+            className="shadow-sm"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create Album
+          </Button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card className="gallery-item border-0 shadow-lg bg-card/50 backdrop-blur-sm cursor-pointer" onClick={() => setSelectedAlbum(null)}>
             <CardContent className="p-4">
@@ -502,6 +533,74 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
         cancelText="Cancel"
         variant="danger"
       />
+
+      {/* Create Album Modal */}
+      {showAlbumModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4 border-0 shadow-2xl">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl">Create Album</CardTitle>
+                  <CardDescription>Create a new album to organize your images</CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowAlbumModal(false);
+                    setNewAlbumName('');
+                  }}
+                  className="h-8 w-8 p-0"
+                >
+                  <Plus className="w-4 h-4 rotate-45" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="album-name">Album Name</Label>
+                <Input
+                  id="album-name"
+                  placeholder="Enter album name..."
+                  value={newAlbumName}
+                  onChange={(e) => setNewAlbumName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleCreateAlbumFromModal();
+                    }
+                    if (e.key === 'Escape') {
+                      setShowAlbumModal(false);
+                      setNewAlbumName('');
+                    }
+                  }}
+                  autoFocus
+                  className="bg-background/50 border-border/50"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowAlbumModal(false);
+                    setNewAlbumName('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateAlbumFromModal}
+                  disabled={!newAlbumName.trim()}
+                  className="shadow-lg"
+                >
+                  <Folder className="w-4 h-4 mr-2" />
+                  Create Album
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Alerts */}
       <AlertContainer alerts={alerts} onRemove={removeAlert} />
