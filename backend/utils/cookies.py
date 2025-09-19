@@ -39,7 +39,10 @@ class CookieManager:
         if max_age is None:
             max_age = settings.cookie_max_age
         
+        logger.info(f"set_auth_cookies: Setting cookies - session: {session_token[:8]}..., max_age: {max_age}")
+        
         cookie_config = CookieManager._get_cookie_config()
+        logger.info(f"set_auth_cookies: Cookie config: {cookie_config}")
         
         # Set session cookie
         response.set_cookie(
@@ -48,6 +51,7 @@ class CookieManager:
             max_age=max_age,
             **cookie_config
         )
+        logger.info(f"set_auth_cookies: Set session cookie: {CookieManager.SESSION_COOKIE}={session_token[:8]}...")
         
         # Set refresh cookie if provided
         if refresh_token:
@@ -76,6 +80,11 @@ class CookieManager:
         session_token = request.cookies.get(CookieManager.SESSION_COOKIE)
         refresh_token = request.cookies.get(CookieManager.REFRESH_COOKIE)
         csrf_token = request.cookies.get(CookieManager.CSRF_COOKIE)
+        
+        logger.info(f"get_auth_cookies: Retrieved cookies - session: {'present' if session_token else 'missing'}, refresh: {'present' if refresh_token else 'missing'}, csrf: {'present' if csrf_token else 'missing'}")
+        if session_token:
+            logger.info(f"get_auth_cookies: Session token: {session_token[:8]}...")
+        
         return session_token, refresh_token, csrf_token
     
     @staticmethod
