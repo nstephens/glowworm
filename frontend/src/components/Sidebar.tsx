@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -15,47 +15,75 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-
-const navigation = [
-  {
-    name: 'Dashboard',
-    href: '/admin',
-    icon: LayoutDashboard,
-    current: false,
-  },
-  {
-    name: 'Images',
-    href: '/admin/images',
-    icon: Images,
-    current: false,
-    badge: '100',
-  },
-  {
-    name: 'Playlists',
-    href: '/admin/playlists',
-    icon: Play,
-    current: false,
-    badge: '1',
-  },
-  {
-    name: 'Displays',
-    href: '/admin/displays',
-    icon: Monitor,
-    current: false,
-    badge: '1',
-  },
-  {
-    name: 'Settings',
-    href: '/admin/settings',
-    icon: Settings,
-    current: false,
-  },
-];
+import { apiService } from '../services/api';
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const [counts, setCounts] = useState({
+    images: 0,
+    playlists: 0,
+    displays: 0,
+  });
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Load counts for badges
+  useEffect(() => {
+    const loadCounts = async () => {
+      try {
+        const [imagesResponse, playlistsResponse, devicesResponse] = await Promise.all([
+          apiService.getImages().catch(() => ({ data: [] })),
+          apiService.getPlaylists().catch(() => ({ playlists: [] })),
+          apiService.getDevices().catch(() => []),
+        ]);
+
+        setCounts({
+          images: imagesResponse.data?.length || 0,
+          playlists: playlistsResponse.playlists?.length || 0,
+          displays: Array.isArray(devicesResponse) ? devicesResponse.filter(d => d.status === 'authorized').length : 0,
+        });
+      } catch (error) {
+        console.log('Could not load sidebar counts:', error);
+      }
+    };
+
+    loadCounts();
+    
+    // Refresh counts every 30 seconds
+    const interval = setInterval(loadCounts, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const navigation = [
+    {
+      name: 'Dashboard',
+      href: '/admin',
+      icon: LayoutDashboard,
+    },
+    {
+      name: 'Images',
+      href: '/admin/images',
+      icon: Images,
+      badge: counts.images > 0 ? counts.images.toString() : undefined,
+    },
+    {
+      name: 'Playlists',
+      href: '/admin/playlists',
+      icon: Play,
+      badge: counts.playlists > 0 ? counts.playlists.toString() : undefined,
+    },
+    {
+      name: 'Displays',
+      href: '/admin/displays',
+      icon: Monitor,
+      badge: counts.displays > 0 ? counts.displays.toString() : undefined,
+    },
+    {
+      name: 'Settings',
+      href: '/admin/settings',
+      icon: Settings,
+    },
+  ];
 
   const handleLogout = async () => {
     try {
