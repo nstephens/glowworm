@@ -65,4 +65,5 @@ Thumbs.db
 # Test files
 test_*.py
 *_test.py
-.cursor/mcp.json
+# Cursor IDE configuration (may contain API keys)
+.cursor/
