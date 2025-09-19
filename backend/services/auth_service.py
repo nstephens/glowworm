@@ -72,11 +72,11 @@ class AuthService:
     
     def authenticate_user(self, username: str, password: str) -> Optional[User]:
         """Authenticate user with username and password"""
-        logger.info(f"Attempting authentication for username: {username}")
+        logger.debug(f"Attempting authentication for username: {username}")
         
         try:
             user = self.db.query(User).filter(User.username == username).first()
-            logger.info(f"User lookup result: {'Found' if user else 'Not found'}")
+            logger.debug(f"User lookup result: {'Found' if user else 'Not found'}")
             
             if not user:
                 logger.warning(f"User '{username}' not found in database")
@@ -86,9 +86,9 @@ class AuthService:
                 logger.warning(f"User '{username}' is not active")
                 return None
             
-            logger.info(f"Verifying password for user: {username}")
+            logger.debug(f"Verifying password for user: {username}")
             password_valid = password_manager.verify_password(password, user.hashed_password)
-            logger.info(f"Password verification result: {'Valid' if password_valid else 'Invalid'}")
+            logger.debug(f"Password verification result: {'Valid' if password_valid else 'Invalid'}")
             
             if not password_valid:
                 logger.warning(f"Invalid password for user: {username}")
@@ -109,7 +109,7 @@ class AuthService:
                       ip_address: Optional[str] = None, device_name: Optional[str] = None,
                       device_type: str = "admin") -> UserSession:
         """Create a new user session"""
-        logger.info(f"create_session: Creating session for user: {user.username}, device_type: {device_type}")
+        logger.debug(f"Creating session for user: {user.username}, device_type: {device_type}")
         
         # Deactivate old sessions for the same device type
         old_sessions_count = self.db.query(UserSession).filter(
@@ -118,16 +118,15 @@ class AuthService:
             UserSession.is_active == True
         ).count()
         
-        logger.info(f"create_session: Deactivating {old_sessions_count} old sessions for user: {user.username}")
-        
-        self.db.query(UserSession).filter(
-            UserSession.user_id == user.id,
-            UserSession.device_type == device_type,
-            UserSession.is_active == True
-        ).update({"is_active": False})
+        if old_sessions_count > 0:
+            logger.debug(f"Deactivating {old_sessions_count} old sessions for user: {user.username}")
+            self.db.query(UserSession).filter(
+                UserSession.user_id == user.id,
+                UserSession.device_type == device_type,
+                UserSession.is_active == True
+            ).update({"is_active": False})
         
         # Create new session
-        logger.info(f"create_session: Creating UserSession object...")
         session = UserSession.create_session(
             user_id=user.id,
             user_agent=user_agent,
@@ -136,18 +135,16 @@ class AuthService:
             device_type=device_type
         )
         
-        logger.info(f"create_session: Session object created - token: {session.session_token[:8]}...")
-        logger.info(f"create_session: Adding session to database...")
         self.db.add(session)
         self.db.commit()
         self.db.refresh(session)
         
-        logger.info(f"create_session: Session committed - ID: {session.id}, token: {session.session_token[:8]}...")
+        logger.info(f"Created session for user: {user.username}, device_type: {device_type}")
         return session
     
     def get_session_by_token(self, session_token: str) -> Optional[UserSession]:
         """Get active session by token"""
-        logger.info(f"get_session_by_token: Querying database for active session: {session_token[:8]}...")
+        logger.debug(f"Querying database for active session: {session_token[:8]}...")
         
         session = self.db.query(UserSession).filter(
             UserSession.session_token == session_token,
@@ -155,14 +152,14 @@ class AuthService:
         ).first()
         
         if not session:
-            logger.warning(f"get_session_by_token: No active session found for token: {session_token[:8]}...")
+            logger.debug(f"No active session found for token: {session_token[:8]}...")
             return None
             
         if session.is_expired():
-            logger.warning(f"get_session_by_token: Session {session_token[:8]}... is expired")
+            logger.warning(f"Session {session_token[:8]}... is expired")
             return None
         
-        logger.info(f"get_session_by_token: Found valid session for user: {session.user.username}")
+        logger.debug(f"Found valid session for user: {session.user.username}")
         
         # Update last used timestamp
         session.last_used = datetime.utcnow()
@@ -172,14 +169,14 @@ class AuthService:
     
     def get_user_by_session(self, session_token: str) -> Optional[User]:
         """Get user by session token"""
-        logger.info(f"get_user_by_session: Looking up session for token: {session_token[:8]}...")
+        logger.debug(f"Looking up session for token: {session_token[:8]}...")
         
         session = self.get_session_by_token(session_token)
         if not session:
-            logger.warning(f"get_user_by_session: No session found for token: {session_token[:8]}...")
+            logger.debug(f"No session found for token: {session_token[:8]}...")
             return None
         
-        logger.info(f"get_user_by_session: Found session for user: {session.user.username}")
+        logger.debug(f"Found session for user: {session.user.username}")
         return session.user
     
     def refresh_session(self, refresh_token: str) -> Optional[Tuple[UserSession, User]]:

@@ -14,142 +14,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
-@router.get("/test-debug")
-async def test_debug():
-    """Test endpoint to verify debug logging is working"""
-    logger.info("TEST: Debug logging is working!")
-    return {"message": "Debug test successful", "status": "working"}
-
-@router.post("/login-simple")
-async def login_simple(
-    request: Request,
-    response: Response,
-    login_data: dict
-):
-    """Simple login endpoint without database dependencies for testing"""
-    username = login_data.get("username")
-    password = login_data.get("password") 
-    device_name = login_data.get("device_name")
-    device_type = login_data.get("device_type", "admin")
-    
-    logger.info(f"LOGIN-SIMPLE: Starting login attempt for username: {username}")
-    
-    try:
-        # Manual database connection
-        from models.database import engine, SessionLocal
-        from sqlalchemy.orm import sessionmaker
-        
-        if engine is None:
-            logger.error("LOGIN-SIMPLE: Engine is None - database not initialized")
-            return {"success": False, "message": "Database not initialized"}
-        
-        # Create manual session
-        Session = sessionmaker(bind=engine)
-        db = Session()
-        
-        try:
-            from services.auth_service import AuthService
-            auth_service = AuthService(db)
-            
-            # Test authentication
-            user = auth_service.authenticate_user(username, password)
-            if not user:
-                logger.warning(f"LOGIN-SIMPLE: Authentication failed for: {username}")
-                return {"success": False, "message": "Invalid credentials"}
-            
-            logger.info(f"LOGIN-SIMPLE: Authentication successful for: {user.username}")
-            
-            # Test session creation
-            session, csrf_token = auth_service.create_session_with_csrf(
-                user=user,
-                user_agent=request.headers.get("user-agent"),
-                ip_address=request.client.host if request.client else None,
-                device_name=device_name,
-                device_type=device_type
-            )
-            
-            logger.info(f"LOGIN-SIMPLE: Session created successfully - token: {session.session_token[:8]}...")
-            
-            # Test cookie setting
-            cookie_manager.set_auth_cookies(
-                response=response,
-                session_token=session.session_token,
-                refresh_token=session.refresh_token,
-                csrf_token=csrf_token
-            )
-            
-            logger.info(f"LOGIN-SIMPLE: Cookies set successfully")
-            
-            return {
-                "success": True, 
-                "message": "Login successful",
-                "session_token": session.session_token[:8] + "...",
-                "user": user.username
-            }
-            
-        finally:
-            db.close()
-            
-    except Exception as e:
-        logger.error(f"LOGIN-SIMPLE: Error: {e}")
-        import traceback
-        logger.error(f"LOGIN-SIMPLE: Traceback: {traceback.format_exc()}")
-        return {"success": False, "message": f"Error: {str(e)}"}
-
-@router.get("/me-simple")
-async def get_current_user_simple(request: Request):
-    """Simple auth check endpoint without dependencies for testing"""
-    logger.info("ME-SIMPLE: Starting auth check...")
-    
-    try:
-        # Manual database connection
-        from models.database import engine
-        from sqlalchemy.orm import sessionmaker
-        
-        if engine is None:
-            logger.error("ME-SIMPLE: Engine is None - database not initialized")
-            return {"authenticated": False, "message": "Database not initialized"}
-        
-        # Create manual session
-        Session = sessionmaker(bind=engine)
-        db = Session()
-        
-        try:
-            from utils.cookies import cookie_manager
-            from services.auth_service import AuthService
-            
-            # Get cookies manually
-            session_token, refresh_token, csrf_token = cookie_manager.get_auth_cookies(request)
-            logger.info(f"ME-SIMPLE: Cookies - session: {'present' if session_token else 'missing'}")
-            
-            if not session_token:
-                logger.warning("ME-SIMPLE: No session token found")
-                return {"authenticated": False, "message": "No session token"}
-            
-            # Check session manually
-            auth_service = AuthService(db)
-            user = auth_service.get_user_by_session(session_token)
-            
-            if not user:
-                logger.warning(f"ME-SIMPLE: Invalid session token: {session_token[:8]}...")
-                return {"authenticated": False, "message": "Invalid session"}
-            
-            logger.info(f"ME-SIMPLE: Authentication successful for: {user.username}")
-            return {
-                "authenticated": True,
-                "user": user.username,
-                "session_token": session_token[:8] + "..."
-            }
-            
-        finally:
-            db.close()
-            
-    except Exception as e:
-        logger.error(f"ME-SIMPLE: Error: {e}")
-        import traceback
-        logger.error(f"ME-SIMPLE: Traceback: {traceback.format_exc()}")
-        return {"authenticated": False, "message": f"Error: {str(e)}"}
-
 # Pydantic models for request/response
 class LoginRequest(BaseModel):
     username: str = Field(..., description="Username")
@@ -207,31 +71,25 @@ async def login(
     db: Session = Depends(get_db)
 ):
     """Login user and create session"""
-    logger.info(f"LOGIN: Starting login attempt for username: {login_data.username}")
+    logger.debug(f"Starting login attempt for username: {login_data.username}")
     
     try:
-        logger.info("LOGIN: Creating AuthService...")
         auth_service = AuthService(db)
         
         # Authenticate user
-        logger.info(f"LOGIN: Calling authenticate_user for: {login_data.username}")
         user = auth_service.authenticate_user(login_data.username, login_data.password)
-        logger.info(f"LOGIN: Authentication result: {'Success' if user else 'Failed'}")
         
         if not user:
-            logger.warning(f"LOGIN: Authentication failed for username: {login_data.username}")
+            logger.warning(f"Authentication failed for username: {login_data.username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid username or password"
             )
         
         # Create session
-        logger.info("LOGIN: Preparing session creation...")
         user_agent = request.headers.get("user-agent")
         ip_address = request.client.host if request.client else None
-        logger.info(f"LOGIN: User-Agent: {user_agent}, IP: {ip_address}")
         
-        logger.info("LOGIN: Calling create_session_with_csrf...")
         session, csrf_token = auth_service.create_session_with_csrf(
             user=user,
             user_agent=user_agent,
@@ -239,13 +97,8 @@ async def login(
             device_name=login_data.device_name,
             device_type=login_data.device_type
         )
-        logger.info(f"LOGIN: Session created - ID: {session.id}, token: {session.session_token[:8]}...")
-        
-        # Debug CSRF token generation
-        logger.info(f"LOGIN: Generated CSRF token: {csrf_token}")
         
         # Set authentication cookies
-        logger.info("LOGIN: Setting authentication cookies...")
         cookie_manager.set_auth_cookies(
             response=response,
             session_token=session.session_token,
@@ -253,7 +106,7 @@ async def login(
             csrf_token=csrf_token
         )
         
-        logger.info(f"LOGIN: User {user.username} logged in successfully")
+        logger.info(f"User {user.username} logged in successfully")
         
         return LoginResponse(
             success=True,
@@ -261,14 +114,10 @@ async def login(
             user=UserResponse(**user.to_dict())
         )
         
-    except HTTPException as he:
-        logger.info(f"LOGIN: HTTPException raised - status: {he.status_code}, detail: {he.detail}")
+    except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"LOGIN: Unexpected error during login: {e}")
-        logger.error(f"LOGIN: Exception type: {type(e).__name__}")
-        import traceback
-        logger.error(f"LOGIN: Traceback: {traceback.format_exc()}")
+        logger.error(f"Unexpected error during login: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Login failed"
