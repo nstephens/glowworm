@@ -24,10 +24,15 @@ async def test_debug():
 async def login_simple(
     request: Request,
     response: Response,
-    login_data: LoginRequest
+    login_data: dict
 ):
     """Simple login endpoint without database dependencies for testing"""
-    logger.info(f"LOGIN-SIMPLE: Starting login attempt for username: {login_data.username}")
+    username = login_data.get("username")
+    password = login_data.get("password") 
+    device_name = login_data.get("device_name")
+    device_type = login_data.get("device_type", "admin")
+    
+    logger.info(f"LOGIN-SIMPLE: Starting login attempt for username: {username}")
     
     try:
         # Manual database connection
@@ -47,9 +52,9 @@ async def login_simple(
             auth_service = AuthService(db)
             
             # Test authentication
-            user = auth_service.authenticate_user(login_data.username, login_data.password)
+            user = auth_service.authenticate_user(username, password)
             if not user:
-                logger.warning(f"LOGIN-SIMPLE: Authentication failed for: {login_data.username}")
+                logger.warning(f"LOGIN-SIMPLE: Authentication failed for: {username}")
                 return {"success": False, "message": "Invalid credentials"}
             
             logger.info(f"LOGIN-SIMPLE: Authentication successful for: {user.username}")
@@ -59,8 +64,8 @@ async def login_simple(
                 user=user,
                 user_agent=request.headers.get("user-agent"),
                 ip_address=request.client.host if request.client else None,
-                device_name=login_data.device_name,
-                device_type=login_data.device_type
+                device_name=device_name,
+                device_type=device_type
             )
             
             logger.info(f"LOGIN-SIMPLE: Session created successfully - token: {session.session_token[:8]}...")
