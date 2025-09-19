@@ -24,7 +24,7 @@ class CookieManager:
             "secure": settings.cookie_secure,  # Secure in production
             "samesite": "lax",  # Balance security and functionality
             "path": "/",  # Restrict to application root
-            # Don't set domain to avoid subdomain issues
+            "domain": "10.10.10.2",  # Allow cross-port access on same IP
         }
     
     @staticmethod
