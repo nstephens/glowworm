@@ -37,10 +37,22 @@ export function Sidebar() {
           apiService.getDevices().catch(() => []),
         ]);
 
+        console.log('Sidebar API Responses:', {
+          imagesResponse,
+          playlistsResponse,
+          devicesResponse
+        });
+
+        const imageCount = imagesResponse.data?.length || 0;
+        const playlistCount = playlistsResponse.playlists?.length || playlistsResponse.count || 0;
+        const displayCount = Array.isArray(devicesResponse) ? devicesResponse.filter(d => d.status === 'authorized').length : 0;
+
+        console.log('Sidebar Counts:', { imageCount, playlistCount, displayCount });
+
         setCounts({
-          images: imagesResponse.data?.length || 0,
-          playlists: playlistsResponse.playlists?.length || 0,
-          displays: Array.isArray(devicesResponse) ? devicesResponse.filter(d => d.status === 'authorized').length : 0,
+          images: imageCount,
+          playlists: playlistCount,
+          displays: displayCount,
         });
       } catch (error) {
         console.log('Could not load sidebar counts:', error);
