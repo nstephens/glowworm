@@ -456,7 +456,7 @@ export const FullscreenSlideshow: React.FC<FullscreenSlideshowProps> = ({
               <img
                 src={currentImage.url}
                 alt={currentImage.original_filename}
-                className="w-full h-full object-cover transition-all duration-[1500ms] ease-in-out"
+                className="w-full h-full object-cover transition-all duration-1000 ease-in-out"
                 style={{ 
                   opacity: topImageOpacity,
                   transform: topImageTransform
@@ -474,7 +474,7 @@ export const FullscreenSlideshow: React.FC<FullscreenSlideshowProps> = ({
               <img
                 src={nextImageData.url}
                 alt={nextImageData.original_filename}
-                className="w-full h-full object-cover transition-all duration-[1500ms] ease-in-out"
+                className="w-full h-full object-cover transition-all duration-1000 ease-in-out"
                 style={{ 
                   opacity: bottomImageOpacity,
                   transform: bottomImageTransform
@@ -489,7 +489,7 @@ export const FullscreenSlideshow: React.FC<FullscreenSlideshowProps> = ({
           <img
             src={currentImage.url}
             alt={currentImage.original_filename}
-            className="w-full h-full object-cover transition-all duration-[1500ms] ease-in-out"
+            className="w-full h-full object-cover transition-all duration-1000 ease-in-out"
             style={{ opacity: imageOpacity }}
             onLoad={() => {}}
             onError={() => {}}
