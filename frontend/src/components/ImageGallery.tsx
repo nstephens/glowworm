@@ -563,6 +563,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   alt={image.original_filename}
                   className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                   loading="lazy"
+                  key={`thumb-${image.id}-${image.album_id}`}
                 />
                 
                 {/* Gradient Overlay */}
