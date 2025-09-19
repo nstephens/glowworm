@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .test-button {
+            background-color: #28a745;
+        }
+        .test-button:hover {
+            background-color: #1e7e34;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Login Debug Test Page</h1>
+        <p>This page tests the authentication endpoints to debug the login issue.</p>
+        
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <input type="text" id="username" value="admin" placeholder="Enter username">
+        </div>
+        
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" placeholder="Enter password">
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <button onclick="testDebug()" class="test-button">1. Test Debug Logging</button>
+            <button onclick="testSimpleLogin()" class="test-button">2. Test Simple Login</button>
+            <button onclick="testSimpleAuth()" class="test-button">3. Test Simple Auth Check</button>
+            <button onclick="testRegularLogin()">4. Test Regular Login</button>
+            <button onclick="testRegularAuth()">5. Test Regular Auth Check</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://10.10.10.2:8001';
+        
+        function showResult(title, data, isError = false) {
+            const resultDiv = document.getElementById('result');
+            const className = isError ? 'error' : (data.success !== false ? 'success' : 'info');
+            resultDiv.innerHTML = `
+                <div class="result ${className}">
+                    <strong>${title}</strong>
+                    ${JSON.stringify(data, null, 2)}
+                </div>
+            `;
+        }
+        
+        async function testDebug() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/test-debug`);
+                const data = await response.json();
+                showResult('🔧 Debug Test Result:', data);
+            } catch (error) {
+                showResult('🔧 Debug Test Error:', {error: error.message}, true);
+            }
+        }
+        
+        async function testSimpleLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                showResult('❌ Error:', {error: 'Please enter username and password'}, true);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login-simple`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                        device_name: 'test-browser',
+                        device_type: 'admin'
+                    })
+                });
+                const data = await response.json();
+                showResult('🔐 Simple Login Result:', data);
+            } catch (error) {
+                showResult('🔐 Simple Login Error:', {error: error.message}, true);
+            }
+        }
+        
+        async function testSimpleAuth() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/me-simple`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                showResult('👤 Simple Auth Check Result:', data);
+            } catch (error) {
+                showResult('👤 Simple Auth Check Error:', {error: error.message}, true);
+            }
+        }
+        
+        async function testRegularLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                showResult('❌ Error:', {error: 'Please enter username and password'}, true);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                        device_name: 'test-browser',
+                        device_type: 'admin'
+                    })
+                });
+                const data = await response.json();
+                showResult('🔑 Regular Login Result:', data);
+            } catch (error) {
+                showResult('🔑 Regular Login Error:', {error: error.message}, true);
+            }
+        }
+        
+        async function testRegularAuth() {
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/me`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                showResult('👥 Regular Auth Check Result:', data);
+            } catch (error) {
+                showResult('👥 Regular Auth Check Error:', {error: error.message}, true);
+            }
+        }
+    </script>
+</body>
+</html>
