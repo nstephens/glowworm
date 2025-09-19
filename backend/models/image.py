@@ -51,7 +51,7 @@ class Image(Base):
             "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
             "playlist_id": self.playlist_id,
             "url": f"http://10.10.10.2:8001/api/images/{self.id}/file",
-            "thumbnail_url": f"http://10.10.10.2:8001/api/images/{self.id}/file?size=medium"
+            "thumbnail_url": f"http://10.10.10.2:8001/api/images/{self.id}/file?size=medium&v={self.id}_{self.album_id or 0}"
         }
 
     @property
