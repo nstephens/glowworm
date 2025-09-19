@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -18,27 +18,68 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Clear all authentication state when login page mounts
+  useEffect(() => {
+    const clearAllAuthState = async () => {
+      try {
+        console.log('🧹 Clearing all authentication state on login page mount');
+        
+        // Clear localStorage
+        localStorage.removeItem('glowworm_last_auth');
+        
+        // Clear any existing sessions via logout API
+        try {
+          await apiService.logout();
+        } catch (e) {
+          console.log('Logout call failed (expected if no session):', e);
+        }
+        
+        // Clear all cookies by setting them to expire
+        document.cookie = 'glowworm_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=10.10.10.2;';
+        document.cookie = 'glowworm_refresh=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=10.10.10.2;';
+        document.cookie = 'glowworm_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=10.10.10.2;';
+        
+        // Also clear without domain in case they were set without domain
+        document.cookie = 'glowworm_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'glowworm_refresh=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'glowworm_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        
+        console.log('✅ Cleared all authentication state');
+      } catch (error) {
+        console.warn('Failed to clear auth state:', error);
+      }
+    };
+    
+    clearAllAuthState();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      // Clear only localStorage, don't call logout API to avoid interference
-      localStorage.removeItem('glowworm_last_auth');
-
+      console.log('🔐 Starting login process...');
+      
       const response = await apiService.login(credentials.username, credentials.password);
+      console.log('🔐 Login API response:', response);
+      
       if (response.success) {
+        console.log('🔐 Login successful, waiting for cookies to set...');
         // Longer delay to ensure session cookie is properly set
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
+        console.log('🔐 Checking authentication status...');
         // Update authentication state before navigating
         await checkAuthStatus();
+        
+        console.log('🔐 Navigating to admin dashboard...');
         navigate('/admin');
       } else {
         setError(response.message || 'Login failed');
       }
     } catch (err: any) {
+      console.error('🔐 Login error:', err);
       setError(err.response?.data?.detail || 'Login failed');
     } finally {
       setLoading(false);
