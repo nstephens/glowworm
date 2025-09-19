@@ -24,18 +24,13 @@ const Login: React.FC = () => {
     setError('');
 
     try {
-      // Clear any existing authentication state and cookies before login
-      try {
-        await apiService.logout();
-        localStorage.removeItem('glowworm_last_auth');
-      } catch {
-        // Ignore logout errors - we're about to login anyway
-      }
+      // Clear only localStorage, don't call logout API to avoid interference
+      localStorage.removeItem('glowworm_last_auth');
 
       const response = await apiService.login(credentials.username, credentials.password);
       if (response.success) {
-        // Small delay to ensure session cookie is properly set
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Longer delay to ensure session cookie is properly set
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Update authentication state before navigating
         await checkAuthStatus();
