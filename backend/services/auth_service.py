@@ -134,13 +134,22 @@ class AuthService:
     
     def get_session_by_token(self, session_token: str) -> Optional[UserSession]:
         """Get active session by token"""
+        logger.info(f"get_session_by_token: Querying database for active session: {session_token[:8]}...")
+        
         session = self.db.query(UserSession).filter(
             UserSession.session_token == session_token,
             UserSession.is_active == True
         ).first()
         
-        if not session or session.is_expired():
+        if not session:
+            logger.warning(f"get_session_by_token: No active session found for token: {session_token[:8]}...")
             return None
+            
+        if session.is_expired():
+            logger.warning(f"get_session_by_token: Session {session_token[:8]}... is expired")
+            return None
+        
+        logger.info(f"get_session_by_token: Found valid session for user: {session.user.username}")
         
         # Update last used timestamp
         session.last_used = datetime.utcnow()
@@ -150,10 +159,14 @@ class AuthService:
     
     def get_user_by_session(self, session_token: str) -> Optional[User]:
         """Get user by session token"""
+        logger.info(f"get_user_by_session: Looking up session for token: {session_token[:8]}...")
+        
         session = self.get_session_by_token(session_token)
         if not session:
+            logger.warning(f"get_user_by_session: No session found for token: {session_token[:8]}...")
             return None
         
+        logger.info(f"get_user_by_session: Found session for user: {session.user.username}")
         return session.user
     
     def refresh_session(self, refresh_token: str) -> Optional[Tuple[UserSession, User]]:
