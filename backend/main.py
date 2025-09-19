@@ -149,22 +149,8 @@ async def root():
         "message": "GlowWorm API",
         "version": "0.1.0",
         "docs": "/docs",
-        "health": "/health",
-        "test": "/test-login"
+        "health": "/health"
     }
-
-# Test login page
-@app.get("/test-login")
-async def test_login_page():
-    """Serve test login page for debugging"""
-    import os
-    from fastapi.responses import FileResponse
-    
-    test_file = os.path.join(os.path.dirname(__file__), "test_login.html")
-    if os.path.exists(test_file):
-        return FileResponse(test_file, media_type="text/html")
-    else:
-        return {"error": "Test file not found"}
 
 if __name__ == "__main__":
     import uvicorn

@@ -92,18 +92,12 @@ metadata = MetaData()
 
 def get_db():
     """Dependency to get database session"""
+    ensure_database_initialized()
+    db = SessionLocal()
     try:
-        ensure_database_initialized()
-        db = SessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
-    except Exception as e:
-        # Only log database-specific errors, not auth-related HTTPExceptions
-        if not isinstance(e, Exception) or 'HTTPException' not in str(type(e)):
-            logger.error(f"Database session error: {e}")
-        raise
+        yield db
+    finally:
+        db.close()
 
 def create_tables():
     """Create all tables"""
