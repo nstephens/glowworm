@@ -16,6 +16,7 @@ import {
   Zap
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import LiveDisplayStatus from '../components/LiveDisplayStatus';
 import type { Image, Album } from '../types';
 
 const AdminDashboard: React.FC = () => {
@@ -238,41 +239,8 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <Card className="animate-fade-in-up border-0 shadow-lg bg-card/50 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5 text-primary" />
-            Recent Activity
-          </CardTitle>
-          <CardDescription>Latest updates from your photo display system</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/30">
-              <div className="w-2 h-2 bg-secondary rounded-full" />
-              <div className="flex-1">
-                <p className="text-sm font-medium">Display "Office Frame" connected</p>
-                <p className="text-xs text-muted-foreground">2 minutes ago</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/30">
-              <div className="w-2 h-2 bg-chart-1 rounded-full" />
-              <div className="flex-1">
-                <p className="text-sm font-medium">{stats.recentUploads} new images uploaded to albums</p>
-                <p className="text-xs text-muted-foreground">1 hour ago</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/30">
-              <div className="w-2 h-2 bg-chart-3 rounded-full" />
-              <div className="flex-1">
-                <p className="text-sm font-medium">Playlists updated with new display settings</p>
-                <p className="text-xs text-muted-foreground">3 hours ago</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Live Display Status */}
+      <LiveDisplayStatus />
     </div>
   );
 };
