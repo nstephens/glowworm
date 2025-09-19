@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { checkAuthStatus } = useAuth();
+  const { checkAuthStatus, clearAuthCache } = useAuth();
   const [credentials, setCredentials] = useState({
     username: '',
     password: '',
@@ -69,9 +69,12 @@ const Login: React.FC = () => {
         // Longer delay to ensure session cookie is properly set
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        console.log('🔐 Checking authentication status...');
-        // Update authentication state before navigating
-        await checkAuthStatus();
+        console.log('🔐 Clearing auth cache and checking status...');
+        // Clear the auth cache to force fresh check
+        clearAuthCache();
+        
+        // Force a fresh authentication check (bypass cache)
+        await checkAuthStatus(true);
         
         console.log('🔐 Navigating to admin dashboard...');
         navigate('/admin');

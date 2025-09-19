@@ -37,16 +37,18 @@ export const useAuth = () => {
     checkAuthStatus();
   }, []);
 
-  const checkAuthStatus = async () => {
+  const checkAuthStatus = async (forceFresh = false) => {
     try {
-      // Check if we have recent cached auth data
-      if (authCache && (Date.now() - authCache.timestamp) < CACHE_DURATION) {
+      // Check if we have recent cached auth data (unless forced fresh)
+      if (!forceFresh && authCache && (Date.now() - authCache.timestamp) < CACHE_DURATION) {
         console.log('🚀 Using cached auth state');
         setIsAuthenticated(authCache.isAuthenticated);
         setCurrentUser(authCache.user);
         setIsLoading(false);
         return;
       }
+
+      console.log('🔄 Performing fresh auth check...');
 
       // Create a timeout promise to fail fast
       const timeoutPromise = new Promise((_, reject) => 
@@ -123,11 +125,18 @@ export const useAuth = () => {
     }
   };
 
+  const clearAuthCache = () => {
+    console.log('🗑️ Clearing auth cache');
+    authCache = null;
+    localStorage.removeItem('glowworm_last_auth');
+  };
+
   return {
     isAuthenticated,
     isLoading,
     currentUser,
     checkAuthStatus,
-    logout
+    logout,
+    clearAuthCache
   };
 };
