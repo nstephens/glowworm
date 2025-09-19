@@ -71,21 +71,31 @@ async def login(
     db: Session = Depends(get_db)
 ):
     """Login user and create session"""
+    logger.info(f"LOGIN: Starting login attempt for username: {login_data.username}")
+    
     try:
+        logger.info("LOGIN: Creating AuthService...")
         auth_service = AuthService(db)
         
         # Authenticate user
+        logger.info(f"LOGIN: Calling authenticate_user for: {login_data.username}")
         user = auth_service.authenticate_user(login_data.username, login_data.password)
+        logger.info(f"LOGIN: Authentication result: {'Success' if user else 'Failed'}")
+        
         if not user:
+            logger.warning(f"LOGIN: Authentication failed for username: {login_data.username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid username or password"
             )
         
         # Create session
+        logger.info("LOGIN: Preparing session creation...")
         user_agent = request.headers.get("user-agent")
         ip_address = request.client.host if request.client else None
+        logger.info(f"LOGIN: User-Agent: {user_agent}, IP: {ip_address}")
         
+        logger.info("LOGIN: Calling create_session_with_csrf...")
         session, csrf_token = auth_service.create_session_with_csrf(
             user=user,
             user_agent=user_agent,
@@ -93,11 +103,13 @@ async def login(
             device_name=login_data.device_name,
             device_type=login_data.device_type
         )
+        logger.info(f"LOGIN: Session created - ID: {session.id}, token: {session.session_token[:8]}...")
         
         # Debug CSRF token generation
-        logger.info(f"Login - Generated CSRF token: {csrf_token}")
+        logger.info(f"LOGIN: Generated CSRF token: {csrf_token}")
         
         # Set authentication cookies
+        logger.info("LOGIN: Setting authentication cookies...")
         cookie_manager.set_auth_cookies(
             response=response,
             session_token=session.session_token,
@@ -105,7 +117,7 @@ async def login(
             csrf_token=csrf_token
         )
         
-        logger.info(f"User {user.username} logged in successfully")
+        logger.info(f"LOGIN: User {user.username} logged in successfully")
         
         return LoginResponse(
             success=True,
@@ -113,10 +125,14 @@ async def login(
             user=UserResponse(**user.to_dict())
         )
         
-    except HTTPException:
+    except HTTPException as he:
+        logger.info(f"LOGIN: HTTPException raised - status: {he.status_code}, detail: {he.detail}")
         raise
     except Exception as e:
-        logger.error(f"Login failed: {e}")
+        logger.error(f"LOGIN: Unexpected error during login: {e}")
+        logger.error(f"LOGIN: Exception type: {type(e).__name__}")
+        import traceback
+        logger.error(f"LOGIN: Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Login failed"
