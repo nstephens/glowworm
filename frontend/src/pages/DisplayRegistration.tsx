@@ -223,7 +223,7 @@ const DisplayRegistration: React.FC = () => {
 
   return (
     <div className="frameless-display bg-gray-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
+      <div className="max-w-4xl w-full">
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <p className="text-red-600">{error}</p>
@@ -268,25 +268,37 @@ const DisplayRegistration: React.FC = () => {
             </div>
 
             {deviceStatus.status === 'pending' && (
-              <div className="space-y-6">
+              <div className="space-y-8">
                 <div className="animate-pulse">
                   <div className="h-2 bg-yellow-200 rounded-full"></div>
                 </div>
                 
-                {/* Prominent Device Token Display */}
-                <div className="bg-white border-4 border-yellow-300 rounded-lg p-6 shadow-lg">
-                  <p className="text-sm text-gray-600 mb-2">Device Code:</p>
-                  <div className="text-6xl font-bold text-gray-900 tracking-wider text-center">
+                {/* Device ID Display */}
+                <div className="bg-gray-50 border-2 border-gray-300 rounded-lg p-4 sm:p-6">
+                  <p className="text-xl sm:text-2xl font-semibold text-gray-700 mb-2 text-center">Device ID:</p>
+                  <div className="text-4xl sm:text-5xl lg:text-6xl font-mono font-bold text-gray-900 text-center">
+                    {deviceStatus.id}
+                  </div>
+                </div>
+                
+                {/* Authorization Token Display */}
+                <div className="bg-white border-2 border-gray-200 rounded-xl p-6 sm:p-8 shadow-lg">
+                  <p className="text-xl sm:text-2xl font-medium text-gray-700 mb-4 text-center">
+                    Authorization Code
+                  </p>
+                  <div className="text-7xl sm:text-8xl lg:text-9xl font-mono font-bold text-gray-900 text-center tracking-wider leading-none">
                     {deviceStatus.device_token}
                   </div>
-                  <p className="text-xs text-gray-500 mt-2 text-center">
-                    Give this code to an administrator for approval
+                  <p className="text-base sm:text-lg text-gray-600 mt-4 text-center">
+                    Provide this code to an administrator for approval
                   </p>
                 </div>
                 
-                <p className="text-sm text-gray-500 text-center">
-                  This page will automatically update when an administrator approves this device.
-                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-700 text-center">
+                    This page will automatically update when the device is approved
+                  </p>
+                </div>
               </div>
             )}
 

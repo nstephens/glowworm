@@ -18,6 +18,24 @@ class DisplayDeviceWebSocketService:
     
     def register_device(self, user_agent: str = None, ip_address: str = None) -> DisplayDevice:
         """Register a new display device and return it with a device token"""
+        
+        # Check if a device with the same IP and user agent already exists and is active
+        if ip_address and user_agent:
+            existing_device = self.db.query(DisplayDevice).filter(
+                DisplayDevice.ip_address == ip_address,
+                DisplayDevice.user_agent == user_agent,
+                DisplayDevice.status.in_([DeviceStatus.PENDING, DeviceStatus.AUTHORIZED])
+            ).first()
+            
+            if existing_device:
+                # Update the last seen timestamp and return existing device
+                existing_device.last_seen = datetime.utcnow()
+                self.db.commit()
+                self.db.refresh(existing_device)
+                logger.info(f"Returning existing device with token: {existing_device.device_token[:8]}... (preventing duplicate)")
+                return existing_device
+        
+        # No existing device found, create a new one
         device_token = DisplayDevice.generate_device_token()
         
         device = DisplayDevice(
@@ -295,6 +313,7 @@ class DisplayDeviceWebSocketService:
             )
         except Exception as e:
             logger.error(f"Failed to notify device about playlist update: {e}")
+
 
 
 

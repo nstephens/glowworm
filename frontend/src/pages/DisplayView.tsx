@@ -631,7 +631,7 @@ const DisplayView: React.FC = () => {
     switch (deviceStatus.status) {
       case 'pending':
         return (
-          <div className="text-center text-white">
+          <div className="text-center text-white max-w-6xl mx-auto px-4">
             <div className="flex items-center justify-center space-x-4 mb-8">
               <img 
                 src="/glowworm_icon.png" 
@@ -641,15 +641,36 @@ const DisplayView: React.FC = () => {
               <h1 className="text-4xl font-bold">Glowworm Display</h1>
             </div>
             <p className="text-xl mb-8">Waiting for authorization...</p>
-            <div className="animate-pulse">
+            
+            {/* Device ID Display */}
+            <div className="bg-white bg-opacity-10 border-2 border-white border-opacity-30 rounded-lg p-4 sm:p-6 mb-8">
+              <p className="text-xl sm:text-2xl font-semibold text-white mb-2">Device ID:</p>
+              <div className="text-4xl sm:text-5xl lg:text-6xl font-mono font-bold text-white">
+                {deviceStatus.id}
+              </div>
+            </div>
+            
+            {/* Authorization Token Display */}
+            <div className="bg-white border-2 border-gray-200 rounded-xl p-6 sm:p-8 shadow-lg mb-8">
+              <p className="text-xl sm:text-2xl font-medium text-gray-700 mb-4 text-center">
+                Authorization Code
+              </p>
+              <div className="text-7xl sm:text-8xl lg:text-9xl font-mono font-bold text-gray-900 text-center tracking-wider leading-none">
+                {deviceStatus.device_token}
+              </div>
+              <p className="text-base sm:text-lg text-gray-600 mt-4 text-center">
+                Provide this code to an administrator for approval
+              </p>
+            </div>
+            
+            <div className="animate-pulse mb-4">
               <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full mx-auto"></div>
             </div>
-            <p className="text-sm mt-4 opacity-75">
-              Please authorize this device from the admin panel
-            </p>
-            <div className="mt-8 text-xs opacity-50">
-              <p>Device ID: {deviceStatus.id}</p>
-              <p>Token: {deviceStatus.device_token.substring(0, 8)}...</p>
+            
+            <div className="bg-blue-600 bg-opacity-80 border border-blue-400 rounded-lg p-4">
+              <p className="text-sm text-blue-100 text-center">
+                This page will automatically update when the device is approved
+              </p>
             </div>
           </div>
         );
