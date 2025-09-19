@@ -24,34 +24,21 @@ class AuthMiddleware:
         credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
     ) -> Optional[User]:
         """Get current authenticated user from cookies or bearer token"""
-        logger.debug("Starting authentication check")
-        
         auth_service = AuthService(db)
         
         # Try to get session from cookies first
         session_token, refresh_token, csrf_token = cookie_manager.get_auth_cookies(request)
-        logger.debug(f"Cookie tokens - session: {'present' if session_token else 'missing'}, refresh: {'present' if refresh_token else 'missing'}, csrf: {'present' if csrf_token else 'missing'}")
         
         if session_token:
-            logger.debug(f"Attempting session lookup with token: {session_token[:8]}...")
             user = auth_service.get_user_by_session(session_token)
             if user:
-                logger.debug(f"Session authentication successful for user: {user.username}")
                 return user
-            else:
-                logger.debug(f"Session token {session_token[:8]}... not found or invalid")
         
         # Try bearer token if no cookie session
         if credentials:
-            logger.debug(f"Attempting bearer token authentication: {credentials.credentials[:8]}...")
             user = auth_service.get_user_by_session(credentials.credentials)
             if user:
-                logger.debug(f"Bearer token authentication successful for user: {user.username}")
                 return user
-            else:
-                logger.debug(f"Bearer token {credentials.credentials[:8]}... not found or invalid")
-        
-        logger.debug("No valid authentication found")
         return None
     
     @staticmethod
