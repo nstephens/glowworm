@@ -51,10 +51,16 @@ def initialize_database():
 
 def ensure_database_initialized():
     """Ensure database is initialized before use"""
-    if engine is None or SessionLocal is None:
-        initialize_database()
+    logger.info(f"ensure_database_initialized: Checking - engine: {'present' if engine else 'None'}, SessionLocal: {'present' if SessionLocal else 'None'}")
     
     if engine is None or SessionLocal is None:
+        logger.info("ensure_database_initialized: Database not initialized, calling initialize_database...")
+        initialize_database()
+    
+    logger.info(f"ensure_database_initialized: After init - engine: {'present' if engine else 'None'}, SessionLocal: {'present' if SessionLocal else 'None'}")
+    
+    if engine is None or SessionLocal is None:
+        logger.error("ensure_database_initialized: Database initialization failed - engine or SessionLocal still None")
         raise RuntimeError("Database not initialized - setup may not be complete")
 
 def refresh_database_connection():
@@ -90,17 +96,28 @@ def get_db():
     """Dependency to get database session"""
     logger.info("get_db: Starting database session creation...")
     try:
+        logger.info("get_db: Calling ensure_database_initialized...")
         ensure_database_initialized()
-        logger.info("get_db: Database initialized, creating session...")
+        logger.info("get_db: Database initialized successfully")
+        
+        logger.info("get_db: Creating SessionLocal...")
+        if SessionLocal is None:
+            logger.error("get_db: SessionLocal is None - database not properly initialized")
+            raise RuntimeError("Database SessionLocal is None")
+            
         db = SessionLocal()
         logger.info("get_db: Session created successfully")
         yield db
     except Exception as e:
         logger.error(f"get_db: Error creating database session: {e}")
+        logger.error(f"get_db: Exception type: {type(e).__name__}")
+        import traceback
+        logger.error(f"get_db: Full traceback: {traceback.format_exc()}")
         raise
     finally:
         logger.info("get_db: Closing database session")
-        db.close()
+        if 'db' in locals():
+            db.close()
 
 def create_tables():
     """Create all tables"""
