@@ -2,31 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom styles for the app */
-body {
-  @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-50 min-h-screen;
+@layer base {
+  :root {
+    --background: 255 255 255;
+    --foreground: 71 85 105;
+    --card: 236 254 255;
+    --card-foreground: 71 85 105;
+    --popover: 255 255 255;
+    --popover-foreground: 71 85 105;
+    --primary: 22 78 99;
+    --primary-foreground: 255 255 255;
+    --secondary: 16 185 129;
+    --secondary-foreground: 255 255 255;
+    --muted: 248 250 252;
+    --muted-foreground: 71 85 105;
+    --accent: 16 185 129;
+    --accent-foreground: 255 255 255;
+    --destructive: 229 62 62;
+    --destructive-foreground: 255 255 255;
+    --border: 209 213 219;
+    --input: 241 245 249;
+    --ring: 16 185 129 / 0.5;
+    --chart-1: 99 102 241;
+    --chart-2: 16 185 129;
+    --chart-3: 251 191 36;
+    --chart-4: 239 68 68;
+    --chart-5: 59 130 246;
+    --radius: 0.5rem;
+    --sidebar: 255 255 255;
+    --sidebar-foreground: 71 85 105;
+    --sidebar-primary: 22 78 99;
+    --sidebar-primary-foreground: 255 255 255;
+    --sidebar-accent: 16 185 129;
+    --sidebar-accent-foreground: 255 255 255;
+    --sidebar-border: 209 213 219;
+    --sidebar-ring: 16 185 129 / 0.5;
+  }
+
+  .dark {
+    --background: 15 23 42;
+    --foreground: 226 232 240;
+    --card: 30 41 59;
+    --card-foreground: 226 232 240;
+    --popover: 30 41 59;
+    --popover-foreground: 226 232 240;
+    --primary: 8 145 178;
+    --primary-foreground: 255 255 255;
+    --secondary: 16 185 129;
+    --secondary-foreground: 255 255 255;
+    --muted: 30 41 59;
+    --muted-foreground: 148 163 184;
+    --accent: 16 185 129;
+    --accent-foreground: 255 255 255;
+    --destructive: 220 38 38;
+    --destructive-foreground: 255 255 255;
+    --border: 51 65 85;
+    --input: 30 41 59;
+    --ring: 16 185 129 / 0.3;
+    --chart-1: 129 140 248;
+    --chart-2: 52 211 153;
+    --chart-3: 251 191 36;
+    --chart-4: 248 113 113;
+    --chart-5: 96 165 250;
+    --sidebar: 15 23 42;
+    --sidebar-foreground: 226 232 240;
+    --sidebar-primary: 8 145 178;
+    --sidebar-primary-foreground: 255 255 255;
+    --sidebar-accent: 16 185 129;
+    --sidebar-accent-foreground: 255 255 255;
+    --sidebar-border: 51 65 85;
+    --sidebar-ring: 16 185 129 / 0.3;
+  }
 }
 
-h1, h2, h3, h4, h5, h6 {
-  @apply font-semibold text-gray-800 dark:text-gray-100;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
 }
 
-a {
-  @apply text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-200;
+/* Custom gallery animations */
+.gallery-item {
+  @apply animate-gallery-item;
 }
 
-button {
-  @apply px-4 py-2 rounded-md font-medium transition-colors duration-200;
-}
-
-.btn-primary {
-  @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
-}
-
-.btn-secondary {
-  @apply bg-gray-200 text-gray-800 hover:bg-gray-300 focus:ring-2 focus:ring-gray-300 focus:border-gray-300;
-}
-
-.input-field {
-  @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500;
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out;
 }

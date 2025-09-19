@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
 import { 
   Images, 
+  FolderOpen,
   Play, 
   Monitor, 
   Upload, 
   Plus, 
+  Settings,
   TrendingUp, 
-  Users, 
   Clock,
-  BarChart3,
-  Activity
+  Zap
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { Image, Album } from '../types';
@@ -88,15 +91,17 @@ const AdminDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-8">
+      <div className="space-y-8">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+          <div className="h-8 bg-muted rounded w-1/4 mb-6"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white rounded-xl p-6 shadow-sm">
-                <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-                <div className="h-8 bg-gray-200 rounded w-3/4"></div>
-              </div>
+              <Card key={i} className="border-0 shadow-lg bg-card/50 backdrop-blur-sm">
+                <CardContent className="p-6">
+                  <div className="h-4 bg-muted rounded w-1/2 mb-2"></div>
+                  <div className="h-8 bg-muted rounded w-3/4"></div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
@@ -104,111 +109,170 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
+  const statsData = [
+    {
+      title: 'Total Images',
+      value: stats.totalImages.toString(),
+      change: `+${stats.recentUploads} this week`,
+      icon: Images,
+      color: 'text-chart-1',
+      bgColor: 'bg-chart-1/10',
+    },
+    {
+      title: 'Albums',
+      value: stats.totalAlbums.toString(),
+      change: 'Organized collections',
+      icon: FolderOpen,
+      color: 'text-chart-2',
+      bgColor: 'bg-chart-2/10',
+    },
+    {
+      title: 'Playlists',
+      value: stats.totalPlaylists.toString(),
+      change: 'Scheduled content',
+      icon: Play,
+      color: 'text-chart-3',
+      bgColor: 'bg-chart-3/10',
+    },
+    {
+      title: 'Active Displays',
+      value: stats.totalDisplays.toString(),
+      change: 'Connected devices',
+      icon: Monitor,
+      color: 'text-chart-4',
+      bgColor: 'bg-chart-4/10',
+    },
+  ];
+
+  const quickActions = [
+    {
+      title: 'Upload Images',
+      description: 'Add new photos to your library',
+      icon: Upload,
+      color: 'bg-primary',
+      href: '/admin/images',
+      onClick: handleQuickUpload,
+    },
+    {
+      title: 'Create Playlist',
+      description: 'Organize images for display',
+      icon: Plus,
+      color: 'bg-secondary',
+      href: '/admin/playlists',
+      onClick: handleManagePlaylists,
+    },
+    {
+      title: 'Manage Displays',
+      description: 'Configure display devices',
+      icon: Settings,
+      color: 'bg-accent',
+      href: '/admin/displays',
+      onClick: handleManageDisplays,
+    },
+  ];
+
   return (
-    <div className="p-6 lg:p-8">
-      {/* Welcome Section */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome to Glowworm</h1>
-        <p className="text-gray-600">Manage your digital signage content and displays</p>
-      </div>
-
+    <div className="space-y-8">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Images</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalImages}</p>
-            </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Images className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm text-gray-500">
-            <TrendingUp className="w-4 h-4 mr-1" />
-            <span>+{stats.recentUploads} this week</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Albums</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalAlbums}</p>
-            </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <BarChart3 className="w-6 h-6 text-green-600" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm text-gray-500">
-            <Activity className="w-4 h-4 mr-1" />
-            <span>Organized collections</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Playlists</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalPlaylists}</p>
-            </div>
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Play className="w-6 h-6 text-purple-600" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm text-gray-500">
-            <Clock className="w-4 h-4 mr-1" />
-            <span>Scheduled content</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Active Displays</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalDisplays}</p>
-            </div>
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <Monitor className="w-6 h-6 text-orange-600" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm text-gray-500">
-            <Activity className="w-4 h-4 mr-1" />
-            <span>Authorized & connected</span>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in-up">
+        {statsData.map((stat, index) => (
+          <Card key={stat.title} className="gallery-item border-0 shadow-lg bg-card/50 backdrop-blur-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className={`p-3 rounded-xl ${stat.bgColor}`}>
+                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                  Active
+                </Badge>
+              </div>
+              <div className="space-y-1">
+                <p className="text-2xl font-bold">{stat.value}</p>
+                <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {stat.change}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Quick Actions */}
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <button
-            onClick={handleQuickUpload}
-            className="flex items-center space-x-3 p-4 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors group"
-          >
-            <Upload className="w-5 h-5 group-hover:scale-110 transition-transform" />
-            <span className="font-medium">Upload Images</span>
-          </button>
-          
-          <button
-            onClick={handleManagePlaylists}
-            className="flex items-center space-x-3 p-4 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors group"
-          >
-            <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
-            <span className="font-medium">Create Playlist</span>
-          </button>
-          
-          <button
-            onClick={handleManageDisplays}
-            className="flex items-center space-x-3 p-4 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors group"
-          >
-            <Monitor className="w-5 h-5 group-hover:scale-110 transition-transform" />
-            <span className="font-medium">Add Display</span>
-          </button>
+      <div className="animate-fade-in-up">
+        <div className="flex items-center gap-2 mb-6">
+          <Zap className="w-5 h-5 text-accent" />
+          <h2 className="text-xl font-semibold">Quick Actions</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {quickActions.map((action) => (
+            <Card
+              key={action.title}
+              className="gallery-item border-0 shadow-lg bg-card/50 backdrop-blur-sm cursor-pointer group"
+              onClick={action.onClick}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div
+                    className={`p-3 rounded-xl ${action.color} group-hover:scale-110 transition-transform duration-200`}
+                  >
+                    <action.icon className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold mb-1">{action.title}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{action.description}</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-primary hover:text-primary-foreground hover:bg-primary"
+                    >
+                      Get Started →
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
 
+      {/* Recent Activity */}
+      <Card className="animate-fade-in-up border-0 shadow-lg bg-card/50 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-primary" />
+            Recent Activity
+          </CardTitle>
+          <CardDescription>Latest updates from your photo display system</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/30">
+              <div className="w-2 h-2 bg-secondary rounded-full" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Display "Office Frame" connected</p>
+                <p className="text-xs text-muted-foreground">2 minutes ago</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/30">
+              <div className="w-2 h-2 bg-chart-1 rounded-full" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">{stats.recentUploads} new images uploaded to albums</p>
+                <p className="text-xs text-muted-foreground">1 hour ago</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/30">
+              <div className="w-2 h-2 bg-chart-3 rounded-full" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Playlists updated with new display settings</p>
+                <p className="text-xs text-muted-foreground">3 hours ago</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

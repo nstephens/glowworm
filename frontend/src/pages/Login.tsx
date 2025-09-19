@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/Card';
-import { Button } from '../components/Button';
-import { Input } from '../components/Input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Camera, Sparkles } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -46,74 +48,84 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <div className="flex items-center justify-center space-x-3 mb-6">
-            <img 
-              src="/glowworm_icon.png" 
-              alt="Glowworm Logo" 
-              className="w-12 h-12 object-contain"
-            />
-            <h1 className="text-3xl font-bold text-primary-600">Glowworm</h1>
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-card/40 flex items-center justify-center p-4">
+      <div className="w-full max-w-md animate-fade-in-up">
+        {/* Logo and Brand */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-2xl mb-4 shadow-lg">
+            <Camera className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Sign in to your account
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Manage your photo display system
-          </p>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Glowworm
+            </h1>
+            <Sparkles className="w-6 h-6 text-accent" />
+          </div>
+          <p className="text-muted-foreground text-sm">Elegant photo display management</p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Login</CardTitle>
+        {/* Login Card */}
+        <Card className="border-0 shadow-2xl bg-card/80 backdrop-blur-sm">
+          <CardHeader className="text-center pb-4">
+            <CardTitle className="text-xl font-semibold">Welcome back</CardTitle>
+            <CardDescription>Sign in to manage your photo displays</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+          <CardContent className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                  <p className="text-sm text-red-600">{error}</p>
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                  <p className="text-sm text-destructive">{error}</p>
                 </div>
               )}
 
-              <Input
-                label="Username"
-                name="username"
-                type="text"
-                value={credentials.username}
-                onChange={handleInputChange}
-                required
-                autoComplete="username"
-              />
+              <div className="space-y-2">
+                <Label htmlFor="username" className="text-sm font-medium">
+                  Username
+                </Label>
+                <Input
+                  id="username"
+                  name="username"
+                  type="text"
+                  placeholder="Enter your username"
+                  value={credentials.username}
+                  onChange={handleInputChange}
+                  className="h-11 bg-input/50 border-border/50 focus:bg-background transition-colors"
+                  required
+                  autoComplete="username"
+                />
+              </div>
 
-              <Input
-                label="Password"
-                name="password"
-                type="password"
-                value={credentials.password}
-                onChange={handleInputChange}
-                required
-                autoComplete="current-password"
-              />
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium">
+                  Password
+                </Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={credentials.password}
+                  onChange={handleInputChange}
+                  className="h-11 bg-input/50 border-border/50 focus:bg-background transition-colors"
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
 
               <Button
                 type="submit"
-                className="w-full"
-                loading={loading}
-                disabled={!credentials.username || !credentials.password}
+                className="w-full h-11 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-xl transition-all duration-200"
+                disabled={loading || !credentials.username || !credentials.password}
               >
-                Sign In
+                {loading ? 'Signing In...' : 'Sign In'}
               </Button>
             </form>
+
+            <p className="text-center text-sm text-muted-foreground">
+              Need help? Contact your system administrator
+            </p>
           </CardContent>
         </Card>
-
-        <div className="text-center">
-          <p className="text-sm text-gray-600">
-            Need help? Contact your system administrator.
-          </p>
-        </div>
       </div>
     </div>
   );
