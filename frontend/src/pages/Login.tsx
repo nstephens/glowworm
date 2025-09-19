@@ -26,6 +26,9 @@ const Login: React.FC = () => {
     try {
       const response = await apiService.login(credentials.username, credentials.password);
       if (response.success) {
+        // Small delay to ensure session cookie is properly set
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Update authentication state before navigating
         await checkAuthStatus();
         navigate('/admin');
