@@ -281,21 +281,21 @@ const DisplayRegistration: React.FC = () => {
                   </div>
                 </div>
                 
-                {/* Authorization Token Display */}
-                <div className="bg-white border-2 border-gray-200 rounded-xl p-6 sm:p-8 shadow-lg">
-                  <p className="text-xl sm:text-2xl font-medium text-gray-700 mb-4 text-center">
-                    Authorization Code
-                  </p>
-                  <div className="text-7xl sm:text-8xl lg:text-9xl font-mono font-bold text-gray-900 text-center tracking-wider leading-none">
-                    {deviceStatus.device_token}
-                  </div>
-                  <p className="text-base sm:text-lg text-gray-600 mt-4 text-center">
-                    Provide this code to an administrator for approval
-                  </p>
-                </div>
+            {/* Authorization Token Display */}
+            <div className="bg-card border border-border rounded-xl p-6 sm:p-8 shadow-lg backdrop-blur-sm">
+              <p className="text-xl sm:text-2xl font-medium text-foreground mb-4 text-center">
+                Authorization Code
+              </p>
+              <div className="text-7xl sm:text-8xl lg:text-9xl font-mono font-bold text-foreground text-center tracking-wider leading-none">
+                {deviceStatus.device_token}
+              </div>
+              <p className="text-base sm:text-lg text-muted-foreground mt-4 text-center">
+                Provide this code to an administrator for approval
+              </p>
+            </div>
                 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-700 text-center">
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+                  <p className="text-sm text-primary text-center">
                     This page will automatically update when the device is approved
                   </p>
                 </div>
