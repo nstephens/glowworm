@@ -14,6 +14,12 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
+@router.get("/test-debug")
+async def test_debug():
+    """Test endpoint to verify debug logging is working"""
+    logger.info("TEST: Debug logging is working!")
+    return {"message": "Debug test successful", "status": "working"}
+
 # Pydantic models for request/response
 class LoginRequest(BaseModel):
     username: str = Field(..., description="Username")

@@ -88,11 +88,18 @@ metadata = MetaData()
 
 def get_db():
     """Dependency to get database session"""
-    ensure_database_initialized()
-    db = SessionLocal()
+    logger.info("get_db: Starting database session creation...")
     try:
+        ensure_database_initialized()
+        logger.info("get_db: Database initialized, creating session...")
+        db = SessionLocal()
+        logger.info("get_db: Session created successfully")
         yield db
+    except Exception as e:
+        logger.error(f"get_db: Error creating database session: {e}")
+        raise
     finally:
+        logger.info("get_db: Closing database session")
         db.close()
 
 def create_tables():
