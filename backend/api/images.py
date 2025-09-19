@@ -610,3 +610,50 @@ async def get_optimized_image(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve optimized image"
         )
+
+@router.get("/{image_id}/debug")
+async def debug_image_info(
+    image_id: int,
+    db: Session = Depends(get_db)
+):
+    """Debug endpoint to check image file paths and thumbnail resolution"""
+    try:
+        image_service = ImageService(db)
+        image = image_service.get_image_by_id(image_id)
+        
+        if not image:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Image not found"
+            )
+        
+        # Get file paths
+        original_path = image_storage_service.get_image_path(image.filename)
+        thumbnail_path = image_storage_service.get_thumbnail_path(image.filename, "medium")
+        
+        return {
+            "image_id": image.id,
+            "filename": image.filename,
+            "original_filename": image.original_filename,
+            "album_id": image.album_id,
+            "file_hash": image.file_hash,
+            "paths": {
+                "original_exists": original_path.exists() if original_path else False,
+                "original_path": str(original_path) if original_path else None,
+                "thumbnail_exists": thumbnail_path.exists() if thumbnail_path else False,
+                "thumbnail_path": str(thumbnail_path) if thumbnail_path else None,
+            },
+            "urls": {
+                "url": image.to_dict()["url"],
+                "thumbnail_url": image.to_dict()["thumbnail_url"]
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Debug image info error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get debug info"
+        )
