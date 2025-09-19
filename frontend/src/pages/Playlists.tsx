@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Edit, Trash2, Play, Settings } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { ArrowLeft, Plus, Edit, Trash2, Play, Settings, Clock, Star, Zap } from 'lucide-react';
 import { apiService } from '../services/api';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import type { Playlist } from '../types';
@@ -107,129 +112,122 @@ export const Playlists: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header with Back Button */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={handleBackToDashboard}
-            className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span>Back to Dashboard</span>
-          </button>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="animate-fade-in-up">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Playlist Management</h1>
-            <p className="text-gray-600">
-              Create and manage display playlists
-            </p>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-2 h-8 bg-gradient-to-b from-chart-3 to-chart-4 rounded-full" />
+              <h1 className="text-3xl font-bold">Playlists</h1>
+            </div>
+            <p className="text-muted-foreground">Create and manage display playlists</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge variant="secondary" className="px-3 py-1">
+              <Play className="w-4 h-4 mr-2" />
+              {playlists.length} playlists
+            </Badge>
+            <Button 
+              className="bg-gradient-to-r from-primary to-primary/90 shadow-lg"
+              onClick={() => setShowCreateModal(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Playlist
+            </Button>
           </div>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center space-x-2 bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Create Playlist</span>
-        </button>
       </div>
 
       {/* Playlists Grid */}
       {playlists.length === 0 ? (
-        <div className="text-center py-12">
-          <Settings className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Playlists Yet</h3>
-          <p className="text-gray-500 mb-4">Create your first playlist to get started</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn-primary"
-          >
-            Create Playlist
-          </button>
-        </div>
+        <Card className="animate-fade-in-up border-0 shadow-lg bg-card/50 backdrop-blur-sm">
+          <CardContent className="text-center py-12">
+            <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Play className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <CardTitle className="mb-2">No Playlists Yet</CardTitle>
+            <CardDescription className="mb-6">Create your first playlist to get started</CardDescription>
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-gradient-to-r from-primary to-primary/90 shadow-lg"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Playlist
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up">
           {playlists.map((playlist) => (
-            <div
+            <Card
               key={playlist.id}
-              className="bg-white rounded-lg shadow-md border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer"
+              className="gallery-item border-0 shadow-lg bg-card/50 backdrop-blur-sm cursor-pointer group hover:shadow-xl transition-all duration-200"
               onClick={() => navigate(`/admin/playlists/${playlist.id}`)}
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                    {playlist.name}
-                    {playlist.is_default && (
-                      <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        Default
-                      </span>
-                    )}
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CardTitle className="text-lg">{playlist.name}</CardTitle>
+                      {playlist.is_default && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Star className="w-3 h-3 mr-1" />
+                          Default
+                        </Badge>
+                      )}
+                    </div>
+                    <CardDescription>
+                      {playlist.image_count} images • {playlist.slug}
+                    </CardDescription>
+                  </div>
+                  <div className="p-2 bg-chart-3/10 rounded-lg">
+                    <Play className="w-5 h-5 text-chart-3" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
                     {playlist.display_mode && playlist.display_mode !== 'default' && (
-                      <span className={`ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        playlist.display_mode === 'auto_sort' ? 'bg-blue-100 text-blue-800' :
-                        playlist.display_mode === 'movement' ? 'bg-purple-100 text-purple-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
+                      <Badge variant="outline" className="text-xs">
                         {playlist.display_mode === 'auto_sort' ? 'Auto Sort' :
                          playlist.display_mode === 'movement' ? 'Movement' :
                          playlist.display_mode}
-                      </span>
+                      </Badge>
                     )}
-                    {console.log(`🎯 Rendering playlist "${playlist.name}": display_mode = ${playlist.display_mode}`)}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {playlist.image_count} images
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Slug: {playlist.slug}
-                  </p>
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {playlist.display_time_seconds || 30}s
+                    </span>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSetDefault(playlist);
+                      }}
+                      disabled={playlist.is_default}
+                    >
+                      <Star className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPlaylistToDelete(playlist);
+                        setShowDeleteModal(true);
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex space-x-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSetDefault(playlist);
-                    }}
-                    disabled={playlist.is_default}
-                    className={`flex items-center space-x-1 px-3 py-1 rounded text-sm transition-colors ${
-                      playlist.is_default
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                    }`}
-                  >
-                    <Play className="w-3 h-3" />
-                    <span>Set Default</span>
-                  </button>
-                </div>
-                
-                <div className="flex space-x-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/admin/playlists/${playlist.id}`);
-                    }}
-                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                    title="Edit playlist"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPlaylistToDelete(playlist);
-                      setShowDeleteModal(true);
-                    }}
-                    className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                    title="Delete playlist"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
@@ -237,42 +235,42 @@ export const Playlists: React.FC = () => {
       {/* Create Playlist Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Create New Playlist</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Playlist Name
-                </label>
-                <input
-                  type="text"
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>Create New Playlist</CardTitle>
+              <CardDescription>Enter a name for your new playlist</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="playlist-name">Playlist Name</Label>
+                <Input
+                  id="playlist-name"
                   value={newPlaylistName}
                   onChange={(e) => setNewPlaylistName(e.target.value)}
-                  placeholder="Enter playlist name..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  onKeyPress={(e) => e.key === 'Enter' && handleCreatePlaylist()}
+                  placeholder="Enter playlist name"
+                  className="w-full"
                 />
               </div>
-              <div className="flex justify-end space-x-3">
-                <button
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setShowCreateModal(false);
                     setNewPlaylistName('');
                   }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleCreatePlaylist}
                   disabled={!newPlaylistName.trim() || isCreating}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="bg-gradient-to-r from-primary to-primary/90"
                 >
-                  {isCreating ? 'Creating...' : 'Create'}
-                </button>
+                  {isCreating ? 'Creating...' : 'Create Playlist'}
+                </Button>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 

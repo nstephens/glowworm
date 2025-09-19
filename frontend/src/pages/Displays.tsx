@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, X, RotateCcw } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { ArrowLeft, X, RotateCcw, Monitor, Wifi, WifiOff, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { apiService } from '../services/api';
 import { urlResolver } from '../services/urlResolver';
