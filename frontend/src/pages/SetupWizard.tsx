@@ -17,7 +17,6 @@ interface SetupFormData {
   display_status_check_interval: number;
   display_websocket_check_interval: number;
   log_level: string;
-  enable_debug_logging: boolean;
 }
 
 interface NetworkInterface {
@@ -54,7 +53,6 @@ const SetupWizard: React.FC = () => {
     display_status_check_interval: 30,
     display_websocket_check_interval: 5,
     log_level: 'INFO',
-    enable_debug_logging: false,
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -490,18 +488,6 @@ const SetupWizard: React.FC = () => {
               <option value="INFO">Info (General information and above)</option>
               <option value="DEBUG">Debug (Detailed debugging information)</option>
             </select>
-          </div>
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              name="enable_debug_logging"
-              checked={formData.enable_debug_logging}
-              onChange={handleInputChange}
-              className="rounded border-gray-600 text-glowworm-500 focus:ring-glowworm-500 bg-gray-800"
-            />
-            <label className="text-sm font-medium text-gray-300">
-              Enable Debug Logging
-            </label>
           </div>
         </div>
 

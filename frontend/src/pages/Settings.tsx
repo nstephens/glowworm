@@ -43,7 +43,6 @@ interface SystemSettings {
   
   // Logging settings
   log_level: string;
-  enable_debug_logging: boolean;
   
   // OAuth settings
   google_client_id: string;
@@ -76,7 +75,6 @@ const Settings: React.FC = () => {
     display_status_check_interval: 30,
     display_websocket_check_interval: 5,
     log_level: 'INFO',
-    enable_debug_logging: false,
     google_client_id: '',
     google_client_secret: '',
     target_display_sizes: []
@@ -133,7 +131,6 @@ const Settings: React.FC = () => {
         display_status_check_interval: 30,
         display_websocket_check_interval: 5,
         log_level: 'INFO',
-        enable_debug_logging: false,
         google_client_id: '',
         google_client_secret: '',
         target_display_sizes: []
@@ -530,24 +527,6 @@ const Settings: React.FC = () => {
           </select>
           <p className="text-xs text-gray-500 mt-1">
             Level of detail for system logging
-          </p>
-        </div>
-
-        <div>
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              name="enable_debug_logging"
-              checked={settings.enable_debug_logging}
-              onChange={handleInputChange}
-              className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-            <span className="text-sm font-medium text-gray-700">
-              Enable Debug Logging
-            </span>
-          </label>
-          <p className="text-xs text-gray-500 mt-1">
-            Enable detailed debug logging for development (may impact performance)
           </p>
         </div>
       </div>

@@ -34,14 +34,8 @@ class GlowWormLogger:
             self.logger.setLevel(logging.INFO)
     
     def debug(self, message: str, *args, **kwargs):
-        """Log debug message (only if debug logging is enabled)"""
-        try:
-            from config.settings import settings
-            if settings.enable_debug_logging:
-                self.logger.debug(message, *args, **kwargs)
-        except Exception:
-            # Fallback to standard debug logging if settings not available
-            self.logger.debug(message, *args, **kwargs)
+        """Log debug message"""
+        self.logger.debug(message, *args, **kwargs)
     
     def info(self, message: str, *args, **kwargs):
         """Log info message"""

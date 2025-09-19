@@ -45,7 +45,6 @@ class Settings(BaseSettings):
     
     # Logging configuration
     log_level: str = Field(default="INFO", description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)")
-    enable_debug_logging: bool = Field(default=False, description="Enable detailed debug logging for development")
     
     # OAuth settings
     google_client_id: Optional[str] = Field(default=None, description="Google OAuth client ID")

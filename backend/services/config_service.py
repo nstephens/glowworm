@@ -146,9 +146,6 @@ class ConfigService:
     def log_level(self) -> str:
         return self.get_setting('log_level', 'INFO')
     
-    @property
-    def enable_debug_logging(self) -> bool:
-        return self.get_setting('enable_debug_logging', False)
     
     @property
     def google_client_id(self) -> str:

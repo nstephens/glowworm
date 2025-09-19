@@ -56,7 +56,6 @@ class SetupCompleteRequest(BaseModel):
     display_status_check_interval: int = 30
     display_websocket_check_interval: int = 5
     log_level: str = "INFO"
-    enable_debug_logging: bool = False
 
 class SetupStatusResponse(BaseModel):
     is_configured: bool
@@ -473,7 +472,6 @@ async def complete_setup(setup_data: SetupCompleteRequest):
                 "display_status_check_interval": setup_data.display_status_check_interval,
                 "display_websocket_check_interval": setup_data.display_websocket_check_interval,
             "log_level": setup_data.log_level,
-            "enable_debug_logging": setup_data.enable_debug_logging,
             "target_display_sizes": ["1080x1920", "2k-portrait", "4k-portrait"]
             }
             
@@ -516,7 +514,6 @@ async def complete_setup(setup_data: SetupCompleteRequest):
             "mysql_port": setup_data.mysql_port,
             "app_db_user": setup_data.app_db_user,
             "app_db_password": setup_data.app_db_password,
-            "admin_password": setup_data.admin_password,
             "mysql_database": settings.mysql_database,
             "secret_key": secret_key,
             "setup_completed": True
