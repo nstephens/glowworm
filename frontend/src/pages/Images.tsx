@@ -40,7 +40,7 @@ export const ImagesHeader: React.FC<{ images: Image[]; albums: Album[]; onUpload
             <ImageIcon className="w-4 h-4 mr-2" />
             {images.length} images
           </Badge>
-          <Button className="bg-gradient-to-r from-primary to-primary/90 shadow-lg" onClick={onUploadClick}>
+          <Button className="shadow-lg" onClick={onUploadClick}>
             <Upload className="w-4 h-4 mr-2" />
             Upload Images
           </Button>
@@ -354,7 +354,7 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
                 <ImageIcon className="w-4 h-4 mr-2" />
                 {images.length} images
               </Badge>
-              <Button className="bg-gradient-to-r from-primary to-primary/90 shadow-lg" onClick={() => setShowUploadModal(true)}>
+              <Button className="shadow-lg" onClick={() => setShowUploadModal(true)}>
                 <Upload className="w-4 h-4 mr-2" />
                 Upload Images
               </Button>

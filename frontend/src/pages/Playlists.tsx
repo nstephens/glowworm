@@ -129,7 +129,7 @@ export const Playlists: React.FC = () => {
               {playlists.length} playlists
             </Badge>
             <Button 
-              className="bg-gradient-to-r from-primary to-primary/90 shadow-lg"
+              className="shadow-lg"
               onClick={() => setShowCreateModal(true)}
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -150,7 +150,7 @@ export const Playlists: React.FC = () => {
             <CardDescription className="mb-6">Create your first playlist to get started</CardDescription>
             <Button
               onClick={() => setShowCreateModal(true)}
-              className="bg-gradient-to-r from-primary to-primary/90 shadow-lg"
+              className="shadow-lg"
             >
               <Plus className="w-4 h-4 mr-2" />
               Create Playlist
@@ -264,7 +264,6 @@ export const Playlists: React.FC = () => {
                 <Button
                   onClick={handleCreatePlaylist}
                   disabled={!newPlaylistName.trim() || isCreating}
-                  className="bg-gradient-to-r from-primary to-primary/90"
                 >
                   {isCreating ? 'Creating...' : 'Create Playlist'}
                 </Button>

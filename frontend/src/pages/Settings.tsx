@@ -783,7 +783,7 @@ const Settings: React.FC = () => {
         <Button
           onClick={handleSaveSettings}
           disabled={isLoading}
-          className="bg-gradient-to-r from-primary to-primary/90 shadow-lg"
+          className="shadow-lg"
         >
           <Save className="w-4 h-4 mr-2" />
           {isLoading ? 'Saving...' : 'Save Settings'}

@@ -114,7 +114,7 @@ const Login: React.FC = () => {
 
               <Button
                 type="submit"
-                className="w-full h-11 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-xl transition-all duration-200"
+                className="w-full h-11 shadow-lg hover:shadow-xl transition-all duration-200"
                 disabled={loading || !credentials.username || !credentials.password}
               >
                 {loading ? 'Signing In...' : 'Sign In'}
