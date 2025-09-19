@@ -20,6 +20,131 @@ async def test_debug():
     logger.info("TEST: Debug logging is working!")
     return {"message": "Debug test successful", "status": "working"}
 
+@router.post("/login-simple")
+async def login_simple(
+    request: Request,
+    response: Response,
+    login_data: LoginRequest
+):
+    """Simple login endpoint without database dependencies for testing"""
+    logger.info(f"LOGIN-SIMPLE: Starting login attempt for username: {login_data.username}")
+    
+    try:
+        # Manual database connection
+        from models.database import engine, SessionLocal
+        from sqlalchemy.orm import sessionmaker
+        
+        if engine is None:
+            logger.error("LOGIN-SIMPLE: Engine is None - database not initialized")
+            return {"success": False, "message": "Database not initialized"}
+        
+        # Create manual session
+        Session = sessionmaker(bind=engine)
+        db = Session()
+        
+        try:
+            from services.auth_service import AuthService
+            auth_service = AuthService(db)
+            
+            # Test authentication
+            user = auth_service.authenticate_user(login_data.username, login_data.password)
+            if not user:
+                logger.warning(f"LOGIN-SIMPLE: Authentication failed for: {login_data.username}")
+                return {"success": False, "message": "Invalid credentials"}
+            
+            logger.info(f"LOGIN-SIMPLE: Authentication successful for: {user.username}")
+            
+            # Test session creation
+            session, csrf_token = auth_service.create_session_with_csrf(
+                user=user,
+                user_agent=request.headers.get("user-agent"),
+                ip_address=request.client.host if request.client else None,
+                device_name=login_data.device_name,
+                device_type=login_data.device_type
+            )
+            
+            logger.info(f"LOGIN-SIMPLE: Session created successfully - token: {session.session_token[:8]}...")
+            
+            # Test cookie setting
+            cookie_manager.set_auth_cookies(
+                response=response,
+                session_token=session.session_token,
+                refresh_token=session.refresh_token,
+                csrf_token=csrf_token
+            )
+            
+            logger.info(f"LOGIN-SIMPLE: Cookies set successfully")
+            
+            return {
+                "success": True, 
+                "message": "Login successful",
+                "session_token": session.session_token[:8] + "...",
+                "user": user.username
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"LOGIN-SIMPLE: Error: {e}")
+        import traceback
+        logger.error(f"LOGIN-SIMPLE: Traceback: {traceback.format_exc()}")
+        return {"success": False, "message": f"Error: {str(e)}"}
+
+@router.get("/me-simple")
+async def get_current_user_simple(request: Request):
+    """Simple auth check endpoint without dependencies for testing"""
+    logger.info("ME-SIMPLE: Starting auth check...")
+    
+    try:
+        # Manual database connection
+        from models.database import engine
+        from sqlalchemy.orm import sessionmaker
+        
+        if engine is None:
+            logger.error("ME-SIMPLE: Engine is None - database not initialized")
+            return {"authenticated": False, "message": "Database not initialized"}
+        
+        # Create manual session
+        Session = sessionmaker(bind=engine)
+        db = Session()
+        
+        try:
+            from utils.cookies import cookie_manager
+            from services.auth_service import AuthService
+            
+            # Get cookies manually
+            session_token, refresh_token, csrf_token = cookie_manager.get_auth_cookies(request)
+            logger.info(f"ME-SIMPLE: Cookies - session: {'present' if session_token else 'missing'}")
+            
+            if not session_token:
+                logger.warning("ME-SIMPLE: No session token found")
+                return {"authenticated": False, "message": "No session token"}
+            
+            # Check session manually
+            auth_service = AuthService(db)
+            user = auth_service.get_user_by_session(session_token)
+            
+            if not user:
+                logger.warning(f"ME-SIMPLE: Invalid session token: {session_token[:8]}...")
+                return {"authenticated": False, "message": "Invalid session"}
+            
+            logger.info(f"ME-SIMPLE: Authentication successful for: {user.username}")
+            return {
+                "authenticated": True,
+                "user": user.username,
+                "session_token": session_token[:8] + "..."
+            }
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"ME-SIMPLE: Error: {e}")
+        import traceback
+        logger.error(f"ME-SIMPLE: Traceback: {traceback.format_exc()}")
+        return {"authenticated": False, "message": f"Error: {str(e)}"}
+
 # Pydantic models for request/response
 class LoginRequest(BaseModel):
     username: str = Field(..., description="Username")
