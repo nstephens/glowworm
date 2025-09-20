@@ -102,10 +102,11 @@ class ApiService {
     return response.data;
   }
 
-  async getImages(albumId?: number, playlistId?: number): Promise<ApiResponse<Image[]>> {
+  async getImages(albumId?: number, playlistId?: number, limit?: number): Promise<ApiResponse<Image[]>> {
     const params = new URLSearchParams();
     if (albumId) params.append('album_id', albumId.toString());
     if (playlistId) params.append('playlist_id', playlistId.toString());
+    if (limit) params.append('limit', limit.toString());
 
     const response = await this.api.get(`/images/?${params.toString()}`);
     return response.data;
