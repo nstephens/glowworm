@@ -132,7 +132,7 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
       setError(null);
 
       const [imagesResponse, albumsResponse] = await Promise.all([
-        apiService.getImages(),
+        apiService.getImages(undefined, undefined, 1000),
         apiService.getAlbums()
       ]);
 

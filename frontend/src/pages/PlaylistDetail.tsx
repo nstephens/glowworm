@@ -204,7 +204,7 @@ export const PlaylistDetail: React.FC = () => {
       const [playlistResponse, imagesResponse, allImagesResponse] = await Promise.all([
         apiService.getPlaylist(parseInt(id)),
         apiService.getPlaylistImages(parseInt(id)),
-        apiService.getImages()
+        apiService.getImages(undefined, undefined, 1000)
       ]);
       
       setPlaylist(playlistResponse.playlist);

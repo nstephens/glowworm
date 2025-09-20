@@ -38,7 +38,7 @@ const AdminDashboard: React.FC = () => {
     try {
       setLoading(true);
       const [imagesResponse, albumsResponse, playlistsResponse, devicesResponse] = await Promise.all([
-        apiService.getImages(),
+        apiService.getImages(undefined, undefined, 1000),
         apiService.getAlbums(),
         apiService.getPlaylists(),
         apiService.getDevices()
