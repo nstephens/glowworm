@@ -19,6 +19,11 @@ Suggested approach is to install the service on a stable linux server. It doesn'
 |-----------|----------|
 | ![Glowworm Playlists](https://manipulate.org/glowworm/glowworm_playlists.png) | ![Glowworm Displays](https://manipulate.org/glowworm/glowworm_displays.png) |
 
+### Display Example
+https://github.com/user-attachments/assets/f90c830d-4503-4673-8615-15d6d51d0e52
+
+
+
 ## ✨ Key Features
 
 - **Image Upload & Management**: Support for JPEG, PNG, GIF, WebP, AVIF formats with smart storage hierarchy
