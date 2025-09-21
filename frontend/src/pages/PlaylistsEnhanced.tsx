@@ -113,13 +113,6 @@ export const PlaylistsEnhanced: React.FC = () => {
       {/* Header with Back Button */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <button
-            onClick={handleBackToDashboard}
-            className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span>Back to Dashboard</span>
-          </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Enhanced Playlist Management</h1>
             <p className="text-gray-600">
