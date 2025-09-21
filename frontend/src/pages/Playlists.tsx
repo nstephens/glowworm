@@ -113,29 +113,20 @@ export const Playlists: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
+      {/* Action Bar */}
       <div className="animate-fade-in-up">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-2 h-8 bg-gradient-to-b from-chart-3 to-chart-4 rounded-full" />
-              <h1 className="text-3xl font-bold">Playlists</h1>
-            </div>
-            <p className="text-muted-foreground">Create and manage display playlists</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Badge variant="secondary" className="px-3 py-1">
-              <Play className="w-4 h-4 mr-2" />
-              {playlists.length} playlists
-            </Badge>
-            <Button 
-              className="shadow-lg"
-              onClick={() => setShowCreateModal(true)}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Playlist
-            </Button>
-          </div>
+        <div className="flex items-center justify-end gap-3 mb-6">
+          <Badge variant="secondary" className="px-3 py-1">
+            <Play className="w-4 h-4 mr-2" />
+            {playlists.length} playlists
+          </Badge>
+          <Button 
+            className="shadow-lg"
+            onClick={() => setShowCreateModal(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create Playlist
+          </Button>
         </div>
       </div>
 

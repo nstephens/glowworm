@@ -8,8 +8,8 @@ const navigationItems = [
   { path: '/admin', label: 'Dashboard', description: 'Overview and quick actions' },
   { path: '/admin/images', label: 'Images', description: 'Upload and manage images' },
   { path: '/admin/playlists', label: 'Playlists', description: 'Create and manage playlists' },
-  { path: '/admin/displays', label: 'Displays', description: 'Manage display devices' },
-  { path: '/admin/settings', label: 'Settings', description: 'System configuration' }
+  { path: '/admin/displays', label: 'Displays', description: 'Manage display devices and authorize new ones' },
+  { path: '/admin/settings', label: 'Settings', description: 'Configure system settings' }
 ];
 
 interface NavigationProps {

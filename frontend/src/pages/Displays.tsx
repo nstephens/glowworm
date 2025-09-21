@@ -410,12 +410,6 @@ const Displays: React.FC = () => {
 
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <div className="flex items-center space-x-4 mb-4">
-        </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Display Devices</h1>
-        <p className="text-gray-600">Manage display devices and authorize new ones</p>
-      </div>
 
       {/* Tabs */}
       <div className="mb-6">
