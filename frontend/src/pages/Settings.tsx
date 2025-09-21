@@ -713,13 +713,6 @@ const Settings: React.FC = () => {
       <AlertContainer alerts={alerts} onRemove={removeAlert} />
       
       {/* Header */}
-      <div className="animate-fade-in-up">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-2 h-8 bg-gradient-to-b from-chart-4 to-chart-5 rounded-full" />
-          <h1 className="text-3xl font-bold">System Settings</h1>
-        </div>
-        <p className="text-muted-foreground">Configure system-wide settings and preferences</p>
-      </div>
 
       {/* Tabs */}
       <Card className="border-0 shadow-lg bg-card/50 backdrop-blur-sm">

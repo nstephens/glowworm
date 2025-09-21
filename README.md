@@ -8,6 +8,14 @@ GlowWorm is designed to display images on low-power devices like Raspberry Pi wh
 
 Suggested approach is to install the service on a stable linux server. It doesn't have to be powerful, and could likely run on a raspberry pi as well (I just haven't tested that personally). 
 
+![](https://manipulate.org/glowworm/glowworm_dashboard.png | width=250)
+
+![](https://manipulate.org/glowworm/glowworm_images.png | width=250)
+
+![](https://manipulate.org/glowworm/glowworm_playlists.png | width=250)
+
+![](https://manipulate.org/glowworm/glowworm_displays.png | width=250)
+
 ## ✨ Key Features
 
 - **Image Upload & Management**: Support for JPEG, PNG, GIF, WebP, AVIF formats with smart storage hierarchy
