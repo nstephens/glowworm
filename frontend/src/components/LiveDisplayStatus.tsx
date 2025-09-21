@@ -34,10 +34,8 @@ const LiveDisplayStatus: React.FC = () => {
   const fetchDisplays = async () => {
     try {
       setError(null);
-      const response = await apiService.get('/display-devices/admin/devices');
-      if (response.data) {
-        setDisplays(response.data);
-      }
+      const devices = await apiService.getDevices();
+      setDisplays(devices || []);
     } catch (err: any) {
       console.error('Failed to fetch displays:', err);
       setError('Failed to load display status');
