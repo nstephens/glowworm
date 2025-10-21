@@ -304,15 +304,8 @@ async def validate_device_cookie(
 ):
     """Validate device cookie and return device status information"""
     try:
-        # Try to get device token from cookies
-        device_token = None
-        try:
-            cookies = cookie_manager.get_auth_cookies(request)
-            # For device cookies, we might need to check a different cookie name
-            # Let's check the request cookies directly for device-specific cookies
-            device_token = request.cookies.get('device_token')
-        except:
-            device_token = None
+        # Get device token from cookie using the cookie manager
+        device_token = cookie_manager.get_display_device_cookie(request)
         
         if not device_token:
             return CookieValidationResponse(
