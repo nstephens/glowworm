@@ -13,11 +13,13 @@ This guide covers running Glowworm with Docker Compose. Choose the method that b
 
 ## 🎯 Option 1: Quick Start Script (Recommended for New Users)
 
-The easiest way to get started:
+The easiest way to get started on a server:
+
+**On your server** (via SSH or direct access):
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/glowworm.git
+git clone https://github.com/nstephens/glowworm.git
 cd glowworm
 
 # Run the quick start script
@@ -31,16 +33,21 @@ The script will:
 - ✅ Pull/build Docker images
 - ✅ Start all services
 
-**That's it!** Access Glowworm at http://localhost
+**Access from any device on your network:**
+- Find your server's IP address: `hostname -I` or `ip addr show`
+- Open `http://YOUR_SERVER_IP` in a browser
+- Complete the setup wizard
 
 ---
 
-## 🛠️ Option 2: Manual Setup (For Developers)
+## 🛠️ Option 2: Manual Setup (For Advanced Users)
 
-### 1. Clone Repository
+### 1. Clone Repository on Your Server
+
+**SSH into your server** or access it directly, then:
 
 ```bash
-git clone https://github.com/yourusername/glowworm.git
+git clone https://github.com/nstephens/glowworm.git
 cd glowworm
 ```
 
@@ -51,18 +58,31 @@ cd glowworm
 cp docker/env.example .env
 ```
 
-**Edit `.env` and set secure passwords:**
+**Edit `.env` and set your configuration:**
 
 ```bash
 # REQUIRED: Generate secure passwords
-# Use: openssl rand -base64 32
+# Run: openssl rand -base64 32
 
 MYSQL_ROOT_PASSWORD=CHANGE_ME_TO_STRONG_PASSWORD
 MYSQL_PASSWORD=CHANGE_ME_TO_STRONG_PASSWORD
 SECRET_KEY=CHANGE_ME_TO_RANDOM_SECRET_KEY
+
+# IMPORTANT: Set to your server's IP address or hostname
+# Example: http://192.168.1.100:8001 or http://myserver.local:8001
+SERVER_BASE_URL=http://YOUR_SERVER_IP:8001
 ```
 
-⚠️ **SECURITY WARNING**: Do NOT use the placeholder values! Generate strong, unique passwords.
+⚠️ **CRITICAL**: 
+- Replace `CHANGE_ME` values with secure passwords
+- Replace `YOUR_SERVER_IP` with your server's actual IP address
+
+**Find your server's IP:**
+```bash
+hostname -I  # Shows all IP addresses
+# or
+ip addr show  # Detailed network information
+```
 
 ### 3. Build and Start
 
@@ -77,13 +97,18 @@ docker-compose up -d
 docker-compose ps
 ```
 
-### 4. Access the Application
+### 4. Access from Any Device on Your Network
 
-- **Web Interface**: http://localhost
-- **API (Direct)**: http://localhost:8001/api
-- **API (Proxied)**: http://localhost/api
+- **Web Interface**: `http://YOUR_SERVER_IP`
+- **Direct API**: `http://YOUR_SERVER_IP:8001/api`
 
-The setup wizard will guide you through initial configuration.
+Replace `YOUR_SERVER_IP` with your server's IP address (e.g., `192.168.1.100`)
+
+### 5. Complete Setup
+
+- Open the web interface in your browser
+- Follow the setup wizard to create admin account
+- Configure display settings
 
 ## 🛠️ Development Setup
 

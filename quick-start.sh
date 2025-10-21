@@ -79,9 +79,17 @@ if [ ! -f .env ]; then
     echo "  2. MYSQL_PASSWORD - Replace CHANGE_ME_TO_STRONG_PASSWORD"
     echo "  3. SECRET_KEY - Replace CHANGE_ME_TO_RANDOM_SECRET_KEY"
     echo ""
-    echo -e "${BLUE}Optional changes:${NC}"
-    echo "  4. SERVER_BASE_URL - Set to your server's IP or domain"
+    echo -e "${BLUE}Optional but RECOMMENDED for headless servers:${NC}"
+    echo "  4. SERVER_BASE_URL - Set to your server's IP address"
+    echo "     Example: http://192.168.1.100:8001"
     echo "  5. FRONTEND_PORT - Change if port 80 is in use"
+    echo ""
+    echo -e "${YELLOW}💡 Find your server's IP address:${NC}"
+    echo "  hostname -I"
+    echo ""
+    echo -e "${BLUE}For headless servers:${NC}"
+    echo "  Set SERVER_BASE_URL to http://YOUR_SERVER_IP:8001"
+    echo "  This allows displays and clients to connect from other devices"
     echo ""
     
     # Open editor if available
@@ -169,16 +177,34 @@ $DOCKER_COMPOSE -f $COMPOSE_FILE ps
 echo ""
 echo -e "${GREEN}✅ Glowworm is running!${NC}"
 echo ""
+
+# Detect server IP
+SERVER_IP=$(hostname -I | awk '{print $1}')
+if [ -z "$SERVER_IP" ]; then
+    SERVER_IP="YOUR_SERVER_IP"
+fi
+
 echo -e "${BLUE}🌐 Access the application:${NC}"
-echo "   📱 Web Interface: http://localhost"
-echo "   🔌 Direct API: http://localhost:8001/api"
+if [ "$SERVER_IP" != "YOUR_SERVER_IP" ]; then
+    echo "   📱 From this server:    http://localhost"
+    echo "   📱 From other devices:  http://$SERVER_IP"
+    echo "   🔌 Direct API:          http://$SERVER_IP:8001/api"
+else
+    echo "   📱 Web Interface: http://localhost (if local)"
+    echo "   📱 From network:  http://YOUR_SERVER_IP (replace with your server's IP)"
+    echo "   🔌 Direct API:    http://YOUR_SERVER_IP:8001/api"
+fi
+echo ""
+echo -e "${YELLOW}💡 For headless/remote servers:${NC}"
+echo "   Find your server IP: ${GREEN}hostname -I${NC}"
+echo "   Access from any device: ${GREEN}http://<SERVER_IP>${NC}"
 echo ""
 echo -e "${BLUE}📚 Next steps:${NC}"
-echo "   1. Open http://localhost in your browser"
+echo "   1. Open the web interface in your browser"
 echo "   2. Complete the setup wizard"
 echo "   3. Create an admin account"
 echo "   4. Upload images and create playlists"
-echo "   5. Register display devices"
+echo "   5. Register display devices from any device on your network"
 echo ""
 echo -e "${BLUE}💡 Useful commands:${NC}"
 echo "   View logs:    $DOCKER_COMPOSE -f $COMPOSE_FILE logs -f"

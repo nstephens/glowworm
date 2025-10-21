@@ -80,57 +80,76 @@ glowworm/
 
 ### 🐳 Docker Deployment (Recommended)
 
-The easiest way to run Glowworm is using Docker:
+The easiest way to run Glowworm is using Docker on a server (headless or not).
+
+#### Prerequisites
+
+- Docker Engine 20.10+
+- Docker Compose 2.0+
+- Server with at least 2GB RAM
+- Network access to your server
 
 #### Quick Start with Docker
 
-```bash
-# Download the quick start script
-curl -O https://raw.githubusercontent.com/nstephens/glowworm/main/quick-start.sh
-chmod +x quick-start.sh
+**On your server**, run:
 
-# Run it (will guide you through configuration)
+```bash
+# Download the repository
+git clone https://github.com/nstephens/glowworm.git
+cd glowworm
+
+# Run the quick start script
 ./quick-start.sh
 ```
 
-That's it! Access Glowworm at http://localhost
+The script will guide you through configuration and start all services.
+
+**Access from your computer:**
+- Replace `SERVER_IP` with your server's IP address (e.g., `192.168.1.100`)
+- Open `http://SERVER_IP` in your browser
+- Complete the setup wizard
 
 #### Manual Docker Setup
 
-1. **Pull the images**
-   ```bash
-   docker pull nickstephens/glowworm-backend:latest
-   docker pull nickstephens/glowworm-frontend:latest
-   docker pull mysql:8.0
-   ```
+**1. On your server, download the files:**
+```bash
+git clone https://github.com/nstephens/glowworm.git
+cd glowworm
+```
 
-2. **Download docker-compose.yml**
-   ```bash
-   git clone https://github.com/nstephens/glowworm.git
-   cd glowworm
-   ```
+**2. Configure environment:**
+```bash
+cp docker/env.example .env
 
-3. **Configure environment**
-   ```bash
-   cp docker/env.example .env
-   
-   # Generate secure passwords
-   openssl rand -base64 32  # Use for MYSQL_ROOT_PASSWORD
-   openssl rand -base64 32  # Use for MYSQL_PASSWORD
-   openssl rand -base64 32  # Use for SECRET_KEY
-   
-   # Edit .env with your passwords
-   nano .env
-   ```
+# Generate secure passwords
+openssl rand -base64 32  # Use for MYSQL_ROOT_PASSWORD
+openssl rand -base64 32  # Use for MYSQL_PASSWORD
+openssl rand -base64 32  # Use for SECRET_KEY
 
-4. **Start services**
-   ```bash
-   docker-compose up -d
-   ```
+# Edit .env with your settings
+nano .env
+```
 
-5. **Access the setup wizard**
-   - Open http://localhost in your browser
-   - Complete the first-time setup wizard
+**Important:** Set `SERVER_BASE_URL` to your server's IP:
+```bash
+SERVER_BASE_URL=http://192.168.1.100:8001  # Replace with your server's IP
+```
+
+**3. Start services:**
+```bash
+docker-compose up -d
+```
+
+**4. Access from any device on your network:**
+- Web Interface: `http://YOUR_SERVER_IP`
+- Direct API: `http://YOUR_SERVER_IP:8001/api`
+- Complete the first-time setup wizard
+
+**5. Register display devices:**
+- On your display device (tablet, Raspberry Pi, etc.)
+- Navigate to `http://YOUR_SERVER_IP`
+- Follow the on-screen authorization code
+- Authorize from the admin panel
 
 **Docker Hub Images:**
 - Backend: https://hub.docker.com/r/nickstephens/glowworm-backend
