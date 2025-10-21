@@ -331,18 +331,7 @@ async def validate_device_cookie(
                 needs_reregistration=True
             )
         
-        # Check if device is active
-        if not device.is_active:
-            return CookieValidationResponse(
-                valid=False,
-                device_id=device.id,
-                device_token=device_token,
-                status="device_inactive",
-                message="Device is inactive",
-                needs_reregistration=True
-            )
-        
-        # Cookie is valid
+        # Cookie is valid - return device info
         return CookieValidationResponse(
             valid=True,
             device_id=device.id,
