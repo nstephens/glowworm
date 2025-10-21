@@ -64,39 +64,22 @@ if [ ! -f .env ]; then
         cp docker/env.example .env
     else
         # Create a minimal .env if example doesn't exist
-        cat > .env << 'EOF'
-# Glowworm Configuration
-# IMPORTANT: Change these default passwords!
-
-MYSQL_ROOT_PASSWORD=change_this_root_password
-MYSQL_PASSWORD=change_this_app_password
-SECRET_KEY=change_this_secret_key_to_something_random
-
-MYSQL_DATABASE=glowworm
-MYSQL_USER=glowworm
-MYSQL_HOST=glowworm-mysql
-MYSQL_PORT=3306
-
-SERVER_BASE_URL=http://localhost
-BACKEND_PORT=8001
-FRONTEND_PORT=80
-
-DEFAULT_DISPLAY_TIME_SECONDS=30
-UPLOAD_DIRECTORY=uploads
-DISPLAY_NETWORK_INTERFACE=localhost
-
-LOG_LEVEL=INFO
-EOF
+        echo -e "${RED}❌ Error: docker/env.example not found${NC}"
+        echo "Please download from: https://raw.githubusercontent.com/yourusername/glowworm/main/docker/env.example"
+        exit 1
     fi
     
-    echo -e "${RED}⚠️  IMPORTANT: You must edit the .env file with secure passwords!${NC}"
+    echo -e "${RED}⚠️  SECURITY CRITICAL: You must set secure passwords!${NC}"
     echo ""
-    echo "Required changes in .env:"
-    echo "  1. MYSQL_ROOT_PASSWORD - Set a strong password"
-    echo "  2. MYSQL_PASSWORD - Set a strong password"
-    echo "  3. SECRET_KEY - Set a random secret key"
+    echo -e "${YELLOW}Generate secure passwords:${NC}"
+    echo "  openssl rand -base64 32"
     echo ""
-    echo "Optional changes:"
+    echo -e "${YELLOW}REQUIRED changes in .env:${NC}"
+    echo "  1. MYSQL_ROOT_PASSWORD - Replace CHANGE_ME_TO_STRONG_PASSWORD"
+    echo "  2. MYSQL_PASSWORD - Replace CHANGE_ME_TO_STRONG_PASSWORD"
+    echo "  3. SECRET_KEY - Replace CHANGE_ME_TO_RANDOM_SECRET_KEY"
+    echo ""
+    echo -e "${BLUE}Optional changes:${NC}"
     echo "  4. SERVER_BASE_URL - Set to your server's IP or domain"
     echo "  5. FRONTEND_PORT - Change if port 80 is in use"
     echo ""
@@ -117,15 +100,25 @@ EOF
 fi
 
 # Validate .env has been edited
-if grep -q "change_this" .env; then
-    echo -e "${RED}❌ Error: .env file still contains default passwords${NC}"
+if grep -q "CHANGE_ME" .env; then
+    echo -e "${RED}❌ SECURITY ERROR: .env file contains default placeholder values${NC}"
     echo ""
-    echo "Please edit .env and replace:"
-    echo "  - change_this_root_password"
-    echo "  - change_this_app_password"
-    echo "  - change_this_secret_key_to_something_random"
+    echo "You MUST replace ALL placeholders in .env:"
+    echo "  ❌ CHANGE_ME_TO_STRONG_PASSWORD"
+    echo "  ❌ CHANGE_ME_TO_RANDOM_SECRET_KEY"
     echo ""
-    echo "With strong, unique values."
+    echo "Generate secure passwords:"
+    echo "  openssl rand -base64 32"
+    echo ""
+    echo "Glowworm will NOT start with default passwords for security reasons."
+    exit 1
+fi
+
+# Additional validation for empty or weak passwords
+if grep -qE "(MYSQL_ROOT_PASSWORD=|MYSQL_PASSWORD=|SECRET_KEY=)$" .env; then
+    echo -e "${RED}❌ SECURITY ERROR: Empty password detected in .env${NC}"
+    echo ""
+    echo "All passwords must be set to strong, unique values."
     exit 1
 fi
 
