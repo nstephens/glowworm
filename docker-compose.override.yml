@@ -26,7 +26,7 @@ services:
       "
     # Override health check for development
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 60s
       timeout: 10s
       retries: 3
