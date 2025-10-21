@@ -91,65 +91,47 @@ The easiest way to run Glowworm is using Docker on a server (headless or not).
 
 #### Quick Start with Docker
 
-**On your server**, run:
+**On your server** (via SSH or direct access):
 
 ```bash
-# Download the repository
-git clone https://github.com/nstephens/glowworm.git
-cd glowworm
+# Create directory and download deployment files
+mkdir glowworm && cd glowworm
 
-# Run the quick start script
-./quick-start.sh
-```
+# Download docker-compose.yml
+curl -O https://raw.githubusercontent.com/nstephens/glowworm/main/docker-compose.yml
 
-The script will guide you through configuration and start all services.
+# Download supporting files
+mkdir -p docker/{mysql,nginx,scripts}
+curl -o docker/env.example https://raw.githubusercontent.com/nstephens/glowworm/main/docker/env.example
+curl -o docker/mysql/init.sql https://raw.githubusercontent.com/nstephens/glowworm/main/docker/mysql/init.sql
+curl -o docker/nginx/frontend.conf https://raw.githubusercontent.com/nstephens/glowworm/main/docker/nginx/frontend.conf
+curl -o docker/scripts/wait-for-mysql.sh https://raw.githubusercontent.com/nstephens/glowworm/main/docker/scripts/wait-for-mysql.sh
+chmod +x docker/scripts/wait-for-mysql.sh
 
-**Access from your computer:**
-- Replace `SERVER_IP` with your server's IP address (e.g., `192.168.1.100`)
-- Open `http://SERVER_IP` in your browser
-- Complete the setup wizard
-
-#### Manual Docker Setup
-
-**1. On your server, download the files:**
-```bash
-git clone https://github.com/nstephens/glowworm.git
-cd glowworm
-```
-
-**2. Configure environment:**
-```bash
+# Configure
 cp docker/env.example .env
+nano .env  # Set passwords and SERVER_BASE_URL to your server's IP
 
-# Generate secure passwords
-openssl rand -base64 32  # Use for MYSQL_ROOT_PASSWORD
-openssl rand -base64 32  # Use for MYSQL_PASSWORD
-openssl rand -base64 32  # Use for SECRET_KEY
-
-# Edit .env with your settings
-nano .env
-```
-
-**Important:** Set `SERVER_BASE_URL` to your server's IP:
-```bash
-SERVER_BASE_URL=http://192.168.1.100:8001  # Replace with your server's IP
-```
-
-**3. Start services:**
-```bash
+# Start
 docker-compose up -d
 ```
 
-**4. Access from any device on your network:**
-- Web Interface: `http://YOUR_SERVER_IP`
-- Direct API: `http://YOUR_SERVER_IP:8001/api`
-- Complete the first-time setup wizard
+**Access from any device on your network:**
+- Find server IP: `hostname -I`
+- Open `http://YOUR_SERVER_IP` in your browser
+- Complete the setup wizard
 
-**5. Register display devices:**
-- On your display device (tablet, Raspberry Pi, etc.)
-- Navigate to `http://YOUR_SERVER_IP`
-- Follow the on-screen authorization code
-- Authorize from the admin panel
+#### Alternative: Clone Full Repository
+
+If you want the full source code or plan to contribute:
+
+```bash
+git clone https://github.com/nstephens/glowworm.git
+cd glowworm
+./quick-start.sh
+```
+
+---
 
 **Docker Hub Images:**
 - Backend: https://hub.docker.com/r/nickstephens/glowworm-backend
