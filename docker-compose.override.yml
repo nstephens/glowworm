@@ -1,0 +1,72 @@
+# Docker Compose override for development
+# This file is automatically loaded by docker-compose for development
+# It provides live reload and development-specific configurations
+
+services:
+  # Backend development overrides
+  glowworm-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    volumes:
+      # Mount source code for live reload
+      - ./backend:/app
+      - /app/venv  # Exclude venv from volume mount
+    environment:
+      # Development settings
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      PYTHONPATH: /app
+    command: >
+      sh -c "
+        echo 'Waiting for MySQL...' &&
+        ./docker/scripts/wait-for-mysql.sh &&
+        echo 'Starting backend with live reload...' &&
+        uvicorn main:app --host 0.0.0.0 --port 8001 --reload --reload-dir /app
+      "
+    # Override health check for development
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Frontend development overrides
+  glowworm-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      target: builder  # Use builder stage for development
+    volumes:
+      # Mount source code for live reload
+      - ./frontend:/app
+      - /app/node_modules  # Exclude node_modules from volume mount
+    environment:
+      NODE_ENV: development
+    command: >
+      sh -c "
+        echo 'Installing dependencies...' &&
+        npm install &&
+        echo 'Starting frontend development server...' &&
+        npm run dev -- --host 0.0.0.0 --port 80
+      "
+    ports:
+      - "3000:80"  # Use port 3000 for development to avoid conflicts
+    # Override health check for development
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # MySQL development overrides
+  glowworm-mysql:
+    # Keep MySQL the same for development
+    # You can uncomment these if you need different MySQL settings for dev
+    # environment:
+    #   MYSQL_ROOT_PASSWORD: dev_root_password
+    #   MYSQL_PASSWORD: dev_password
+    ports:
+      - "3307:3306"  # Use different port to avoid conflicts with local MySQL

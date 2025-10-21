@@ -1,6 +1,3 @@
-# Production Docker Compose for Glowworm
-# For end users - uses pre-built images from Docker Hub
-
 services:
   # MySQL Database
   glowworm-mysql:
@@ -26,9 +23,11 @@ services:
       retries: 5
       start_period: 30s
 
-  # Backend API (Pre-built image from Docker Hub)
+  # Backend API
   glowworm-backend:
-    image: yourusername/glowworm-backend:latest  # Change 'yourusername' to your Docker Hub username
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
     container_name: glowworm-backend
     restart: unless-stopped
     environment:
@@ -66,9 +65,11 @@ services:
       retries: 3
       start_period: 40s
 
-  # Frontend Web Interface (Pre-built image from Docker Hub)
+  # Frontend Web Interface
   glowworm-frontend:
-    image: yourusername/glowworm-frontend:latest  # Change 'yourusername' to your Docker Hub username
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
     container_name: glowworm-frontend
     restart: unless-stopped
     ports:
@@ -94,4 +95,3 @@ volumes:
 networks:
   glowworm-network:
     driver: bridge
-

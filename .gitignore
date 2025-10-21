@@ -64,6 +64,9 @@ Thumbs.db
 # Task Master files
 .taskmaster/
 
+# Docker publishing materials (maintainer only)
+docker-publish/
+
 # Test files
 test_*.py
 *_test.py
