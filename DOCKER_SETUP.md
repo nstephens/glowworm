@@ -172,13 +172,14 @@ glowworm/
 
 ### Port Configuration
 
-- **Port 80**: Web interface (with API proxy)
+**Production (exposed to host):**
+- **Port 80**: Web interface
 - **Port 8001**: Direct API access (for displays)
-- **Port 3306**: MySQL database
+- **MySQL**: Internal only (no host port) - prevents conflicts!
 
-For development:
+**Development mode:**
 - **Port 3000**: Frontend dev server
-- **Port 3307**: MySQL (to avoid conflicts)
+- **Port 3307**: MySQL exposed for debugging (optional)
 
 ## 🔍 Troubleshooting
 
@@ -207,13 +208,34 @@ docker-compose logs glowworm-backend
 docker-compose restart
 ```
 
-**3. Permission Issues**
+**3. Access MySQL Database (for debugging)**
+
+MySQL is not exposed to the host to prevent conflicts. To access it:
+
+```bash
+# Option 1: Access via docker exec
+docker-compose exec glowworm-mysql mysql -u root -p
+# Enter your MYSQL_ROOT_PASSWORD when prompted
+
+# Option 2: Access via backend container
+docker-compose exec glowworm-backend bash
+# Then connect to glowworm-mysql:3306 from within
+
+# Option 3: Temporarily expose MySQL
+# Edit docker-compose.yml and add under glowworm-mysql:
+#   ports:
+#     - "3307:3306"
+# Then: docker-compose up -d
+# Connect to localhost:3307
+```
+
+**4. Permission Issues**
 ```bash
 # Fix upload directory permissions
 docker-compose exec glowworm-backend chown -R glowworm:glowworm /app/uploads
 ```
 
-**4. Build Issues**
+**5. Build Issues (if building from source)**
 ```bash
 # Rebuild containers
 docker-compose build --no-cache
