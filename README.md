@@ -78,14 +78,80 @@ glowworm/
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### 🐳 Docker Deployment (Recommended)
+
+The easiest way to run Glowworm is using Docker:
+
+#### Quick Start with Docker
+
+```bash
+# Download the quick start script
+curl -O https://raw.githubusercontent.com/nstephens/glowworm/main/quick-start.sh
+chmod +x quick-start.sh
+
+# Run it (will guide you through configuration)
+./quick-start.sh
+```
+
+That's it! Access Glowworm at http://localhost
+
+#### Manual Docker Setup
+
+1. **Pull the images**
+   ```bash
+   docker pull nickstephens/glowworm-backend:latest
+   docker pull nickstephens/glowworm-frontend:latest
+   docker pull mysql:8.0
+   ```
+
+2. **Download docker-compose.yml**
+   ```bash
+   git clone https://github.com/nstephens/glowworm.git
+   cd glowworm
+   ```
+
+3. **Configure environment**
+   ```bash
+   cp docker/env.example .env
+   
+   # Generate secure passwords
+   openssl rand -base64 32  # Use for MYSQL_ROOT_PASSWORD
+   openssl rand -base64 32  # Use for MYSQL_PASSWORD
+   openssl rand -base64 32  # Use for SECRET_KEY
+   
+   # Edit .env with your passwords
+   nano .env
+   ```
+
+4. **Start services**
+   ```bash
+   docker-compose up -d
+   ```
+
+5. **Access the setup wizard**
+   - Open http://localhost in your browser
+   - Complete the first-time setup wizard
+
+**Docker Hub Images:**
+- Backend: https://hub.docker.com/r/nickstephens/glowworm-backend
+- Frontend: https://hub.docker.com/r/nickstephens/glowworm-frontend
+
+**Full Docker documentation**: See [DOCKER_SETUP.md](DOCKER_SETUP.md)
+
+---
+
+### 💻 Manual Installation (Alternative)
+
+If you prefer to install without Docker:
+
+#### Prerequisites
 
 - Python 3.8+ with pip
 - Node.js 16+ with npm
 - MySQL 8.0+
 - Git
 
-### Service Setup
+#### Service Setup
 
 1. **Clone the repository**
    ```bash
@@ -239,7 +305,7 @@ GlowWorm is optimized for Raspberry Pi displays running FullPageOS. You can inst
       --enable-features=VaapiVideoDecoder
    )
    ```
-2. Create a new xorg conf file to change resolution to 1920x1080 -- I was able to run at 4k, but it is much smoother at 2k and I can't easily tell the differenceq
+2. Create a new xorg conf file to change resolution to 1920x1080 -- I was able to run at 4k, but it is much smoother at 2k and I can't easily tell the difference
    ```bash
    sudo vi /etc/X11/xorg.conf.d/20-raspi.conf
 
