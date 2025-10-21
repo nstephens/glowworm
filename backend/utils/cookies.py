@@ -115,6 +115,8 @@ class CookieManager:
         # Display devices need access from any path
         cookie_config["path"] = "/"
         
+        logger.info(f"Setting display cookie '{CookieManager.DISPLAY_COOKIE}' with config: {cookie_config}")
+        
         response.set_cookie(
             key=CookieManager.DISPLAY_COOKIE,
             value=device_token,

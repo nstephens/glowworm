@@ -74,7 +74,8 @@ async def register_device(
         # Set device token cookie
         cookie_manager.set_display_device_cookie(response, device.device_token)
         
-        logger.info(f"Device registered: {device.device_token[:8]}...")
+        logger.info(f"Device registered: {device.device_token[:8]}... (ID: {device.id})")
+        logger.info(f"Set cookie 'glowworm_display' with token: {device.device_token[:8]}...")
         
         return DeviceRegistrationResponse(
             device_id=device.id,
@@ -306,6 +307,9 @@ async def validate_device_cookie(
     try:
         # Get device token from cookie using the cookie manager
         device_token = cookie_manager.get_display_device_cookie(request)
+        
+        logger.info(f"Cookie validation request - token present: {bool(device_token)}")
+        logger.info(f"All cookies in request: {list(request.cookies.keys())}")
         
         if not device_token:
             return CookieValidationResponse(
