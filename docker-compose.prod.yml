@@ -1,0 +1,97 @@
+# Production Docker Compose for Glowworm
+# For end users - uses pre-built images from Docker Hub
+
+services:
+  # MySQL Database
+  glowworm-mysql:
+    image: mysql:8.0
+    container_name: glowworm-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-glowworm}
+      MYSQL_USER: ${MYSQL_USER:-glowworm}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "3306:3306"
+    networks:
+      - glowworm-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Backend API (Pre-built image from Docker Hub)
+  glowworm-backend:
+    image: yourusername/glowworm-backend:latest  # Change 'yourusername' to your Docker Hub username
+    container_name: glowworm-backend
+    restart: unless-stopped
+    environment:
+      # Database connection
+      MYSQL_HOST: glowworm-mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-glowworm}
+      MYSQL_USER: ${MYSQL_USER:-glowworm}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      
+      # Application settings
+      SECRET_KEY: ${SECRET_KEY}
+      SERVER_BASE_URL: ${SERVER_BASE_URL:-http://localhost}
+      DEFAULT_DISPLAY_TIME_SECONDS: ${DEFAULT_DISPLAY_TIME_SECONDS:-30}
+      UPLOAD_DIRECTORY: ${UPLOAD_DIRECTORY:-uploads}
+      
+      # Network settings
+      DISPLAY_NETWORK_INTERFACE: ${DISPLAY_NETWORK_INTERFACE:-localhost}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - uploads_data:/app/uploads
+    ports:
+      - "${BACKEND_PORT:-8001}:8001"
+    depends_on:
+      glowworm-mysql:
+        condition: service_healthy
+    networks:
+      - glowworm-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend Web Interface (Pre-built image from Docker Hub)
+  glowworm-frontend:
+    image: yourusername/glowworm-frontend:latest  # Change 'yourusername' to your Docker Hub username
+    container_name: glowworm-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      glowworm-backend:
+        condition: service_healthy
+    networks:
+      - glowworm-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  mysql_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  glowworm-network:
+    driver: bridge
+
