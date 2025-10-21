@@ -63,10 +63,10 @@ services:
 
   # MySQL development overrides
   glowworm-mysql:
-    # Keep MySQL the same for development
+    # For development, optionally expose MySQL on different port for debugging
+    ports:
+      - "3307:3306"  # Expose on 3307 to avoid conflicts with local MySQL
     # You can uncomment these if you need different MySQL settings for dev
     # environment:
     #   MYSQL_ROOT_PASSWORD: dev_root_password
     #   MYSQL_PASSWORD: dev_password
-    ports:
-      - "3307:3306"  # Use different port to avoid conflicts with local MySQL

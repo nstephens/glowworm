@@ -88,6 +88,7 @@ The easiest way to run Glowworm is using Docker on a server (headless or not).
 - Docker Compose 2.0+
 - Server with at least 2GB RAM
 - Network access to your server
+- **Only ports 80 and 8001 needed** (MySQL runs in Docker network)
 
 #### Ultra-Quick Deploy (2 Commands)
 

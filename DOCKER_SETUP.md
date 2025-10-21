@@ -7,7 +7,8 @@ This guide covers running Glowworm with Docker Compose. Choose the method that b
 - Docker Engine 20.10+
 - Docker Compose 2.0+
 - At least 2GB RAM available
-- Ports 80, 8001, and 3306 available (or customize in .env)
+- Ports 80 and 8001 available (or customize in .env)
+- **Note:** MySQL runs entirely within Docker network - no host port needed!
 
 ---
 

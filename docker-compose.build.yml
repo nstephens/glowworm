@@ -81,8 +81,8 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ports:
-      - "3306:3306"
+    # No ports exposed - only accessible within Docker network
+    # This prevents conflicts with host MySQL and improves security
     networks:
       - glowworm-network
     healthcheck:
