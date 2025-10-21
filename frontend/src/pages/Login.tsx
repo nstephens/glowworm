@@ -34,15 +34,19 @@ const Login: React.FC = () => {
           console.log('Logout call failed (expected if no session):', e);
         }
         
-        // Clear all cookies by setting them to expire
-        document.cookie = 'glowworm_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=10.10.10.2;';
-        document.cookie = 'glowworm_refresh=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=10.10.10.2;';
-        document.cookie = 'glowworm_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=10.10.10.2;';
+        // Get the current hostname for cookie clearing
+        const hostname = window.location.hostname;
         
-        // Also clear without domain in case they were set without domain
-        document.cookie = 'glowworm_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        document.cookie = 'glowworm_refresh=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        document.cookie = 'glowworm_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        // Clear all cookies by setting them to expire
+        const cookieNames = ['glowworm_session', 'glowworm_refresh', 'glowworm_csrf'];
+        cookieNames.forEach(cookieName => {
+          // Clear with domain (for cross-port access)
+          if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+            document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${hostname};`;
+          }
+          // Also clear without domain
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        });
         
         console.log('✅ Cleared all authentication state');
       } catch (error) {

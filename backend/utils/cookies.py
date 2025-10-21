@@ -19,13 +19,23 @@ class CookieManager:
     @staticmethod
     def _get_cookie_config() -> Dict[str, Any]:
         """Get secure cookie configuration"""
-        return {
+        # Extract domain from server_base_url for cross-port cookie access
+        from urllib.parse import urlparse
+        parsed_url = urlparse(settings.server_base_url)
+        cookie_domain = parsed_url.hostname
+        
+        config = {
             "httponly": True,  # Always HttpOnly for security
             "secure": settings.cookie_secure,  # Secure in production
             "samesite": "lax",  # Balance security and functionality
             "path": "/",  # Restrict to application root
-            "domain": "10.10.10.2",  # Allow cross-port access on same IP
         }
+        
+        # Only set domain if it's not localhost (to allow cross-port access)
+        if cookie_domain and cookie_domain not in ["localhost", "127.0.0.1"]:
+            config["domain"] = cookie_domain
+        
+        return config
     
     @staticmethod
     def set_auth_cookies(

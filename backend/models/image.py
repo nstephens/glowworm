@@ -36,6 +36,14 @@ class Image(Base):
 
     def to_dict(self):
         """Convert image to dictionary"""
+        # Get server base URL from settings
+        try:
+            from services.config_service import config_service
+            base_url = config_service.server_base_url
+        except Exception:
+            from config.settings import settings
+            base_url = settings.server_base_url
+        
         return {
             "id": self.id,
             "filename": self.filename,
@@ -50,8 +58,8 @@ class Image(Base):
             "exif": self.exif,
             "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
             "playlist_id": self.playlist_id,
-            "url": f"http://10.10.10.2:8001/api/images/{self.id}/file",
-            "thumbnail_url": f"http://10.10.10.2:8001/api/images/{self.id}/file?size=medium&v={self.id}_{self.album_id or 0}"
+            "url": f"{base_url}/api/images/{self.id}/file",
+            "thumbnail_url": f"{base_url}/api/images/{self.id}/file?size=medium&v={self.id}_{self.album_id or 0}"
         }
 
     @property

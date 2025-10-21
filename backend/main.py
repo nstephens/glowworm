@@ -78,17 +78,31 @@ add_security_headers(app)
 # Add performance monitoring middleware
 app.add_middleware(PerformanceMonitoringMiddleware)
 
-# CORS middleware - allow specific origins for dynamic IP access
-# In production, you should restrict this to specific domains
+# CORS middleware - dynamically build allowed origins from server_base_url
+from urllib.parse import urlparse
+
+# Parse the server base URL to get the hostname
+parsed_url = urlparse(settings.server_base_url)
+server_host = parsed_url.hostname or "localhost"
+frontend_ports = [3003, 3000, 80]  # Common frontend ports
+
+# Build allowed origins list
+allowed_origins = [
+    "http://localhost:3003",
+    "http://127.0.0.1:3003", 
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+# Add server host with different ports if not localhost
+if server_host not in ["localhost", "127.0.0.1"]:
+    for port in frontend_ports:
+        allowed_origins.append(f"http://{server_host}:{port}")
+        allowed_origins.append(f"https://{server_host}:{port}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3003",
-        "http://127.0.0.1:3003", 
-        "http://10.10.10.2:3003",
-        "http://10.10.10.2:3000",  # Fallback port
-        "http://localhost:3000",   # Fallback port
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],
     allow_headers=["*"],
