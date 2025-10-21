@@ -326,13 +326,57 @@ After publishing, update:
    - Never use placeholder values from `env.example`
 2. **Environment Files**: Never commit `.env` files to version control
 3. **Network Security**: Consider using a reverse proxy for production deployments
-4. **Database Security**: The MySQL container is exposed on port 3306 - consider firewall rules for production
+4. **Database Security**: MySQL runs in Docker network only (not exposed to host) - extra secure!
+5. **Data Backup**: Regularly backup `./data/` directory
 
 ## 📦 Data Persistence
 
-- **MySQL Data**: Stored in `mysql_data` Docker volume
-- **Uploads**: Stored in `uploads_data` Docker volume
-- **Backup**: Use `docker-compose down -v` to remove all data
+All data is stored in local directories for easy access and backup:
+
+- **MySQL Data**: `./data/mysql/` - Database files
+- **Uploads**: `./data/uploads/` - Images and thumbnails
+
+### Easy Backup
+
+```bash
+# Backup everything
+tar -czf glowworm-backup-$(date +%Y%m%d).tar.gz data/
+
+# Backup just database
+tar -czf mysql-backup-$(date +%Y%m%d).tar.gz data/mysql/
+
+# Backup just images
+tar -czf uploads-backup-$(date +%Y%m%d).tar.gz data/uploads/
+```
+
+### Easy Restore
+
+```bash
+# Stop services
+docker-compose down
+
+# Extract backup
+tar -xzf glowworm-backup-20241021.tar.gz
+
+# Restart services
+docker-compose up -d
+```
+
+### Migration to New Server
+
+Simply copy the entire `glowworm/` directory to the new server:
+```bash
+# On old server
+tar -czf glowworm-complete.tar.gz glowworm/
+
+# Transfer to new server
+scp glowworm-complete.tar.gz user@newserver:~/
+
+# On new server
+tar -xzf glowworm-complete.tar.gz
+cd glowworm
+docker-compose up -d
+```
 
 ## 🚀 Production Deployment
 

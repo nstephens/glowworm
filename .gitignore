@@ -21,6 +21,9 @@ frontend/dist/
 uploads/
 backend/logs/
 
+# Docker data directories
+data/
+
 # Database files
 *.db
 *.sqlite

@@ -184,6 +184,12 @@ fi
 echo -e "${GREEN}✅ Configuration file ready${NC}"
 echo ""
 
+# Create data directories for persistent storage
+echo -e "${YELLOW}📁 Creating data directories...${NC}"
+mkdir -p data/mysql data/uploads
+echo -e "${GREEN}✅ Data directories created${NC}"
+echo ""
+
 # Download required files if they don't exist
 if [ ! -f docker-compose.yml ]; then
     echo -e "${YELLOW}📥 Downloading docker-compose.yml...${NC}"
@@ -267,6 +273,11 @@ echo "   2. Complete the setup wizard"
 echo "   3. Create an admin account"
 echo "   4. Upload images and create playlists"
 echo "   5. Register display devices from any device on your network"
+echo ""
+echo -e "${BLUE}💾 Data Storage:${NC}"
+echo "   Database:  ./data/mysql/"
+echo "   Images:    ./data/uploads/"
+echo "   Backup:    tar -czf backup.tar.gz data/"
 echo ""
 echo -e "${BLUE}💡 Useful commands:${NC}"
 echo "   View logs:    $DOCKER_COMPOSE -f $COMPOSE_FILE logs -f"

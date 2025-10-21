@@ -10,7 +10,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:-glowworm}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
-      - mysql_data:/var/lib/mysql
+      - ./data/mysql:/var/lib/mysql
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     # No ports exposed - only accessible within Docker network
     # This prevents conflicts with host MySQL and improves security
@@ -48,7 +48,7 @@ services:
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     volumes:
-      - uploads_data:/app/uploads
+      - ./data/uploads:/app/uploads
     ports:
       - "${BACKEND_PORT:-8001}:8001"
     depends_on:
@@ -81,12 +81,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-
-volumes:
-  mysql_data:
-    driver: local
-  uploads_data:
-    driver: local
 
 networks:
   glowworm-network:
