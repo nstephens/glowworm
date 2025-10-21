@@ -7,12 +7,12 @@ from pathlib import Path
 from sqlalchemy import create_engine, text
 
 class Settings(BaseSettings):
-    # Database settings
-    mysql_host: str = Field(default="localhost", description="MySQL host")
-    mysql_port: int = Field(default=3306, description="MySQL port")
-    app_db_user: str = Field(default="glowworm", description="Application database username")
-    app_db_password: str = Field(default="", description="Application database password")
-    mysql_database: str = Field(default="glowworm", description="MySQL database name")
+    # Database settings (can be set via environment variables or settings.json)
+    mysql_host: str = Field(default=os.getenv("MYSQL_HOST", "localhost"), description="MySQL host")
+    mysql_port: int = Field(default=int(os.getenv("MYSQL_PORT", "3306")), description="MySQL port")
+    app_db_user: str = Field(default=os.getenv("MYSQL_USER", "glowworm"), description="Application database username")
+    app_db_password: str = Field(default=os.getenv("MYSQL_PASSWORD", ""), description="Application database password")
+    mysql_database: str = Field(default=os.getenv("MYSQL_DATABASE", "glowworm"), description="MySQL database name")
     
     # Legacy field mapping for backward compatibility
     @property
@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     # Application settings
     app_name: str = Field(default="GlowWorm", description="Application name")
     app_version: str = Field(default="0.1.0", description="Application version")
-    secret_key: str = Field(default="", description="Secret key for encryption")
-    server_base_url: str = Field(default="http://localhost:8001", description="Base URL for the server (used for API endpoints and image URLs)")
+    secret_key: str = Field(default=os.getenv("SECRET_KEY", ""), description="Secret key for encryption")
+    server_base_url: str = Field(default=os.getenv("SERVER_BASE_URL", "http://localhost:8001"), description="Base URL for the server (used for API endpoints and image URLs)")
     
     # Server configuration
     backend_port: int = Field(default=8001, description="Backend server port")
@@ -91,7 +91,28 @@ def get_fresh_settings() -> Settings:
 
 def is_configured() -> bool:
     """Check if the application is properly configured"""
-    # Reload configuration from file to get latest values
+    # For Docker deployments, check if we have environment variables set
+    if os.getenv('MYSQL_PASSWORD') and os.getenv('SECRET_KEY'):
+        # Running in Docker with environment variables - test database connection
+        try:
+            mysql_host = os.getenv('MYSQL_HOST', 'localhost')
+            mysql_port = int(os.getenv('MYSQL_PORT', '3306'))
+            mysql_user = os.getenv('MYSQL_USER', 'glowworm')
+            mysql_password = os.getenv('MYSQL_PASSWORD', '')
+            mysql_database = os.getenv('MYSQL_DATABASE', 'glowworm')
+            
+            database_url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}:{mysql_port}/{mysql_database}"
+            engine = create_engine(database_url, connect_args={"connect_timeout": 5})
+            
+            # Test the connection
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            
+            return True
+        except Exception:
+            return False
+    
+    # Check file-based configuration (non-Docker deployments)
     try:
         config_file = get_config_file_path()
         if config_file.exists():
