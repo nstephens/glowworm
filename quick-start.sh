@@ -5,6 +5,9 @@
 
 set -e
 
+# Configuration
+REPO_BASE="https://raw.githubusercontent.com/nstephens/glowworm/main"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -133,18 +136,29 @@ fi
 echo -e "${GREEN}✅ Configuration file ready${NC}"
 echo ""
 
+# Download required files if they don't exist
+if [ ! -f docker-compose.yml ]; then
+    echo -e "${YELLOW}📥 Downloading docker-compose.yml...${NC}"
+    curl -sS -o docker-compose.yml "$REPO_BASE/docker-compose.yml"
+fi
+
+# Download docker config files if they don't exist
+if [ ! -f docker/mysql/init.sql ]; then
+    echo -e "${YELLOW}📥 Downloading docker configuration files...${NC}"
+    mkdir -p docker/{mysql,nginx,scripts}
+    curl -sS -o docker/mysql/init.sql "$REPO_BASE/docker/mysql/init.sql"
+    curl -sS -o docker/nginx/frontend.conf "$REPO_BASE/docker/nginx/frontend.conf"
+    curl -sS -o docker/scripts/wait-for-mysql.sh "$REPO_BASE/docker/scripts/wait-for-mysql.sh"
+    chmod +x docker/scripts/wait-for-mysql.sh
+    echo -e "${GREEN}✅ Configuration files downloaded${NC}"
+fi
+
 # Check which docker-compose file to use
-if [ -f docker-compose.prod.yml ]; then
-    COMPOSE_FILE="docker-compose.prod.yml"
-    echo -e "${BLUE}Using production configuration (pre-built images)${NC}"
-elif [ -f docker-compose.yml ]; then
+if [ -f docker-compose.yml ]; then
     COMPOSE_FILE="docker-compose.yml"
-    echo -e "${BLUE}Using local configuration${NC}"
+    echo -e "${BLUE}Using docker-compose configuration${NC}"
 else
-    echo -e "${RED}❌ No docker-compose file found${NC}"
-    echo ""
-    echo "Please download docker-compose.yml from:"
-    echo "  https://raw.githubusercontent.com/yourusername/glowworm/main/docker-compose.prod.yml"
+    echo -e "${RED}❌ docker-compose.yml not found${NC}"
     exit 1
 fi
 

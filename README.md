@@ -89,18 +89,34 @@ The easiest way to run Glowworm is using Docker on a server (headless or not).
 - Server with at least 2GB RAM
 - Network access to your server
 
-#### Quick Start with Docker
+#### Ultra-Quick Deploy (2 Commands)
 
-**On your server** (via SSH or direct access):
+**On your server** (via SSH), run:
 
 ```bash
-# Create directory and download deployment files
+curl -O https://raw.githubusercontent.com/nstephens/glowworm/main/quick-start.sh
+chmod +x quick-start.sh && ./quick-start.sh
+```
+
+The script will:
+1. Download all required files (~50KB)
+2. Guide you through password generation
+3. Help configure your server IP
+4. Start all services
+
+**Then access from any device:**
+- Find server IP: `hostname -I`
+- Open `http://YOUR_SERVER_IP` in browser
+- Complete setup wizard
+
+#### Manual Docker Setup (More Control)
+
+If you prefer to configure manually:
+
+```bash
+# Create directory and download files
 mkdir glowworm && cd glowworm
-
-# Download docker-compose.yml
 curl -O https://raw.githubusercontent.com/nstephens/glowworm/main/docker-compose.yml
-
-# Download supporting files
 mkdir -p docker/{mysql,nginx,scripts}
 curl -o docker/env.example https://raw.githubusercontent.com/nstephens/glowworm/main/docker/env.example
 curl -o docker/mysql/init.sql https://raw.githubusercontent.com/nstephens/glowworm/main/docker/mysql/init.sql
@@ -110,16 +126,13 @@ chmod +x docker/scripts/wait-for-mysql.sh
 
 # Configure
 cp docker/env.example .env
-nano .env  # Set passwords and SERVER_BASE_URL to your server's IP
+nano .env  # Set passwords and SERVER_BASE_URL
 
 # Start
 docker-compose up -d
 ```
 
-**Access from any device on your network:**
-- Find server IP: `hostname -I`
-- Open `http://YOUR_SERVER_IP` in your browser
-- Complete the setup wizard
+**Access:** `http://YOUR_SERVER_IP` (replace with your server's IP from `hostname -I`)
 
 #### Alternative: Clone Full Repository
 
