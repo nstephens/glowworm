@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     
     # File upload settings
     max_file_size: int = Field(default=15 * 1024 * 1024, description="Max file size in bytes (15MB)")
-    upload_path: str = Field(default="../uploads", description="Upload directory path")
+    upload_path: str = Field(default=os.getenv("UPLOAD_PATH", "../uploads"), description="Upload directory path")
     
     # Display settings
     default_slideshow_duration: int = Field(default=5, description="Default slideshow duration in seconds")

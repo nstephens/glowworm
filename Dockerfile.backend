@@ -5,6 +5,7 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV UPLOAD_PATH=/app/uploads
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -34,12 +35,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend application
 COPY backend/ /app/
 
-# Create uploads directory
-RUN mkdir -p /app/uploads
-
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash glowworm
+
+# Create uploads directory with correct permissions
+# The mounted volume will override this, but we need it for proper ownership
+RUN mkdir -p /app/uploads && chown -R glowworm:glowworm /app/uploads
+
+# Set ownership of app directory
 RUN chown -R glowworm:glowworm /app
+
+# Switch to non-root user
 USER glowworm
 
 # Expose port
