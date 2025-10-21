@@ -12,12 +12,10 @@ RUN npm ci
 # Copy source code
 COPY frontend/ ./
 
-# Create non-root user
-RUN addgroup -g 1000 glowworm && \
-    adduser -D -u 1000 -G glowworm glowworm && \
-    chown -R glowworm:glowworm /app
+# Use the existing node user (non-root)
+RUN chown -R node:node /app
 
-USER glowworm
+USER node
 
 # Expose port
 EXPOSE 3003
