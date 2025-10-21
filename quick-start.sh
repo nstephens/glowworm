@@ -143,15 +143,20 @@ EOF
     echo "  This allows displays and clients to connect from other devices"
     echo ""
     
-    # Open editor if available
-    if command -v nano &> /dev/null; then
+    # Open editor
+    EDITOR="${EDITOR:-${VISUAL:-nano}}"
+    
+    if command -v $EDITOR &> /dev/null; then
+        read -p "Press Enter to edit .env with $EDITOR (or Ctrl+C to edit manually)..."
+        $EDITOR .env
+    elif command -v nano &> /dev/null; then
         read -p "Press Enter to edit .env with nano (or Ctrl+C to edit manually)..."
         nano .env
     elif command -v vi &> /dev/null; then
         read -p "Press Enter to edit .env with vi (or Ctrl+C to edit manually)..."
         vi .env
     else
-        echo -e "${YELLOW}Please edit .env file manually with your text editor.${NC}"
+        echo -e "${YELLOW}No editor found. Please edit .env file manually with your text editor.${NC}"
         read -p "Press Enter after editing .env file..."
     fi
     
