@@ -63,14 +63,62 @@ if [ ! -f .env ]; then
     echo -e "${YELLOW}📝 Creating configuration file (.env)...${NC}"
     echo ""
     
-    if [ -f docker/env.example ]; then
-        cp docker/env.example .env
-    else
-        # Create a minimal .env if example doesn't exist
-        echo -e "${RED}❌ Error: docker/env.example not found${NC}"
-        echo "Please download from: https://raw.githubusercontent.com/yourusername/glowworm/main/docker/env.example"
-        exit 1
-    fi
+    # Create .env from embedded template
+    cat > .env << 'EOF'
+# Glowworm Docker Environment Configuration
+# 
+# SECURITY WARNING: Do NOT use default passwords!
+# Generate strong, random passwords for production use.
+#
+# Quick password generation:
+#   openssl rand -base64 32
+#   or use: https://passwordsgenerator.net/
+
+# ===========================================
+# MYSQL CONFIGURATION
+# ===========================================
+# REQUIRED: Replace with strong, unique passwords (minimum 20 characters)
+MYSQL_ROOT_PASSWORD=CHANGE_ME_TO_STRONG_PASSWORD
+MYSQL_PASSWORD=CHANGE_ME_TO_STRONG_PASSWORD
+
+# Database settings
+MYSQL_DATABASE=glowworm
+MYSQL_USER=glowworm
+MYSQL_HOST=glowworm-mysql
+MYSQL_PORT=3306
+
+# ===========================================
+# BACKEND CONFIGURATION
+# ===========================================
+# REQUIRED: Generate a secure random secret key for JWT tokens
+# Run: openssl rand -base64 32
+SECRET_KEY=CHANGE_ME_TO_RANDOM_SECRET_KEY
+
+# Server settings
+# IMPORTANT: Set SERVER_BASE_URL to your server's IP address or domain
+# Example: http://192.168.1.100:8001 or http://myserver.local:8001
+SERVER_BASE_URL=http://localhost:8001
+BACKEND_PORT=8001
+FRONTEND_PORT=80
+
+# Application settings
+DEFAULT_DISPLAY_TIME_SECONDS=30
+UPLOAD_DIRECTORY=uploads
+
+# ===========================================
+# NETWORK CONFIGURATION
+# ===========================================
+# Change these to your actual network interface IP if needed
+# For local development, localhost should work fine
+DISPLAY_NETWORK_INTERFACE=localhost
+
+# ===========================================
+# DEVELOPMENT SETTINGS (Optional)
+# ===========================================
+# Uncomment for development
+# DEBUG=true
+# LOG_LEVEL=DEBUG
+EOF
     
     echo -e "${RED}⚠️  SECURITY CRITICAL: You must set secure passwords!${NC}"
     echo ""
