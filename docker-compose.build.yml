@@ -1,30 +1,13 @@
-services:
-  # MySQL Database
-  glowworm-mysql:
-    image: mysql:8.0
-    container_name: glowworm-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-glowworm}
-      MYSQL_USER: ${MYSQL_USER:-glowworm}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ports:
-      - "3306:3306"
-    networks:
-      - glowworm-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+# Docker Compose for building from source
+# Use this if you want to build images locally instead of pulling from Docker Hub
+# Usage: docker-compose -f docker-compose.build.yml build
 
-  # Backend API
+services:
+  # Backend API - Build from source
   glowworm-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
     image: nickstephens/glowworm-backend:latest
     container_name: glowworm-backend
     restart: unless-stopped
@@ -63,8 +46,11 @@ services:
       retries: 3
       start_period: 40s
 
-  # Frontend Web Interface
+  # Frontend Web Interface - Build from source
   glowworm-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
     image: nickstephens/glowworm-frontend:latest
     container_name: glowworm-frontend
     restart: unless-stopped
@@ -82,6 +68,30 @@ services:
       retries: 3
       start_period: 30s
 
+  # MySQL Database
+  glowworm-mysql:
+    image: mysql:8.0
+    container_name: glowworm-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-glowworm}
+      MYSQL_USER: ${MYSQL_USER:-glowworm}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "3306:3306"
+    networks:
+      - glowworm-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
 volumes:
   mysql_data:
     driver: local
@@ -91,3 +101,4 @@ volumes:
 networks:
   glowworm-network:
     driver: bridge
+
