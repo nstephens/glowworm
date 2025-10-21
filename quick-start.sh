@@ -204,9 +204,8 @@ fi
 # Download docker config files if they don't exist
 if [ ! -f docker/mysql/init.sql ]; then
     echo -e "${YELLOW}📥 Downloading docker configuration files...${NC}"
-    mkdir -p docker/{mysql,nginx,scripts}
+    mkdir -p docker/{mysql,scripts}
     curl -sS -o docker/mysql/init.sql "$REPO_BASE/docker/mysql/init.sql"
-    curl -sS -o docker/nginx/frontend.conf "$REPO_BASE/docker/nginx/frontend.conf"
     curl -sS -o docker/scripts/wait-for-mysql.sh "$REPO_BASE/docker/scripts/wait-for-mysql.sh"
     chmod +x docker/scripts/wait-for-mysql.sh
     echo -e "${GREEN}✅ Configuration files downloaded${NC}"
@@ -259,18 +258,18 @@ fi
 
 echo -e "${BLUE}🌐 Access the application:${NC}"
 if [ "$SERVER_IP" != "YOUR_SERVER_IP" ]; then
-    echo "   📱 From this server:    http://localhost"
-    echo "   📱 From other devices:  http://$SERVER_IP"
-    echo "   🔌 Direct API:          http://$SERVER_IP:8001/api"
+    echo "   📱 From this server:    http://localhost:3003"
+    echo "   📱 From other devices:  http://$SERVER_IP:3003"
+    echo "   🔌 Backend API:         http://$SERVER_IP:8001/api"
 else
-    echo "   📱 Web Interface: http://localhost (if local)"
-    echo "   📱 From network:  http://YOUR_SERVER_IP (replace with your server's IP)"
-    echo "   🔌 Direct API:    http://YOUR_SERVER_IP:8001/api"
+    echo "   📱 Web Interface: http://localhost:3003 (if local)"
+    echo "   📱 From network:  http://YOUR_SERVER_IP:3003 (replace with your server's IP)"
+    echo "   🔌 Backend API:   http://YOUR_SERVER_IP:8001/api"
 fi
 echo ""
 echo -e "${YELLOW}💡 For headless/remote servers:${NC}"
 echo "   Find your server IP: ${GREEN}hostname -I${NC}"
-echo "   Access from any device: ${GREEN}http://<SERVER_IP>${NC}"
+echo "   Access from any device: ${GREEN}http://<SERVER_IP>:3003${NC}"
 echo ""
 echo -e "${BLUE}📚 Next steps:${NC}"
 echo "   1. Open the web interface in your browser"

@@ -88,7 +88,8 @@ The easiest way to run Glowworm is using Docker on a server (headless or not).
 - Docker Compose 2.0+
 - Server with at least 2GB RAM
 - Network access to your server
-- **Only ports 80 and 8001 needed** (MySQL runs in Docker network)
+- **Ports needed:** 3003 (frontend) and 8001 (backend)
+- **Note:** MySQL runs in Docker network (no port conflict)
 
 #### Ultra-Quick Deploy (2 Commands)
 
@@ -107,7 +108,7 @@ The script will:
 
 **Then access from any device:**
 - Find server IP: `hostname -I`
-- Open `http://YOUR_SERVER_IP` in browser
+- Open `http://YOUR_SERVER_IP:3003` in browser
 - Complete setup wizard
 
 #### Manual Docker Setup (More Control)
@@ -118,10 +119,9 @@ If you prefer to configure manually:
 # Create directory and download files
 mkdir glowworm && cd glowworm
 curl -O https://raw.githubusercontent.com/nstephens/glowworm/main/docker-compose.yml
-mkdir -p docker/{mysql,nginx,scripts}
+mkdir -p docker/{mysql,scripts}
 curl -o docker/env.example https://raw.githubusercontent.com/nstephens/glowworm/main/docker/env.example
 curl -o docker/mysql/init.sql https://raw.githubusercontent.com/nstephens/glowworm/main/docker/mysql/init.sql
-curl -o docker/nginx/frontend.conf https://raw.githubusercontent.com/nstephens/glowworm/main/docker/nginx/frontend.conf
 curl -o docker/scripts/wait-for-mysql.sh https://raw.githubusercontent.com/nstephens/glowworm/main/docker/scripts/wait-for-mysql.sh
 chmod +x docker/scripts/wait-for-mysql.sh
 
@@ -133,7 +133,7 @@ nano .env  # Set passwords and SERVER_BASE_URL
 docker-compose up -d
 ```
 
-**Access:** `http://YOUR_SERVER_IP` (replace with your server's IP from `hostname -I`)
+**Access:** `http://YOUR_SERVER_IP:3003` (replace with your server's IP from `hostname -I`)
 
 #### Alternative: Clone Full Repository
 

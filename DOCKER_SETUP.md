@@ -7,7 +7,7 @@ This guide covers running Glowworm with Docker Compose. Choose the method that b
 - Docker Engine 20.10+
 - Docker Compose 2.0+
 - At least 2GB RAM available
-- Ports 80 and 8001 available (or customize in .env)
+- Ports 3003 (frontend) and 8001 (backend) available
 - **Note:** MySQL runs entirely within Docker network - no host port needed!
 
 ---
@@ -36,7 +36,7 @@ The script will:
 
 **Access from any device on your network:**
 - Find your server's IP address: `hostname -I` or `ip addr show`
-- Open `http://YOUR_SERVER_IP` in a browser
+- Open `http://YOUR_SERVER_IP:3003` in a browser
 - Complete the setup wizard
 
 ---
@@ -173,12 +173,12 @@ glowworm/
 ### Port Configuration
 
 **Production (exposed to host):**
-- **Port 80**: Web interface
-- **Port 8001**: Direct API access (for displays)
+- **Port 3003**: Frontend web interface
+- **Port 8001**: Backend API (for admin and displays)
 - **MySQL**: Internal only (no host port) - prevents conflicts!
 
-**Development mode:**
-- **Port 3000**: Frontend dev server
+**Development mode (with docker-compose.override.yml):**
+- **Port 3000**: Frontend dev server (live reload)
 - **Port 3307**: MySQL exposed for debugging (optional)
 
 ## 🔍 Troubleshooting
