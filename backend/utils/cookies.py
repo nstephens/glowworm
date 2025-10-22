@@ -19,10 +19,9 @@ class CookieManager:
     @staticmethod
     def _get_cookie_config() -> Dict[str, Any]:
         """Get secure cookie configuration"""
-        # Extract domain from server_base_url for cross-port cookie access
-        from urllib.parse import urlparse
-        parsed_url = urlparse(settings.server_base_url)
-        cookie_domain = parsed_url.hostname
+        # Don't set explicit cookie domain - this allows cookies to work
+        # regardless of whether accessed via IP, localhost, or custom domain
+        # Cookies will be scoped to the exact hostname used to access the app
         
         config = {
             "httponly": True,  # Always HttpOnly for security
@@ -31,9 +30,10 @@ class CookieManager:
             "path": "/",  # Restrict to application root
         }
         
-        # Only set domain if it's not localhost (to allow cross-port access)
-        if cookie_domain and cookie_domain not in ["localhost", "127.0.0.1"]:
-            config["domain"] = cookie_domain
+        # Not setting 'domain' allows cookies to work with:
+        # - Direct IP access (http://10.10.10.2:3003)
+        # - Custom domains (https://gw.pdungeon.com)
+        # - Localhost development (http://localhost:3003)
         
         return config
     
