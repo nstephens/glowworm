@@ -18,6 +18,8 @@ def create_database_engine():
             echo=False,  # Set to True for SQL debugging
             pool_pre_ping=True,  # Verify connections before use
             pool_recycle=3600,   # Recycle connections every hour
+            pool_size=20,        # Increase pool to handle concurrent image requests
+            max_overflow=40,     # Allow up to 60 total connections for bursts
         )
         return engine
     except Exception as e:
