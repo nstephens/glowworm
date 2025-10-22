@@ -192,6 +192,14 @@ echo ""
 # Create data directories for persistent storage
 echo -e "${YELLOW}📁 Creating data directories...${NC}"
 mkdir -p data/mysql data/uploads
+
+# Set permissions for container users (UID 1000 for glowworm/node users)
+# MySQL runs as UID 999, uploads needs UID 1000
+if command -v sudo &> /dev/null && [ "$EUID" -ne 0 ]; then
+    echo -e "${YELLOW}Setting directory permissions (may require sudo)...${NC}"
+    sudo chown -R 1000:1000 data/uploads 2>/dev/null || chown -R 1000:1000 data/uploads 2>/dev/null || true
+fi
+
 echo -e "${GREEN}✅ Data directories created${NC}"
 echo ""
 
