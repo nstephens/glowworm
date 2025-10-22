@@ -1,18 +1,21 @@
 # Frontend Dockerfile - Runs Vite dev server
 FROM node:20-alpine
 
+# Create app directory with correct ownership
+RUN mkdir -p /app && chown node:node /app
+
 WORKDIR /app
 
-# Copy package files and install as node user
-COPY --chown=node:node frontend/package*.json ./
-
-# Switch to node user before npm install
+# Switch to node user
 USER node
+
+# Copy package files
+COPY --chown=node:node frontend/package*.json ./
 
 # Install dependencies
 RUN npm ci
 
-# Copy source code with correct ownership
+# Copy source code
 COPY --chown=node:node frontend/ ./
 
 # Expose port
