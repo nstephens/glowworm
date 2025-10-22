@@ -38,15 +38,29 @@ class PasswordManager:
     def verify_password(plain_password: str, hashed_password: str) -> bool:
         """Verify a password against its hash
         
-        Pre-hashes password with SHA-256 to match hashing behavior.
+        Supports both new (SHA-256 pre-hashed) and legacy (passlib) password hashes
+        for backward compatibility during migration.
         """
         try:
-            # Pre-hash the password (same as during hashing)
+            # Try new method: SHA-256 pre-hash + bcrypt
             password_bytes = plain_password.encode('utf-8')
             prehashed = hashlib.sha256(password_bytes).hexdigest()
             
-            # Verify with bcrypt
-            return bcrypt_lib.checkpw(prehashed.encode('utf-8'), hashed_password.encode('utf-8'))
+            if bcrypt_lib.checkpw(prehashed.encode('utf-8'), hashed_password.encode('utf-8')):
+                return True
+            
+            # Fallback: Try legacy passlib method (for passwords created before migration)
+            # This allows existing users to still log in
+            try:
+                from passlib.context import CryptContext
+                pwd_context_legacy = CryptContext(schemes=["bcrypt"], deprecated="auto")
+                if pwd_context_legacy.verify(plain_password, hashed_password):
+                    logger.info("Password verified using legacy passlib method")
+                    return True
+            except Exception:
+                pass
+            
+            return False
         except Exception as e:
             logger.error(f"Failed to verify password: {e}")
             return False
