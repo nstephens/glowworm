@@ -123,7 +123,8 @@ mkdir -p docker/{mysql,scripts}
 curl -o docker/env.example https://raw.githubusercontent.com/nstephens/glowworm/main/docker/env.example
 curl -o docker/mysql/init.sql https://raw.githubusercontent.com/nstephens/glowworm/main/docker/mysql/init.sql
 curl -o docker/scripts/wait-for-mysql.sh https://raw.githubusercontent.com/nstephens/glowworm/main/docker/scripts/wait-for-mysql.sh
-chmod +x docker/scripts/wait-for-mysql.sh
+curl -o docker/scripts/start-backend.sh https://raw.githubusercontent.com/nstephens/glowworm/main/docker/scripts/start-backend.sh
+chmod +x docker/scripts/wait-for-mysql.sh docker/scripts/start-backend.sh
 
 # Configure
 cp docker/env.example .env

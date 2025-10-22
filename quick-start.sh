@@ -215,7 +215,8 @@ if [ ! -f docker/mysql/init.sql ]; then
     mkdir -p docker/{mysql,scripts}
     curl -sS -o docker/mysql/init.sql "$REPO_BASE/docker/mysql/init.sql"
     curl -sS -o docker/scripts/wait-for-mysql.sh "$REPO_BASE/docker/scripts/wait-for-mysql.sh"
-    chmod +x docker/scripts/wait-for-mysql.sh
+    curl -sS -o docker/scripts/start-backend.sh "$REPO_BASE/docker/scripts/start-backend.sh"
+    chmod +x docker/scripts/wait-for-mysql.sh docker/scripts/start-backend.sh
     echo -e "${GREEN}✅ Configuration files downloaded${NC}"
 fi
 
