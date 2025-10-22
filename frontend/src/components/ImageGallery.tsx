@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import type { Image, Album } from '../types';
 import { ConfirmationModal } from './ConfirmationModal';
+import { urlResolver } from '../services/urlResolver';
 
 interface ImageGalleryProps {
   images: Image[];
@@ -559,7 +560,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
               {/* Image Container */}
               <div className={viewMode === 'grid' ? 'aspect-square relative' : 'w-20 h-20 flex-shrink-0 relative'}>
                 <img
-                  src={image.thumbnail_url}
+                  src={urlResolver.getServerBaseUrl() + image.thumbnail_url}
                   alt={image.original_filename}
                   className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                   loading="lazy"
