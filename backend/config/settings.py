@@ -7,12 +7,12 @@ from pathlib import Path
 from sqlalchemy import create_engine, text
 
 class Settings(BaseSettings):
-    # Database settings (can be set via environment variables or settings.json)
-    mysql_host: str = Field(default=os.getenv("MYSQL_HOST", "localhost"), description="MySQL host")
-    mysql_port: int = Field(default=int(os.getenv("MYSQL_PORT", "3306")), description="MySQL port")
-    app_db_user: str = Field(default=os.getenv("MYSQL_USER", "glowworm"), description="Application database username")
-    app_db_password: str = Field(default=os.getenv("MYSQL_PASSWORD", ""), description="Application database password")
-    mysql_database: str = Field(default=os.getenv("MYSQL_DATABASE", "glowworm"), description="MySQL database name")
+    # Database settings (automatically read from env vars by Pydantic)
+    mysql_host: str = Field(default="localhost", description="MySQL host", env="MYSQL_HOST")
+    mysql_port: int = Field(default=3306, description="MySQL port", env="MYSQL_PORT")
+    app_db_user: str = Field(default="glowworm", description="Application database username", env="MYSQL_USER")
+    app_db_password: str = Field(default="", description="Application database password", env="MYSQL_PASSWORD")
+    mysql_database: str = Field(default="glowworm", description="MySQL database name", env="MYSQL_DATABASE")
     
     # Legacy field mapping for backward compatibility
     @property
@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     # Application settings
     app_name: str = Field(default="GlowWorm", description="Application name")
     app_version: str = Field(default="0.1.0", description="Application version")
-    secret_key: str = Field(default=os.getenv("SECRET_KEY", ""), description="Secret key for encryption")
-    server_base_url: str = Field(default=os.getenv("SERVER_BASE_URL", "http://localhost:8001"), description="Base URL for the server (used for API endpoints and image URLs)")
+    secret_key: str = Field(default="", description="Secret key for encryption", env="SECRET_KEY")
+    server_base_url: str = Field(default="http://localhost:8001", description="Base URL for the server (used for API endpoints and image URLs)", env="SERVER_BASE_URL")
     
     # Server configuration
     backend_port: int = Field(default=8001, description="Backend server port")
@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     
     # File upload settings
     max_file_size: int = Field(default=15 * 1024 * 1024, description="Max file size in bytes (15MB)")
-    upload_path: str = Field(default=os.getenv("UPLOAD_PATH", "../uploads"), description="Upload directory path")
+    upload_path: str = Field(default="../uploads", description="Upload directory path", env="UPLOAD_PATH")
     
     # Display settings
     default_slideshow_duration: int = Field(default=5, description="Default slideshow duration in seconds")
