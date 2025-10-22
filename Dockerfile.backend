@@ -20,33 +20,31 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
+# Create non-root user first
+RUN useradd --create-home --shell /bin/bash glowworm
+
+# Create app directory with correct ownership
+RUN mkdir -p /app && chown glowworm:glowworm /app
+
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY backend/requirements.txt /app/requirements.txt
+# Copy requirements as glowworm user
+COPY --chown=glowworm:glowworm backend/requirements.txt /app/requirements.txt
 
-# Create virtual environment and install Python dependencies
-RUN python3 -m venv /app/venv
+# Create virtual environment as root (faster), then fix ownership
+RUN python3 -m venv /app/venv && chown -R glowworm:glowworm /app/venv
+
+# Switch to glowworm user for pip install
+USER glowworm
 ENV PATH="/app/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend application
-COPY backend/ /app/
+# Copy backend application with correct ownership
+COPY --chown=glowworm:glowworm backend/ /app/
 
-# Create non-root user for security
-RUN useradd --create-home --shell /bin/bash glowworm
-
-# Create uploads directory with correct permissions
-# The mounted volume will override this, but we need it for proper ownership
-RUN mkdir -p /app/uploads && chown -R glowworm:glowworm /app/uploads
-
-# Set ownership of app directory
-RUN chown -R glowworm:glowworm /app
-
-# Switch to non-root user
-USER glowworm
+# Create uploads directory
+RUN mkdir -p /app/uploads
 
 # Expose port
 EXPOSE 8001
