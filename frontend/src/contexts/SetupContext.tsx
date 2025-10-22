@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { setupApi } from '../services/api';
+import { urlResolver } from '../services/urlResolver';
 
 interface SetupContextType {
   isConfigured: boolean | null;
+  needsBootstrap: boolean;
+  needsAdmin: boolean;
   isLoading: boolean;
   checkSetupStatus: () => Promise<void>;
   getNetworkInterfaces: () => Promise<any>;
@@ -10,6 +13,7 @@ interface SetupContextType {
   checkUser: (userData: any) => Promise<any>;
   recreateUser: (userData: any) => Promise<any>;
   completeSetup: (setupData: any) => Promise<boolean>;
+  createAdmin: (password: string) => Promise<boolean>;
 }
 
 const SetupContext = createContext<SetupContextType | undefined>(undefined);
@@ -20,6 +24,8 @@ interface SetupProviderProps {
 
 export const SetupProvider: React.FC<SetupProviderProps> = ({ children }) => {
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
+  const [needsBootstrap, setNeedsBootstrap] = useState(false);
+  const [needsAdmin, setNeedsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const checkSetupStatus = async () => {
@@ -27,9 +33,13 @@ export const SetupProvider: React.FC<SetupProviderProps> = ({ children }) => {
       setIsLoading(true);
       const status = await setupApi.getStatus();
       setIsConfigured(status.is_configured);
+      setNeedsBootstrap(status.needs_bootstrap || false);
+      setNeedsAdmin(status.needs_admin || false);
     } catch (error) {
       console.error('Failed to check setup status:', error);
       setIsConfigured(false);
+      setNeedsBootstrap(true);
+      setNeedsAdmin(false);
     } finally {
       setIsLoading(false);
     }
@@ -75,12 +85,37 @@ export const SetupProvider: React.FC<SetupProviderProps> = ({ children }) => {
     try {
       const result = await setupApi.completeSetup(setupData);
       if (result.success) {
-        setIsConfigured(true);
+        await checkSetupStatus(); // Refresh status
         return true;
       }
       return false;
     } catch (error) {
       console.error('Failed to complete setup:', error);
+      return false;
+    }
+  };
+
+  const createAdmin = async (password: string): Promise<boolean> => {
+    try {
+      const response = await fetch(urlResolver.getApiUrl('/setup/create-admin'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          admin_password: password
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        await checkSetupStatus(); // Refresh status
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to create admin:', error);
       return false;
     }
   };
@@ -91,6 +126,8 @@ export const SetupProvider: React.FC<SetupProviderProps> = ({ children }) => {
 
   const value: SetupContextType = {
     isConfigured,
+    needsBootstrap,
+    needsAdmin,
     isLoading,
     checkSetupStatus,
     getNetworkInterfaces,
@@ -98,6 +135,7 @@ export const SetupProvider: React.FC<SetupProviderProps> = ({ children }) => {
     checkUser,
     recreateUser,
     completeSetup,
+    createAdmin,
   };
 
   return (

@@ -6,6 +6,7 @@ import './App.css';
 // Import pages
 import HomePage from './pages/HomePage';
 import SetupWizard from './pages/SetupWizard';
+import AdminSetup from './pages/AdminSetup';
 import AdminDashboard from './pages/AdminDashboard';
 import DisplayView from './pages/DisplayView';
 import DisplayRegistration from './pages/DisplayRegistration';
@@ -51,7 +52,7 @@ const ImagesWithHeader: React.FC = () => {
 };
 
 function AppContent() {
-  const { isConfigured, isLoading } = useSetup();
+  const { isConfigured, needsBootstrap, needsAdmin, isLoading } = useSetup();
 
   if (isLoading) {
     return (
@@ -69,24 +70,34 @@ function AppContent() {
       <Routes>
         {isConfigured ? (
           <>
+            {/* Fully configured - normal app routes */}
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/admin" element={<ProtectedRoute><AdminLayout><AdminDashboard /></AdminLayout></ProtectedRoute>} />
-            <Route path="/admin/images" element={<ProtectedRoute><ImagesWithHeader /></ProtectedRoute>} />
+            <Route path="/admin/images" element={<ProtectedRoute><AdminLayout><Images /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/playlists" element={<ProtectedRoute><AdminLayout><Playlists /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/playlists/:id" element={<ProtectedRoute><AdminLayout><PlaylistDetail /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/displays" element={<ProtectedRoute><AdminLayout><Displays /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/settings" element={<AdminProtectedRoute><AdminLayout><Settings /></AdminLayout></AdminProtectedRoute>} />
             <Route path="/display" element={<DisplayRegistration />} />
             <Route path="/display/:slug" element={<DisplayView />} />
-            {/* Redirect /setup to home if already configured */}
+            {/* Redirect setup routes to home if already configured */}
             <Route path="/setup" element={<HomePage />} />
+            <Route path="/setup/admin" element={<HomePage />} />
+          </>
+        ) : needsAdmin ? (
+          <>
+            {/* Stage 2: Bootstrap configured (Docker), needs admin creation */}
+            <Route path="/setup/admin" element={<AdminSetup />} />
+            <Route path="*" element={<AdminSetup />} />
           </>
         ) : (
-          <Route path="/setup" element={<SetupWizard />} />
+          <>
+            {/* Stage 1: Needs full bootstrap setup (Native installation) */}
+            <Route path="/setup" element={<SetupWizard />} />
+            <Route path="*" element={<SetupWizard />} />
+          </>
         )}
-        {/* Fallback for unconfigured state if user tries other routes */}
-        {!isConfigured && <Route path="*" element={<SetupWizard />} />}
       </Routes>
     </div>
   );

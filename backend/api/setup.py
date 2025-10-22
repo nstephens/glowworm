@@ -59,6 +59,8 @@ class SetupCompleteRequest(BaseModel):
 
 class SetupStatusResponse(BaseModel):
     is_configured: bool
+    needs_bootstrap: bool = False
+    needs_admin: bool = False
     message: str
 
 class TestConnectionResponse(BaseModel):
@@ -89,12 +91,75 @@ def generate_secret_key() -> str:
     return secrets.token_urlsafe(32)
 
 @router.get("/status", response_model=SetupStatusResponse)
-async def get_setup_status():
-    """Check if the application is configured"""
+async def get_setup_status(db: Session = Depends(get_db)):
+    """Check if the application is configured and if admin user exists"""
+    # Check if database/bootstrap is configured
+    bootstrap_configured = is_configured()
+    
+    # Check if admin user exists (for stage 2)
+    admin_exists = False
+    if bootstrap_configured:
+        try:
+            from models.user import User
+            admin_user = db.query(User).filter(User.username == "admin").first()
+            admin_exists = admin_user is not None
+        except Exception as e:
+            logger.debug(f"Could not check for admin user: {e}")
+            admin_exists = False
+    
     return SetupStatusResponse(
-        is_configured=is_configured(),
+        is_configured=bootstrap_configured and admin_exists,
+        needs_bootstrap=not bootstrap_configured,
+        needs_admin=bootstrap_configured and not admin_exists,
         message="Setup status retrieved successfully"
     )
+
+@router.post("/create-admin")
+async def create_admin_user(
+    admin_data: AdminConfigRequest,
+    db: Session = Depends(get_db)
+):
+    """Create admin user (Stage 2 setup for Docker deployments)"""
+    try:
+        # Verify bootstrap is configured
+        if not is_configured():
+            raise HTTPException(
+                status_code=400, 
+                detail="Database not configured. Please complete bootstrap setup first."
+            )
+        
+        # Check if admin already exists
+        from models.user import User
+        existing_admin = db.query(User).filter(User.username == "admin").first()
+        if existing_admin:
+            raise HTTPException(
+                status_code=400,
+                detail="Admin user already exists"
+            )
+        
+        # Create admin user
+        auth_service = AuthService(db)
+        admin_user = auth_service.create_user(
+            username="admin",
+            password=admin_data.admin_password
+        )
+        
+        logger.info(f"Admin user created successfully: {admin_user.username}")
+        
+        return {
+            "success": True,
+            "message": "Admin user created successfully",
+            "user": {
+                "id": admin_user.id,
+                "username": admin_user.username
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Admin user creation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create admin user: {str(e)}")
 
 @router.get("/network-interfaces", response_model=NetworkInterfacesResponse)
 async def get_network_interfaces():
