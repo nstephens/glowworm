@@ -1,14 +1,14 @@
-from passlib.context import CryptContext
-from passlib.hash import bcrypt
+import bcrypt as bcrypt_lib
 import secrets
 import string
 from typing import Optional
 import logging
+import hashlib
 
 logger = logging.getLogger(__name__)
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__default_rounds=12)
+# Bcrypt rounds for hashing (higher = more secure but slower)
+BCRYPT_ROUNDS = 12
 
 class PasswordManager:
     """Manage password hashing and verification"""
@@ -17,16 +17,19 @@ class PasswordManager:
     def hash_password(password: str) -> str:
         """Hash a password using bcrypt
         
-        Handles passwords longer than 72 bytes by pre-hashing with SHA-256.
-        This allows arbitrarily long passwords while staying within bcrypt's limit.
+        Always pre-hashes with SHA-256 to avoid bcrypt's 72 byte limit.
+        This allows passwords of any length while maintaining security.
         """
         try:
-            # If password is longer than 72 bytes, pre-hash it with SHA-256
-            if len(password.encode('utf-8')) > 72:
-                import hashlib
-                password = hashlib.sha256(password.encode('utf-8')).hexdigest()
+            # Always pre-hash to avoid any length issues and ensure consistency
+            password_bytes = password.encode('utf-8')
+            prehashed = hashlib.sha256(password_bytes).hexdigest()
             
-            return pwd_context.hash(password)
+            # Now hash with bcrypt
+            salt = bcrypt_lib.gensalt(rounds=BCRYPT_ROUNDS)
+            hashed = bcrypt_lib.hashpw(prehashed.encode('utf-8'), salt)
+            
+            return hashed.decode('utf-8')
         except Exception as e:
             logger.error(f"Failed to hash password: {e}")
             raise
@@ -35,15 +38,15 @@ class PasswordManager:
     def verify_password(plain_password: str, hashed_password: str) -> bool:
         """Verify a password against its hash
         
-        Handles long passwords by pre-hashing with SHA-256 if needed.
+        Pre-hashes password with SHA-256 to match hashing behavior.
         """
         try:
-            # If password is longer than 72 bytes, pre-hash it (same as during hashing)
-            if len(plain_password.encode('utf-8')) > 72:
-                import hashlib
-                plain_password = hashlib.sha256(plain_password.encode('utf-8')).hexdigest()
+            # Pre-hash the password (same as during hashing)
+            password_bytes = plain_password.encode('utf-8')
+            prehashed = hashlib.sha256(password_bytes).hexdigest()
             
-            return pwd_context.verify(plain_password, hashed_password)
+            # Verify with bcrypt
+            return bcrypt_lib.checkpw(prehashed.encode('utf-8'), hashed_password.encode('utf-8'))
         except Exception as e:
             logger.error(f"Failed to verify password: {e}")
             return False
