@@ -1,6 +1,9 @@
 # Frontend Dockerfile - Runs Vite dev server
 FROM node:20-alpine
 
+# Install curl for health checks
+RUN apk add --no-cache curl
+
 # Create app directory with correct ownership
 RUN mkdir -p /app && chown node:node /app
 
@@ -23,7 +26,7 @@ EXPOSE 3003
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3003/ || exit 1
+    CMD curl -f http://localhost:3003/ || exit 1
 
 # Start Vite dev server
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3003"]
