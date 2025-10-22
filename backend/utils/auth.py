@@ -15,8 +15,17 @@ class PasswordManager:
     
     @staticmethod
     def hash_password(password: str) -> str:
-        """Hash a password using bcrypt"""
+        """Hash a password using bcrypt
+        
+        Handles passwords longer than 72 bytes by pre-hashing with SHA-256.
+        This allows arbitrarily long passwords while staying within bcrypt's limit.
+        """
         try:
+            # If password is longer than 72 bytes, pre-hash it with SHA-256
+            if len(password.encode('utf-8')) > 72:
+                import hashlib
+                password = hashlib.sha256(password.encode('utf-8')).hexdigest()
+            
             return pwd_context.hash(password)
         except Exception as e:
             logger.error(f"Failed to hash password: {e}")
@@ -24,8 +33,16 @@ class PasswordManager:
     
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        """Verify a password against its hash"""
+        """Verify a password against its hash
+        
+        Handles long passwords by pre-hashing with SHA-256 if needed.
+        """
         try:
+            # If password is longer than 72 bytes, pre-hash it (same as during hashing)
+            if len(plain_password.encode('utf-8')) > 72:
+                import hashlib
+                plain_password = hashlib.sha256(plain_password.encode('utf-8')).hexdigest()
+            
             return pwd_context.verify(plain_password, hashed_password)
         except Exception as e:
             logger.error(f"Failed to verify password: {e}")
