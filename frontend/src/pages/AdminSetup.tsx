@@ -59,9 +59,9 @@ const AdminSetup: React.FC = () => {
       if (response.ok && data.success) {
         setSuccess(true);
         
-        // Redirect to login after 2 seconds
+        // Redirect to login after 2 seconds using window.location for reliability
         setTimeout(() => {
-          navigate('/login');
+          window.location.href = '/login';
         }, 2000);
       } else {
         setError(data.detail || 'Failed to create admin user');
