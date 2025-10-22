@@ -88,8 +88,8 @@ The easiest way to run Glowworm is using Docker on a server (headless or not).
 - Docker Compose 2.0+
 - Server with at least 2GB RAM
 - Network access to your server
-- **Ports needed:** 3003 (frontend) and 8001 (backend)
-- **Note:** MySQL runs in Docker network (no port conflict)
+- **Port needed:** 3003 (frontend - single entry point)
+- **Note:** Backend (8001) and MySQL run in Docker network (not exposed for security)
 
 #### Ultra-Quick Deploy (2 Commands)
 
@@ -153,6 +153,94 @@ cd glowworm
 - Frontend: https://hub.docker.com/r/nickstephens/glowworm-frontend
 
 **Full Docker documentation**: See [DOCKER_SETUP.md](DOCKER_SETUP.md)
+
+---
+
+### 🌐 Reverse Proxy Setup (Recommended for Production)
+
+For production deployments, we recommend using a reverse proxy to provide:
+- ✅ Custom domain names (e.g., `photos.yourdomain.com`)
+- ✅ SSL/HTTPS encryption
+- ✅ Simplified access (single URL, no ports)
+- ✅ Better security
+
+#### Using Nginx Proxy Manager (Easiest)
+
+**If using Nginx Proxy Manager in Docker**, connect it to the Glowworm network first:
+
+```bash
+# Find your Nginx Proxy Manager container name
+docker ps | grep nginx
+
+# Connect it to Glowworm's network
+docker network connect glowworm_glowworm-network <npm-container-name>
+```
+
+**Then in Nginx Proxy Manager UI:**
+
+1. **Create a new Proxy Host**
+   - Domain Names: `your-domain.com`
+   - Scheme: `http`
+   - Forward Hostname/IP: `glowworm-frontend`
+   - Forward Port: `3003`
+   - Enable SSL, force SSL as desired
+
+2. **Add this to the "Advanced" tab:**
+
+```nginx
+# Let Vite frontend handle all API proxying internally
+location / {
+    proxy_pass http://glowworm-frontend:3003;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    
+    # WebSocket support for Vite HMR and real-time features
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+}
+```
+
+That's it! The Vite frontend will automatically proxy `/api/*` and `/ws/*` requests to the backend internally.
+
+#### Using Native Nginx (Not in Docker)
+
+If running Nginx natively on the host, use the host's IP or localhost:
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    
+    location / {
+        proxy_pass http://localhost:3003;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocket support
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+#### Other Reverse Proxies
+
+**Traefik**, **Caddy**, and other reverse proxies work similarly:
+- Point them at the frontend service (port 3003 or container name `glowworm-frontend`)
+- The frontend internally handles all API/WebSocket routing
+- No special configuration needed
+
+**Key Points:**
+- Only proxy to the **frontend** (port 3003) - don't expose backend port 8001
+- The frontend's built-in Vite proxy handles all `/api/*` and `/ws/*` routing
+- Works with any domain name or SSL configuration
+- No CORS or mixed content issues
 
 ---
 
