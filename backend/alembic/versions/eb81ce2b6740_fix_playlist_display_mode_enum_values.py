@@ -21,17 +21,27 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # First, update existing data from uppercase to lowercase
-    op.execute("UPDATE playlists SET display_mode = 'default' WHERE display_mode = 'DEFAULT'")
-    op.execute("UPDATE playlists SET display_mode = 'auto_sort' WHERE display_mode = 'AUTO_SORT'")
-    op.execute("UPDATE playlists SET display_mode = 'movement' WHERE display_mode = 'MOVEMENT'")
+    # Check if playlists table exists before trying to update it
+    connection = op.get_bind()
+    inspector = sa.inspect(connection)
+    tables = inspector.get_table_names()
     
-    # Now change the column type to use the proper enum with lowercase values
-    op.alter_column('playlists', 'display_mode',
-                   existing_type=mysql.VARCHAR(collation='utf8mb4_unicode_ci', length=20),
-                   type_=sa.Enum('default', 'auto_sort', 'movement', name='displaymode'),
-                   existing_nullable=True,
-                   existing_server_default=sa.text("'default'"))
+    if 'playlists' in tables:
+        # Table exists, update existing data from uppercase to lowercase
+        op.execute("UPDATE playlists SET display_mode = 'default' WHERE display_mode = 'DEFAULT'")
+        op.execute("UPDATE playlists SET display_mode = 'auto_sort' WHERE display_mode = 'AUTO_SORT'")
+        op.execute("UPDATE playlists SET display_mode = 'movement' WHERE display_mode = 'MOVEMENT'")
+        
+        # Now change the column type to use the proper enum with lowercase values
+        op.alter_column('playlists', 'display_mode',
+                       existing_type=mysql.VARCHAR(collation='utf8mb4_unicode_ci', length=20),
+                       type_=sa.Enum('default', 'auto_sort', 'movement', name='displaymode'),
+                       existing_nullable=True,
+                       existing_server_default=sa.text("'default'"))
+    else:
+        # Table doesn't exist yet - this migration will be skipped
+        # The table will be created by a later migration with correct enum
+        pass
 
 
 def downgrade() -> None:
