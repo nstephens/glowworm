@@ -139,9 +139,11 @@ async def create_admin_user(
         
         # Create admin user
         auth_service = AuthService(db)
+        from models.user import UserRole
         admin_user = auth_service.create_user(
             username="admin",
-            password=admin_data.admin_password
+            password=admin_data.admin_password,
+            role=UserRole.ADMIN
         )
         
         logger.info(f"Admin user created successfully: {admin_user.username}")
