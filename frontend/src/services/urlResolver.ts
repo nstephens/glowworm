@@ -45,9 +45,15 @@ class UrlResolver {
       // If running on localhost, use localhost:8001
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
         this.serverBaseUrl = 'http://localhost:8001';
-      } else {
-        // For production, assume same hostname but port 8001
+      } 
+      // If accessing via IP address, add port 8001
+      else if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
         this.serverBaseUrl = `${protocol}//${hostname}:8001`;
+      }
+      // For domain names (reverse proxy), use same protocol and hostname without port
+      // The reverse proxy should handle routing /api/* to the backend
+      else {
+        this.serverBaseUrl = `${protocol}//${hostname}`;
       }
     }
   }
