@@ -23,7 +23,8 @@ interface SetupProviderProps {
 }
 
 export const SetupProvider: React.FC<SetupProviderProps> = ({ children }) => {
-  const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
+  // Optimistically assume configured to prevent showing setup wizard on network errors
+  const [isConfigured, setIsConfigured] = useState<boolean | null>(true);
   const [needsBootstrap, setNeedsBootstrap] = useState(false);
   const [needsAdmin, setNeedsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,9 +38,9 @@ export const SetupProvider: React.FC<SetupProviderProps> = ({ children }) => {
       setNeedsAdmin(status.needs_admin || false);
     } catch (error) {
       console.error('Failed to check setup status:', error);
-      setIsConfigured(false);
-      setNeedsBootstrap(true);
-      setNeedsAdmin(false);
+      // Don't assume app is unconfigured on network errors
+      // Keep existing state - only show setup wizard if API explicitly says so
+      // This prevents spurious setup wizard appearances due to network timeouts
     } finally {
       setIsLoading(false);
     }
