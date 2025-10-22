@@ -3,19 +3,17 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY frontend/package*.json ./
+# Copy package files and install as node user
+COPY --chown=node:node frontend/package*.json ./
+
+# Switch to node user before npm install
+USER node
 
 # Install dependencies
 RUN npm ci
 
-# Copy source code
-COPY frontend/ ./
-
-# Use the existing node user (non-root)
-RUN chown -R node:node /app
-
-USER node
+# Copy source code with correct ownership
+COPY --chown=node:node frontend/ ./
 
 # Expose port
 EXPOSE 3003
