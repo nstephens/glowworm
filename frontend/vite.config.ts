@@ -11,6 +11,20 @@ export default defineConfig({
     hmr: {
       clientPort: 3003, // For reverse proxy compatibility
     },
+    // Proxy API requests to backend - allows frontend to be single entry point
+    proxy: {
+      '/api': {
+        target: 'http://glowworm-backend:8001',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/ws': {
+        target: 'http://glowworm-backend:8001',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      },
+    },
   },
   preview: {
     host: '0.0.0.0',
