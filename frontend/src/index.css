@@ -113,6 +113,20 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+  
+  /* Smooth theme transitions */
+  * {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+  
+  /* Respect user's motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition-duration: 0ms;
+    }
+  }
 }
 
 /* Custom gallery animations */

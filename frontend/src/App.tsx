@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { SetupProvider, useSetup } from './contexts/SetupContext';
+import { ThemeProvider } from './components/theme-provider';
 import './App.css';
 
 // Import pages
@@ -105,11 +106,13 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
-      <SetupProvider>
-        <AppContent />
-      </SetupProvider>
-    </Router>
+    <ThemeProvider defaultTheme="system" storageKey="glowworm-theme">
+      <Router>
+        <SetupProvider>
+          <AppContent />
+        </SetupProvider>
+      </Router>
+    </ThemeProvider>
   );
 }
 
