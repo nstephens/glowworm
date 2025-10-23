@@ -91,6 +91,9 @@ export const ImageCard: React.FC<ImageCardProps> = ({
         }
       }}
       aria-label={`View ${image.title}`}
+      aria-describedby={`image-${image.id}-description`}
+      aria-pressed={isSelected}
+      data-image-card
     >
       {/* Selection checkbox */}
       {showSelection && (
@@ -163,8 +166,22 @@ export const ImageCard: React.FC<ImageCardProps> = ({
         />
       </div>
 
-      {/* Focus ring for accessibility */}
-      <div className="absolute inset-0 rounded-lg ring-0 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 pointer-events-none" />
-    </div>
-  );
-};
+        {/* Focus ring for accessibility */}
+        <div className="absolute inset-0 rounded-lg ring-0 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 pointer-events-none" />
+        
+        {/* Screen reader description */}
+        <div 
+          id={`image-${image.id}-description`}
+          className="sr-only"
+        >
+          {image.title}. 
+          {image.album && `Album: ${image.album}. `}
+          {image.tags && image.tags.length > 0 && `Tags: ${image.tags.join(', ')}. `}
+          {image.orientation} orientation. 
+          {image.width} by {image.height} pixels.
+          {isSelected ? ' Selected.' : ' Not selected.'}
+          Press Space to toggle selection, Enter to view details.
+        </div>
+      </div>
+    );
+  };
