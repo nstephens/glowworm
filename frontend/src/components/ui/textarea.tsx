@@ -1,25 +1,24 @@
 import * as React from "react"
 
-import { cn } from "../../lib/utils"
+import { cn } from "@/lib/utils"
 
-export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface TextareaProps
+  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   /** Show error state */
   error?: boolean;
 }
 
-const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, error = false, ...props }, ref) => {
+const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
+  ({ className, error = false, ...props }, ref) => {
     return (
-      <input
-        type={type}
+      <textarea
         className={cn(
-          "flex h-10 w-full rounded-md border bg-input px-4 py-2 text-sm transition-all duration-200",
-          "file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground",
+          "flex min-h-[80px] w-full rounded-md border bg-input px-4 py-3 text-sm transition-all duration-200",
           "placeholder:text-muted-foreground",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:border-primary",
           "disabled:cursor-not-allowed disabled:opacity-50",
           "hover:border-primary/50",
+          "resize-y",
           error && "border-destructive focus-visible:ring-destructive",
           className
         )}
@@ -29,6 +28,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     )
   }
 )
-Input.displayName = "Input"
+Textarea.displayName = "Textarea"
 
-export { Input }
+export { Textarea }
+
