@@ -230,7 +230,7 @@ def reset_settings(current_settings):
             if key in current_settings and current_settings[key]:
                 new_settings[key] = current_settings[key]
         
-        # Reset admin and setup flags
+        # CRITICAL: Reset admin and setup flags to trigger setup wizard
         new_settings['admin_password'] = ''
         new_settings['setup_completed'] = False
         
@@ -239,6 +239,8 @@ def reset_settings(current_settings):
             json.dump(new_settings, f, indent=2)
         
         print("  ✅ Settings reset (credentials preserved)")
+        print(f"  ℹ️  setup_completed = False (will show setup wizard)")
+        print(f"  ℹ️  admin_password cleared (requires new admin creation)")
         return True
         
     except Exception as e:
@@ -254,23 +256,32 @@ def print_summary():
     print()
     print("🚀 Next Steps:")
     print()
-    print("  1. Start the backend server:")
+    print("  ⚠️  IMPORTANT: Restart the backend server to pick up new settings!")
+    print()
+    print("  1. Stop any running backend/frontend servers (Ctrl+C)")
+    print()
+    print("  2. Start the backend server:")
     print("     cd backend")
     print("     source venv/bin/activate")
     print("     uvicorn main:app --reload --port 8001")
     print()
-    print("  2. Start the frontend (in a new terminal):")
+    print("  3. Start the frontend (in a new terminal):")
     print("     cd frontend")
     print("     npm run dev")
     print()
-    print("  3. Open your browser:")
+    print("  4. Open your browser (use hard refresh or incognito):")
     print("     http://localhost:3003")
     print()
-    print("  4. Complete the setup wizard:")
+    print("  5. Complete the setup wizard:")
     print("     - Create admin user account")
     print("     - Configure initial settings")
     print()
     print("💡 Quick start: ./start_glowworm.sh")
+    print()
+    print("🔧 If setup wizard doesn't appear:")
+    print("   - Ensure backend server was restarted")
+    print("   - Clear browser cache/localStorage (F12 → Application → Clear storage)")
+    print("   - Try incognito window")
     print()
 
 

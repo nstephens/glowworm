@@ -42,9 +42,13 @@ export const SetupProvider: React.FC<SetupProviderProps> = ({ children }) => {
       setNeedsAdmin(status.needs_admin || false);
     } catch (error) {
       console.error('❌ Failed to check setup status:', error);
-      // Don't assume app is unconfigured on network errors
-      // Keep existing state - only show setup wizard if API explicitly says so
-      // This prevents spurious setup wizard appearances due to network timeouts
+      console.error('  This is likely a CORS or network error.');
+      console.error('  If you just reset the database, restart the backend server.');
+      // On error, assume setup is needed to be safe
+      // This ensures setup wizard appears if backend is unreachable
+      setIsConfigured(false);
+      setNeedsBootstrap(true);
+      setNeedsAdmin(false);
     } finally {
       setIsLoading(false);
     }
