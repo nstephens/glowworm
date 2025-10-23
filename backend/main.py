@@ -84,7 +84,7 @@ from urllib.parse import urlparse
 # Parse the server base URL to get the hostname
 parsed_url = urlparse(settings.server_base_url)
 server_host = parsed_url.hostname or "localhost"
-frontend_ports = [3003, 3000, 80]  # Common frontend ports
+frontend_ports = [3003, 3000, 80, 443]  # Common frontend ports
 
 # Build allowed origins list
 allowed_origins = [
@@ -94,11 +94,13 @@ allowed_origins = [
     "http://127.0.0.1:3000",
 ]
 
-# Add server host with different ports if not localhost
-if server_host not in ["localhost", "127.0.0.1"]:
-    for port in frontend_ports:
-        allowed_origins.append(f"http://{server_host}:{port}")
-        allowed_origins.append(f"https://{server_host}:{port}")
+# Always add server host with different ports (even if localhost)
+for port in frontend_ports:
+    allowed_origins.append(f"http://{server_host}:{port}")
+    allowed_origins.append(f"https://{server_host}:{port}")
+
+# Log allowed origins for debugging
+logger.info(f"CORS allowed origins: {allowed_origins}")
 
 app.add_middleware(
     CORSMiddleware,
