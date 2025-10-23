@@ -1,5 +1,10 @@
 export { UploadComponent } from './UploadComponent';
+export { EnhancedUploadComponent } from './EnhancedUploadComponent';
+export { CompleteUploadComponent } from './CompleteUploadComponent';
 export { UploadZone } from './UploadZone';
 export { UploadProgress, type UploadFile } from './UploadProgress';
 export { AlbumTagSelector, type Album, type Tag } from './AlbumTagSelector';
 export { UploadProvider, useUpload } from './UploadContext';
+export { ErrorHandler, type UploadError } from './ErrorHandler';
+export { NetworkStatusMonitor, type NetworkStatus, type ServerStatus } from './NetworkStatusMonitor';
+export { BatchOperations } from './BatchOperations';
