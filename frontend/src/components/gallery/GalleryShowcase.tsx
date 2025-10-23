@@ -132,25 +132,37 @@ export const GalleryShowcase: React.FC = () => {
   };
 
   const fetchImages = async (page: number) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Simulate API call with random errors for testing
+    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
+    
+    // Simulate occasional errors for testing error handling
+    if (Math.random() < 0.1) { // 10% chance of error
+      throw new Error('Failed to fetch images. Please try again.');
+    }
     
     // Return more mock images for infinite scroll demo
-    const moreImages = Array.from({ length: 10 }, (_, i) => ({
-      id: `page-${page}-${i}`,
-      src: `https://picsum.photos/800/600?random=${page * 10 + i}`,
-      width: 800,
-      height: 600,
-      title: `Image ${page * 10 + i}`,
-      album: 'Demo',
-      tags: ['demo'],
-      orientation: 'landscape' as const,
-      createdAt: new Date().toISOString(),
-    }));
+    const moreImages = Array.from({ length: 10 }, (_, i) => {
+      const orientations: Array<'landscape' | 'portrait' | 'square'> = ['landscape', 'portrait', 'square'];
+      const orientation = orientations[Math.floor(Math.random() * orientations.length)];
+      const width = orientation === 'landscape' ? 800 : orientation === 'portrait' ? 600 : 700;
+      const height = orientation === 'landscape' ? 600 : orientation === 'portrait' ? 800 : 700;
+      
+      return {
+        id: `page-${page}-${i}`,
+        src: `https://picsum.photos/${width}/${height}?random=${page * 10 + i}`,
+        width,
+        height,
+        title: `Image ${page * 10 + i}`,
+        album: 'Demo',
+        tags: ['demo'],
+        orientation,
+        createdAt: new Date().toISOString(),
+      };
+    });
 
     return {
       images: moreImages,
-      hasMore: page < 3, // Simulate 3 pages of data
+      hasMore: page < 5, // Simulate 5 pages of data
     };
   };
 

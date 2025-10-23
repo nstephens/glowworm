@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import Masonry from 'react-masonry-css';
 import { useInView } from 'react-intersection-observer';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { 
   Edit, 
   Trash, 
@@ -10,10 +11,14 @@ import {
   Download, 
   Eye,
   Check,
-  X
+  X,
+  AlertCircle,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 
 export interface Image {
@@ -82,10 +87,45 @@ export const MasonryGallery: React.FC<MasonryGalleryProps> = ({
     triggerOnce: false,
   });
 
-  // Mock data for now - will be replaced with actual API integration
+  // React Query for infinite scroll with proper loading states and error handling
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isRefetching,
+  } = useInfiniteQuery({
+    queryKey: ['images'],
+    queryFn: ({ pageParam = 1 }) => fetchImages(pageParam),
+    getNextPageParam: (lastPage, pages) => {
+      return lastPage.hasMore ? pages.length + 1 : undefined;
+    },
+    initialData: initialImages.length > 0 ? {
+      pages: [{ images: initialImages, hasMore: true }],
+      pageParams: [1]
+    } : undefined,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+  });
+
+  // Flatten all images from all pages
   const allImages = useMemo(() => {
+    if (data?.pages) {
+      return data.pages.flatMap(page => page.images);
+    }
     return initialImages.length > 0 ? initialImages : generateMockImages();
-  }, [initialImages]);
+  }, [data?.pages, initialImages]);
+
+  // Trigger infinite scroll when load more ref comes into view
+  React.useEffect(() => {
+    if (inView && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Masonry breakpoints for responsive layout
   const breakpointColumnsObj = {
@@ -140,6 +180,49 @@ export const MasonryGallery: React.FC<MasonryGalleryProps> = ({
       aspectRatio: aspectRatio.toString(),
     };
   }, []);
+
+  // Show loading state for initial load
+  if (isLoading) {
+    return (
+      <div className={cn("gallery-container", className)}>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+            <p className="text-muted-foreground">Loading images...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (isError) {
+    return (
+      <div className={cn("gallery-container", className)}>
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              Failed to load images: {error instanceof Error ? error.message : 'Unknown error'}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+            >
+              {isRefetching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("gallery-container", className)}>
@@ -337,10 +420,42 @@ export const MasonryGallery: React.FC<MasonryGalleryProps> = ({
         })}
       </Masonry>
 
-      {/* Loading indicator */}
-      {inView && (
+      {/* Loading indicators */}
+      {isFetchingNextPage && (
         <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <div className="text-center space-y-2">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+            <p className="text-sm text-muted-foreground">Loading more images...</p>
+          </div>
+        </div>
+      )}
+
+      {/* End of results indicator */}
+      {!hasNextPage && allImages.length > 0 && (
+        <div className="flex justify-center py-8">
+          <div className="text-center space-y-2">
+            <div className="h-1 w-16 bg-muted mx-auto rounded"></div>
+            <p className="text-sm text-muted-foreground">
+              You've reached the end ({allImages.length} images)
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {allImages.length === 0 && !isLoading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center space-y-4">
+            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto">
+              <Eye className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">No images found</h3>
+              <p className="text-muted-foreground">
+                Try adjusting your filters or upload some images to get started.
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>
