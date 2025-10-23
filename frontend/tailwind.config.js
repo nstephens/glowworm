@@ -7,6 +7,19 @@ export default {
   darkMode: ["class"],
   theme: {
     extend: {
+      spacing: {
+        // 8px grid system
+        '1': '0.25rem',   // 4px
+        '2': '0.5rem',    // 8px
+        '3': '0.75rem',   // 12px
+        '4': '1rem',      // 16px
+        '6': '1.5rem',    // 24px
+        '8': '2rem',      // 32px
+        '12': '3rem',     // 48px
+        '16': '4rem',     // 64px
+        '24': '6rem',     // 96px
+        '32': '8rem',     // 128px
+      },
       colors: {
         border: "var(--border)",
         input: "var(--input)",
@@ -65,8 +78,8 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono: ["var(--font-geist-mono)", "ui-monospace", "monospace"],
+        sans: ["Inter", "SF Pro Display", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
+        mono: ["JetBrains Mono", "SF Mono", "Consolas", "Liberation Mono", "Menlo", "Courier", "monospace"],
       },
       keyframes: {
         "fade-in-up": {
