@@ -91,6 +91,12 @@ def reset_database(current_settings):
         db_root_user = current_settings.get('mysql_root_user', 'root')
         db_root_password = current_settings.get('mysql_root_password', '')
         
+        # If no password in settings, prompt for it
+        if not db_root_password:
+            import getpass
+            print(f"  MySQL root password not found in settings.")
+            db_root_password = getpass.getpass(f"  Please enter MySQL root password for '{db_root_user}' (or press Enter if none): ")
+        
         # Connect to MySQL server (not database)
         print(f"  Connecting to MySQL at {db_host}:{db_port} as {db_root_user}...")
         connection = pymysql.connect(
@@ -256,11 +262,16 @@ def main():
     """Main reset function"""
     # Parse arguments
     parser = argparse.ArgumentParser(description='Reset GlowWorm to factory defaults')
-    parser.add_argument('--yes', action='store_true', help='Skip confirmation prompt')
+    parser.add_argument('--yes', '-y', action='store_true', help='Skip confirmation prompt')
+    parser.add_argument('--mysql-password', '--password', '-p', help='MySQL root password (if not in settings.json)')
     args = parser.parse_args()
     
     # Load current settings first
     current_settings = load_current_settings()
+    
+    # Override password if provided via command line
+    if args.mysql_password:
+        current_settings['mysql_root_password'] = args.mysql_password
     
     # Confirm reset
     if not confirm_reset(args.yes):

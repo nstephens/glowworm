@@ -25,6 +25,14 @@ python scripts/glowworm_reset_to_defaults.py
 python scripts/glowworm_reset_to_defaults.py --yes
 ```
 
+**Provide MySQL root password:**
+```bash
+python scripts/glowworm_reset_to_defaults.py --password YOUR_PASSWORD
+python scripts/glowworm_reset_to_defaults.py -p YOUR_PASSWORD --yes
+```
+
+**Note:** If password is not provided via command line or in settings.json, the script will prompt you for it interactively.
+
 ### Bash Version (Alternative)
 
 ```bash
