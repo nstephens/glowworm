@@ -20,7 +20,10 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ImageCard } from './ImageCard';
+import { BulkActionsToolbar } from './BulkActionsToolbar';
+import { DragSelection } from './DragSelection';
 import { useFilters } from './FilterContext';
+import { useBulkSelection } from './BulkSelectionProvider';
 import { cn } from '@/lib/utils';
 
 export interface Image {
@@ -79,9 +82,17 @@ export const MasonryGallery: React.FC<MasonryGalleryProps> = ({
   showSelection = true,
   className,
 }) => {
-  const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [hoveredImage, setHoveredImage] = useState<string | null>(null);
+  
+  // Use bulk selection context
+  const {
+    state: bulkState,
+    toggleImageSelection,
+    selectAll,
+    clearSelection,
+    getSelectedImages,
+    isImageSelected,
+  } = useBulkSelection();
 
   // Intersection observer for infinite scroll
   const { ref: loadMoreRef, inView } = useInView({
@@ -143,43 +154,29 @@ export const MasonryGallery: React.FC<MasonryGalleryProps> = ({
     500: 1
   };
 
-  // Toggle selection for an image
-  const toggleImageSelection = useCallback((imageId: string) => {
-    setSelectedImages(prev => {
-      const newSelection = new Set(prev);
-      if (newSelection.has(imageId)) {
-        newSelection.delete(imageId);
-      } else {
-        newSelection.add(imageId);
-      }
-      return newSelection;
-    });
-  }, []);
-
-  // Clear all selections
-  const clearSelection = useCallback(() => {
-    setSelectedImages(new Set());
-    setIsSelectionMode(false);
-  }, []);
-
-  // Select all images
-  const selectAll = useCallback(() => {
-    setSelectedImages(new Set(displayImages.map(img => img.id)));
-    setIsSelectionMode(true);
-  }, [displayImages]);
-
-  // Keyboard shortcuts
+  // Enhanced keyboard shortcuts
   useHotkeys('esc', clearSelection, { enableOnTags: ['INPUT', 'TEXTAREA'] });
   useHotkeys('ctrl+a', (e) => {
     e.preventDefault();
-    selectAll();
+    selectAll(displayImages);
+  });
+  useHotkeys('ctrl+i', (e) => {
+    e.preventDefault();
+    // Invert selection - this would need to be implemented in the context
+  });
+  useHotkeys('delete', (e) => {
+    e.preventDefault();
+    const selectedImages = getSelectedImages(displayImages);
+    if (selectedImages.length > 0) {
+      onBulkAction?.('delete', selectedImages);
+    }
   });
 
   // Handle bulk actions
-  const handleBulkAction = useCallback((action: string) => {
-    const selectedImageObjects = displayImages.filter(img => selectedImages.has(img.id));
+  const handleBulkAction = useCallback((action: string, images?: Image[]) => {
+    const selectedImageObjects = images || getSelectedImages(displayImages);
     onBulkAction?.(action, selectedImageObjects);
-  }, [displayImages, selectedImages, onBulkAction]);
+  }, [displayImages, getSelectedImages, onBulkAction]);
 
   // Calculate aspect ratio for proper image sizing
   const getImageStyle = useCallback((image: Image) => {
@@ -234,86 +231,46 @@ export const MasonryGallery: React.FC<MasonryGalleryProps> = ({
 
   return (
     <div className={cn("gallery-container", className)}>
-      {/* Bulk action toolbar */}
-      {selectedImages.size > 0 && (
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-medium">
-                {selectedImages.size} image{selectedImages.size !== 1 ? 's' : ''} selected
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearSelection}
-                className="h-8 w-8 p-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleBulkAction('download')}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleBulkAction('edit')}
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleBulkAction('share')}
-              >
-                <Share className="h-4 w-4 mr-2" />
-                Share
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => handleBulkAction('delete')}
-              >
-                <Trash className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Enhanced bulk actions toolbar */}
+      <BulkActionsToolbar
+        selectedImages={getSelectedImages(displayImages)}
+        onBulkAction={handleBulkAction}
+      />
 
-      {/* Masonry grid */}
-      <Masonry
-        breakpointCols={breakpointColumnsObj}
-        className="flex -ml-4 w-auto"
-        columnClassName="pl-4 bg-clip-padding"
+      {/* Drag selection wrapper */}
+      <DragSelection
+        images={displayImages}
+        onSelectionChange={(selectedImages) => {
+          // Handle selection changes if needed
+        }}
       >
-        {displayImages.map((image, index) => {
-          const isSelected = selectedImages.has(image.id);
-          const isLast = index === displayImages.length - 1;
+        {/* Masonry grid */}
+        <Masonry
+          breakpointCols={breakpointColumnsObj}
+          className="flex -ml-4 w-auto"
+          columnClassName="pl-4 bg-clip-padding"
+        >
+          {displayImages.map((image, index) => {
+            const isSelected = isImageSelected(image.id);
+            const isLast = index === displayImages.length - 1;
 
-          return (
-            <ImageCard
-              key={image.id}
-              ref={isLast ? loadMoreRef : undefined}
-              image={image}
-              isSelected={isSelected}
-              isLast={isLast}
-              onSelect={onImageSelect || (() => {})}
-              onToggleSelection={toggleImageSelection}
-              onAction={handleBulkAction}
-              showSelection={showSelection}
-            />
-          );
-        })}
-      </Masonry>
+            return (
+              <ImageCard
+                key={image.id}
+                ref={isLast ? loadMoreRef : undefined}
+                image={image}
+                isSelected={isSelected}
+                isLast={isLast}
+                onSelect={onImageSelect || (() => {})}
+                onToggleSelection={toggleImageSelection}
+                onAction={handleBulkAction}
+                showSelection={showSelection}
+                data-image-card
+              />
+            );
+          })}
+        </Masonry>
+      </DragSelection>
 
       {/* Loading indicators */}
       {isFetchingNextPage && (

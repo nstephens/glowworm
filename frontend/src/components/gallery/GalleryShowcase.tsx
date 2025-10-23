@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MasonryGallery, Image } from './MasonryGallery';
 import { FilterProvider } from './FilterContext';
+import { BulkSelectionProvider } from './BulkSelectionProvider';
 import { FilterPanel } from './FilterPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -162,8 +163,9 @@ export const GalleryShowcase: React.FC = () => {
   };
 
   return (
-    <FilterProvider images={mockImages}>
-      <div className="p-6 space-y-6">
+    <BulkSelectionProvider>
+      <FilterProvider images={mockImages}>
+        <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Photo Gallery</h1>
@@ -236,7 +238,8 @@ export const GalleryShowcase: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-      </div>
-    </FilterProvider>
+        </div>
+      </FilterProvider>
+    </BulkSelectionProvider>
   );
 };

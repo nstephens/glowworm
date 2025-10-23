@@ -6,3 +6,6 @@ export { FilterPanel } from './FilterPanel';
 export { ImageCard } from './ImageCard';
 export { ImageOverlay } from './ImageOverlay';
 export { ImageSkeleton } from './ImageSkeleton';
+export { BulkSelectionProvider, useBulkSelection, type BulkSelectionState, type BulkSelectionContextType } from './BulkSelectionProvider';
+export { BulkActionsToolbar } from './BulkActionsToolbar';
+export { DragSelection } from './DragSelection';
