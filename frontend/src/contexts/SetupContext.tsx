@@ -33,11 +33,15 @@ export const SetupProvider: React.FC<SetupProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       const status = await setupApi.getStatus();
+      console.log('🔍 Setup Status Response:', status);
+      console.log('  is_configured:', status.is_configured);
+      console.log('  needs_bootstrap:', status.needs_bootstrap);
+      console.log('  needs_admin:', status.needs_admin);
       setIsConfigured(status.is_configured);
       setNeedsBootstrap(status.needs_bootstrap || false);
       setNeedsAdmin(status.needs_admin || false);
     } catch (error) {
-      console.error('Failed to check setup status:', error);
+      console.error('❌ Failed to check setup status:', error);
       // Don't assume app is unconfigured on network errors
       // Keep existing state - only show setup wizard if API explicitly says so
       // This prevents spurious setup wizard appearances due to network timeouts
