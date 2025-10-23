@@ -205,7 +205,7 @@ def clear_uploads():
         return False
 
 
-def reset_settings(current_settings):
+def reset_settings(current_settings, full_reset=False):
     """Reset settings while preserving database credentials"""
     print("\n⚙️  Step 4: Resetting application settings...")
     
@@ -218,14 +218,24 @@ def reset_settings(current_settings):
         with open(example_file, 'r') as f:
             new_settings = json.load(f)
         
-        # Preserve critical credentials from current settings
-        preserve_keys = [
-            'mysql_host', 'mysql_port', 'mysql_root_user', 'mysql_root_password',
-            'app_db_user', 'app_db_password', 'mysql_database', 'secret_key',
-            'server_base_url', 'backend_port', 'frontend_port'
-        ]
+        if full_reset:
+            # Full reset - only preserve MySQL connection info, clear app credentials
+            preserve_keys = [
+                'mysql_host', 'mysql_port', 'mysql_root_user', 'mysql_root_password',
+                'app_db_user', 'mysql_database', 'server_base_url', 'backend_port', 'frontend_port'
+            ]
+            print("  Full reset mode: Clearing app_db_password and secret_key...")
+            print("  This will trigger the native setup wizard (full bootstrap flow)")
+        else:
+            # Docker-style reset - preserve all credentials
+            preserve_keys = [
+                'mysql_host', 'mysql_port', 'mysql_root_user', 'mysql_root_password',
+                'app_db_user', 'app_db_password', 'mysql_database', 'secret_key',
+                'server_base_url', 'backend_port', 'frontend_port'
+            ]
+            print("  Docker-style reset: Preserving database credentials and secret key...")
+            print("  This will trigger admin setup only (Docker flow)")
         
-        print("  Preserving database credentials and server settings...")
         for key in preserve_keys:
             if key in current_settings and current_settings[key]:
                 new_settings[key] = current_settings[key]
@@ -238,9 +248,12 @@ def reset_settings(current_settings):
         with open(settings_file, 'w') as f:
             json.dump(new_settings, f, indent=2)
         
-        print("  ✅ Settings reset (credentials preserved)")
-        print(f"  ℹ️  setup_completed = False (will show setup wizard)")
-        print(f"  ℹ️  admin_password cleared (requires new admin creation)")
+        print("  ✅ Settings reset")
+        print(f"  ℹ️  setup_completed = False")
+        print(f"  ℹ️  admin_password = '' (cleared)")
+        if full_reset:
+            print(f"  ℹ️  app_db_password = '' (cleared)")
+            print(f"  ℹ️  secret_key = '' (cleared)")
         return True
         
     except Exception as e:
@@ -291,6 +304,7 @@ def main():
     parser = argparse.ArgumentParser(description='Reset GlowWorm to factory defaults')
     parser.add_argument('--yes', '-y', action='store_true', help='Skip confirmation prompt')
     parser.add_argument('--mysql-password', '--password', '-p', help='MySQL root password (if not in settings.json)')
+    parser.add_argument('--full', '-f', action='store_true', help='Full reset - clear app_db_password and secret_key to trigger native setup wizard')
     args = parser.parse_args()
     
     # Load current settings first
@@ -339,7 +353,7 @@ def main():
     steps_completed.append("migrations")
     
     # Step 4: Reset settings (do this last to preserve credentials until the end)
-    if reset_settings(current_settings):
+    if reset_settings(current_settings, full_reset=args.full):
         steps_completed.append("settings")
     else:
         print("\n⚠️  Warning: Settings reset failed, but database is ready")
