@@ -4,24 +4,24 @@
 
 @layer base {
   :root {
-    /* Primary Palette - Photo-focused */
-    --primary: #6366f1; /* Indigo - Trust, professionalism */
+    /* Primary Palette - Photo-focused (WCAG AA compliant) */
+    --primary: #4f46e5; /* Darker indigo for better contrast */
     --primary-foreground: #ffffff;
-    --secondary: #f59e0b; /* Amber - Warmth, creativity */
+    --secondary: #b45309; /* Even darker amber for WCAG AA compliance */
     --secondary-foreground: #ffffff;
-    
+
     /* Neutral Palette - Sophisticated grays */
     --background: #fafafa; /* Warm white */
     --foreground: #1f2937; /* Charcoal */
     --muted: #f3f4f6; /* Light gray */
     --muted-foreground: #6b7280; /* Medium gray */
-    
-    /* Accent Colors - Photo-inspired */
-    --accent: #ec4899; /* Pink - For highlights and CTAs */
+
+    /* Accent Colors - Photo-inspired (WCAG AA compliant) */
+    --accent: #db2777; /* Darker pink for better contrast */
     --accent-foreground: #ffffff;
-    --success: #10b981; /* Emerald - Success states */
-    --warning: #f59e0b; /* Amber - Warnings */
-    --destructive: #ef4444; /* Red - Errors and deletions */
+    --success: #059669; /* Darker emerald for better contrast */
+    --warning: #b45309; /* Even darker amber for WCAG AA compliance */
+    --destructive: #dc2626; /* Darker red for better contrast */
     --destructive-foreground: #ffffff;
     
     /* UI Elements */
