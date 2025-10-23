@@ -14,12 +14,12 @@ export default defineConfig({
     // Proxy API requests to backend - allows frontend to be single entry point
     proxy: {
       '/api': {
-        target: 'http://glowworm-backend:8001',
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:8001',
         changeOrigin: true,
         secure: false,
       },
       '/ws': {
-        target: 'http://glowworm-backend:8001',
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:8001',
         changeOrigin: true,
         secure: false,
         ws: true,

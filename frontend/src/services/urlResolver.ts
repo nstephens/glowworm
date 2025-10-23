@@ -77,6 +77,17 @@ class UrlResolver {
    * Get API endpoint URL
    */
   public getApiUrl(endpoint: string = ''): string {
+    // In development, use relative URLs so Vite proxy handles the routing
+    // This avoids CORS issues and matches the architecture where frontend is the single entry point
+    const isDevelopment = import.meta.env.DEV;
+    
+    if (isDevelopment) {
+      // Use relative URL - Vite proxy will forward to backend
+      const apiPath = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
+      return apiPath;
+    }
+    
+    // In production, use absolute URLs
     const baseUrl = this.serverBaseUrl.endsWith('/') 
       ? this.serverBaseUrl.slice(0, -1) 
       : this.serverBaseUrl;
