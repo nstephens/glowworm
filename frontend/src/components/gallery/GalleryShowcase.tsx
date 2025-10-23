@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
 import { MasonryGallery, Image } from './MasonryGallery';
+import { FilterProvider } from './FilterContext';
+import { FilterPanel } from './FilterPanel';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Filter, 
   Grid, 
   List, 
-  Search,
   Download,
   Share,
   Trash,
@@ -25,9 +21,6 @@ import {
  * and bulk actions. Use this for development and testing purposes.
  */
 export const GalleryShowcase: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAlbum, setSelectedAlbum] = useState<string>('all');
-  const [selectedOrientation, setSelectedOrientation] = useState<string>('all');
   const [showSelection, setShowSelection] = useState(true);
   const [viewMode, setViewMode] = useState<'masonry' | 'grid'>('masonry');
 
@@ -101,8 +94,10 @@ export const GalleryShowcase: React.FC = () => {
     },
   ];
 
-  const albums = ['all', 'Vacation', 'Nature', 'Urban', 'Art', 'Family'];
-  const orientations = ['all', 'landscape', 'portrait', 'square'];
+  // Get all unique albums and tags for filter options
+  const allAlbums = [...new Set(mockImages.map(img => img.album).filter(Boolean))];
+  const allTags = [...new Set(mockImages.flatMap(img => img.tags || []))];
+  const allOrientations = [...new Set(mockImages.map(img => img.orientation).filter(Boolean))];
 
   const handleImageSelect = (image: Image) => {
     console.log('Selected image:', image);
@@ -167,125 +162,53 @@ export const GalleryShowcase: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Photo Gallery</h1>
-          <p className="text-muted-foreground">
-            Browse and manage your photos with our enhanced masonry layout
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={viewMode === 'masonry' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('masonry')}
-          >
-            <Grid className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={viewMode === 'grid' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('grid')}
-          >
-            <List className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Filters and Search */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters & Search
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Search */}
-            <div className="space-y-2">
-              <Label htmlFor="search">Search</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="search"
-                  placeholder="Search images..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            {/* Album Filter */}
-            <div className="space-y-2">
-              <Label htmlFor="album">Album</Label>
-              <Select value={selectedAlbum} onValueChange={setSelectedAlbum}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select album" />
-                </SelectTrigger>
-                <SelectContent>
-                  {albums.map((album) => (
-                    <SelectItem key={album} value={album}>
-                      {album === 'all' ? 'All Albums' : album}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Orientation Filter */}
-            <div className="space-y-2">
-              <Label htmlFor="orientation">Orientation</Label>
-              <Select value={selectedOrientation} onValueChange={setSelectedOrientation}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select orientation" />
-                </SelectTrigger>
-                <SelectContent>
-                  {orientations.map((orientation) => (
-                    <SelectItem key={orientation} value={orientation}>
-                      {orientation === 'all' ? 'All Orientations' : orientation}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Options */}
-            <div className="space-y-2">
-              <Label>Options</Label>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="selection"
-                  checked={showSelection}
-                  onCheckedChange={setShowSelection}
-                />
-                <Label htmlFor="selection" className="text-sm">
-                  Show selection
-                </Label>
-              </div>
-            </div>
+    <FilterProvider images={mockImages}>
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Photo Gallery</h1>
+            <p className="text-muted-foreground">
+              Browse and manage your photos with our enhanced masonry layout
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={viewMode === 'masonry' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('masonry')}
+            >
+              <Grid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'grid' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('grid')}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
 
-      {/* Gallery Stats */}
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <Badge variant="secondary">{mockImages.length} images</Badge>
-        <Badge variant="outline">6 albums</Badge>
-        <Badge variant="outline">3 orientations</Badge>
-      </div>
+        {/* Filter Panel */}
+        <FilterPanel />
 
-      {/* Masonry Gallery */}
-      <MasonryGallery
-        initialImages={mockImages}
-        fetchImages={fetchImages}
-        onImageSelect={handleImageSelect}
-        onBulkAction={handleBulkAction}
-        showSelection={showSelection}
-        className="min-h-[600px]"
-      />
+        {/* Gallery Stats */}
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <Badge variant="secondary">{mockImages.length} images</Badge>
+          <Badge variant="outline">{allAlbums.length} albums</Badge>
+          <Badge variant="outline">{allTags.length} tags</Badge>
+          <Badge variant="outline">{allOrientations.length} orientations</Badge>
+        </div>
+
+        {/* Masonry Gallery */}
+        <MasonryGallery
+          initialImages={mockImages}
+          fetchImages={fetchImages}
+          onImageSelect={handleImageSelect}
+          onBulkAction={handleBulkAction}
+          showSelection={showSelection}
+          className="min-h-[600px]"
+        />
 
       {/* Keyboard Shortcuts Info */}
       <Card>
@@ -313,6 +236,7 @@ export const GalleryShowcase: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </FilterProvider>
   );
 };

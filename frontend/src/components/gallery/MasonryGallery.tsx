@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useFilters } from './FilterContext';
 import { cn } from '@/lib/utils';
 
 export interface Image {
@@ -112,6 +113,9 @@ export const MasonryGallery: React.FC<MasonryGalleryProps> = ({
     cacheTime: 10 * 60 * 1000, // 10 minutes
   });
 
+  // Get filtered images from context
+  const { filteredImages: contextFilteredImages } = useFilters();
+  
   // Flatten all images from all pages
   const allImages = useMemo(() => {
     if (data?.pages) {
@@ -119,6 +123,9 @@ export const MasonryGallery: React.FC<MasonryGalleryProps> = ({
     }
     return initialImages.length > 0 ? initialImages : generateMockImages();
   }, [data?.pages, initialImages]);
+
+  // Use filtered images if context is available, otherwise use all images
+  const displayImages = contextFilteredImages.length > 0 ? contextFilteredImages : allImages;
 
   // Trigger infinite scroll when load more ref comes into view
   React.useEffect(() => {
@@ -156,9 +163,9 @@ export const MasonryGallery: React.FC<MasonryGalleryProps> = ({
 
   // Select all images
   const selectAll = useCallback(() => {
-    setSelectedImages(new Set(allImages.map(img => img.id)));
+    setSelectedImages(new Set(displayImages.map(img => img.id)));
     setIsSelectionMode(true);
-  }, [allImages]);
+  }, [displayImages]);
 
   // Keyboard shortcuts
   useHotkeys('esc', clearSelection, { enableOnTags: ['INPUT', 'TEXTAREA'] });
@@ -169,9 +176,9 @@ export const MasonryGallery: React.FC<MasonryGalleryProps> = ({
 
   // Handle bulk actions
   const handleBulkAction = useCallback((action: string) => {
-    const selectedImageObjects = allImages.filter(img => selectedImages.has(img.id));
+    const selectedImageObjects = displayImages.filter(img => selectedImages.has(img.id));
     onBulkAction?.(action, selectedImageObjects);
-  }, [allImages, selectedImages, onBulkAction]);
+  }, [displayImages, selectedImages, onBulkAction]);
 
   // Calculate aspect ratio for proper image sizing
   const getImageStyle = useCallback((image: Image) => {
@@ -287,10 +294,10 @@ export const MasonryGallery: React.FC<MasonryGalleryProps> = ({
         className="flex -ml-4 w-auto"
         columnClassName="pl-4 bg-clip-padding"
       >
-        {allImages.map((image, index) => {
+        {displayImages.map((image, index) => {
           const isSelected = selectedImages.has(image.id);
           const isHovered = hoveredImage === image.id;
-          const isLast = index === allImages.length - 1;
+          const isLast = index === displayImages.length - 1;
 
           return (
             <div
@@ -431,19 +438,19 @@ export const MasonryGallery: React.FC<MasonryGalleryProps> = ({
       )}
 
       {/* End of results indicator */}
-      {!hasNextPage && allImages.length > 0 && (
+      {!hasNextPage && displayImages.length > 0 && (
         <div className="flex justify-center py-8">
           <div className="text-center space-y-2">
             <div className="h-1 w-16 bg-muted mx-auto rounded"></div>
             <p className="text-sm text-muted-foreground">
-              You've reached the end ({allImages.length} images)
+              You've reached the end ({displayImages.length} images)
             </p>
           </div>
         </div>
       )}
 
       {/* Empty state */}
-      {allImages.length === 0 && !isLoading && (
+      {displayImages.length === 0 && !isLoading && (
         <div className="flex items-center justify-center py-12">
           <div className="text-center space-y-4">
             <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto">
