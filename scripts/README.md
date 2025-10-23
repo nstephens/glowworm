@@ -13,6 +13,7 @@ python scripts/glowworm_reset_to_defaults.py
 ```
 
 **Features:**
+- **Automatically uses venv** (no manual activation needed!)
 - Interactive confirmation prompt
 - Preserves database credentials and server settings
 - Color-coded output

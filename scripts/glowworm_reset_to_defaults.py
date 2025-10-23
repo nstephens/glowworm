@@ -17,14 +17,33 @@ import os
 import sys
 import json
 import shutil
-import pymysql
 import argparse
+import subprocess
 from pathlib import Path
 
 # Define project root
 PROJECT_ROOT = Path(__file__).parent.parent
 BACKEND_DIR = PROJECT_ROOT / 'backend'
 UPLOADS_DIR = PROJECT_ROOT / 'uploads'
+VENV_PYTHON = BACKEND_DIR / 'venv' / 'bin' / 'python'
+
+# Check if we're running in venv, if not, re-execute with venv python
+if not hasattr(sys, 'real_prefix') and not (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
+    # Not in venv, check if venv exists
+    if VENV_PYTHON.exists():
+        print(f"🔄 Re-executing with virtual environment: {VENV_PYTHON}")
+        print()
+        # Re-execute this script with venv python
+        os.execv(str(VENV_PYTHON), [str(VENV_PYTHON)] + sys.argv)
+    else:
+        print("❌ Virtual environment not found.")
+        print(f"Expected: {VENV_PYTHON}")
+        print()
+        print("Please run ./setup.sh first to create the virtual environment.")
+        sys.exit(1)
+
+# Now we're in venv, import pymysql
+import pymysql
 
 
 def confirm_reset(skip_confirm=False):
