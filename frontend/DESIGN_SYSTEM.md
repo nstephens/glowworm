@@ -692,6 +692,114 @@ import { Slider } from '@/components/ui/slider';
 - Keyboard support (arrow keys)
 - Range selection support
 
+### Modal System
+
+Comprehensive modal system with specialized variants for different use cases.
+
+#### InfoModal
+
+```tsx
+import { InfoModal } from '@/components/modals';
+
+<InfoModal
+  open={isOpen}
+  onOpenChange={setIsOpen}
+  title="Welcome!"
+  description="Here's some important information"
+  showIcon
+>
+  <p>Detailed information goes here...</p>
+</InfoModal>
+```
+
+**Features:**
+- Simple OK button by default
+- Optional info icon
+- Centered content
+- Perfect for notifications and help text
+
+#### ActionModal
+
+```tsx
+import { ActionModal } from '@/components/modals';
+
+<ActionModal
+  open={isOpen}
+  onOpenChange={setIsOpen}
+  title="Create Album"
+  description="Enter album details"
+  submitText="Create"
+  onSubmit={handleSubmit}
+  isSubmitting={isLoading}
+>
+  <form>
+    <Input placeholder="Album name" />
+  </form>
+</ActionModal>
+```
+
+**Features:**
+- Submit and cancel buttons
+- Loading state support
+- Form submission handling
+- Customizable button text and variants
+
+#### ConfirmationModal
+
+```tsx
+import { ConfirmationModal } from '@/components/modals';
+
+<ConfirmationModal
+  open={isOpen}
+  onOpenChange={setIsOpen}
+  title="Delete Album?"
+  description="This action cannot be undone."
+  confirmText="Delete"
+  variant="destructive"
+  onConfirm={handleDelete}
+  isConfirming={isDeleting}
+>
+  <p>Are you sure you want to delete this album?</p>
+</ConfirmationModal>
+```
+
+**Features:**
+- Warning icon for destructive actions
+- Clear confirm/cancel buttons
+- Loading state support
+- Destructive variant with warning styling
+
+#### FullScreenModal
+
+```tsx
+import { FullScreenModal } from '@/components/modals';
+
+<FullScreenModal
+  open={isOpen}
+  onOpenChange={setIsOpen}
+  title="Photo Gallery"
+  showCloseButton
+>
+  <ImageGallery images={images} />
+</FullScreenModal>
+```
+
+**Features:**
+- Full screen overlay
+- Optional header with close button
+- Mobile-optimized layout
+- Perfect for image viewing and bulk operations
+
+#### Modal Features
+
+All modals include:
+- **ESC key to close** (built-in)
+- **Click outside to close** (built-in)
+- **Focus trapping** (built-in)
+- **Accessibility compliant** (ARIA attributes)
+- **TypeScript typed** (full type safety)
+- **Smooth animations** (enter/exit transitions)
+
 ---
 
 ## Accessibility Guidelines
