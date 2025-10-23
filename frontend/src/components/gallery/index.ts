@@ -3,3 +3,6 @@ export { GalleryShowcase } from './GalleryShowcase';
 export { GalleryWithQueryProvider } from './GalleryWithQueryProvider';
 export { FilterProvider, useFilters, type FilterState, type FilterContextType } from './FilterContext';
 export { FilterPanel } from './FilterPanel';
+export { ImageCard } from './ImageCard';
+export { ImageOverlay } from './ImageOverlay';
+export { ImageSkeleton } from './ImageSkeleton';

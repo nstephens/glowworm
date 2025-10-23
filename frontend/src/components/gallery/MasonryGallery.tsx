@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ImageCard } from './ImageCard';
 import { useFilters } from './FilterContext';
 import { cn } from '@/lib/utils';
 
@@ -296,133 +297,20 @@ export const MasonryGallery: React.FC<MasonryGalleryProps> = ({
       >
         {displayImages.map((image, index) => {
           const isSelected = selectedImages.has(image.id);
-          const isHovered = hoveredImage === image.id;
           const isLast = index === displayImages.length - 1;
 
           return (
-            <div
+            <ImageCard
               key={image.id}
               ref={isLast ? loadMoreRef : undefined}
-              className={cn(
-                "masonry-item mb-4 break-inside-avoid",
-                "group relative overflow-hidden rounded-lg bg-card border",
-                "transition-all duration-200",
-                "hover:shadow-lg hover:scale-[1.02]",
-                isSelected && "ring-2 ring-primary ring-offset-2",
-                isHovered && "shadow-lg scale-[1.02]"
-              )}
-              style={getImageStyle(image)}
-              onMouseEnter={() => setHoveredImage(image.id)}
-              onMouseLeave={() => setHoveredImage(null)}
-            >
-              {/* Selection checkbox */}
-              {showSelection && (
-                <div className="absolute top-2 left-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Checkbox
-                    checked={isSelected}
-                    onChange={() => toggleImageSelection(image.id)}
-                    aria-label={`Select ${image.title}`}
-                    className="bg-background/80 backdrop-blur-sm"
-                  />
-                </div>
-              )}
-
-              {/* Image */}
-              <div className="relative w-full h-full">
-                <img
-                  src={image.src}
-                  alt={image.title}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = '/placeholder-image.jpg';
-                  }}
-                />
-
-                {/* Hover overlay with actions */}
-                <div className={cn(
-                  "absolute inset-0 bg-black/60 backdrop-blur-sm",
-                  "flex flex-col justify-between p-4",
-                  "opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                )}>
-                  {/* Image title */}
-                  <div className="text-white">
-                    <h3 className="font-semibold text-sm truncate">{image.title}</h3>
-                    {image.album && (
-                      <p className="text-xs text-white/80 truncate">{image.album}</p>
-                    )}
-                  </div>
-
-                  {/* Action buttons */}
-                  <div className="flex items-center justify-end gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-white hover:bg-white/20"
-                      onClick={() => onImageSelect?.(image)}
-                      aria-label="View details"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-white hover:bg-white/20"
-                      onClick={() => handleBulkAction('download')}
-                      aria-label="Download"
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-white hover:bg-white/20"
-                      onClick={() => handleBulkAction('share')}
-                      aria-label="Share"
-                    >
-                      <Share className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-white hover:bg-white/20"
-                      onClick={() => handleBulkAction('favorite')}
-                      aria-label="Add to favorites"
-                    >
-                      <Star className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-white hover:bg-white/20"
-                      onClick={() => handleBulkAction('edit')}
-                      aria-label="Edit"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-white hover:bg-white/20"
-                      onClick={() => handleBulkAction('delete')}
-                      aria-label="Delete"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Selection indicator */}
-                {isSelected && (
-                  <div className="absolute top-2 right-2 z-20">
-                    <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center">
-                      <Check className="h-4 w-4 text-primary-foreground" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+              image={image}
+              isSelected={isSelected}
+              isLast={isLast}
+              onSelect={onImageSelect || (() => {})}
+              onToggleSelection={toggleImageSelection}
+              onAction={handleBulkAction}
+              showSelection={showSelection}
+            />
           );
         })}
       </Masonry>
