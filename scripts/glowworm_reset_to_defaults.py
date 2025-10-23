@@ -141,13 +141,29 @@ def run_migrations():
         os.chdir(BACKEND_DIR)
         
         print("  Running alembic upgrade head...")
-        result = os.system("alembic upgrade head")
         
-        if result == 0:
+        # Use the venv's alembic directly
+        alembic_cmd = BACKEND_DIR / 'venv' / 'bin' / 'alembic'
+        
+        if not alembic_cmd.exists():
+            print(f"  ❌ Alembic not found at: {alembic_cmd}")
+            print("  Please ensure alembic is installed in the venv:")
+            print("    cd backend && source venv/bin/activate && pip install alembic")
+            return False
+        
+        # Run alembic using subprocess with venv
+        result = subprocess.run(
+            [str(alembic_cmd), 'upgrade', 'head'],
+            cwd=str(BACKEND_DIR),
+            capture_output=False,
+            text=True
+        )
+        
+        if result.returncode == 0:
             print("  ✅ Database tables created successfully")
             return True
         else:
-            print("  ❌ Migration failed with exit code:", result)
+            print(f"  ❌ Migration failed with exit code: {result.returncode}")
             return False
             
     except Exception as e:
