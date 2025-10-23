@@ -441,9 +441,300 @@ Import these in your routes for visual inspection during development.
 
 ---
 
+---
+
+## UI Components
+
+Comprehensive component library built on shadcn/ui and customized for the GlowWorm design system.
+
+### Buttons
+
+```tsx
+import { Button } from '@/components/ui/button';
+
+// Variants
+<Button variant="default">Primary Action</Button>
+<Button variant="secondary">Secondary Action</Button>
+<Button variant="destructive">Delete</Button>
+<Button variant="outline">Outline</Button>
+<Button variant="ghost">Ghost</Button>
+<Button variant="link">Link</Button>
+<Button variant="success">Success</Button>
+
+// Sizes
+<Button size="sm">Small</Button>
+<Button size="default">Default</Button>
+<Button size="lg">Large</Button>
+<Button size="xl">Extra Large</Button>
+<Button size="icon"><Icon /></Button>
+```
+
+**Features:**
+- Micro-interactions (active:scale-95)
+- Enhanced hover states with shadow elevation
+- Smooth 200ms transitions
+- Full keyboard accessibility
+
+### Form Inputs
+
+```tsx
+import { Input, Textarea, Label } from '@/components/ui';
+
+// Input with label
+<div>
+  <Label htmlFor="email">Email</Label>
+  <Input id="email" type="email" placeholder="you@example.com" />
+</div>
+
+// Input with error state
+<Input error placeholder="Invalid input" />
+
+// Textarea
+<Textarea placeholder="Enter description..." rows={4} />
+```
+
+**Features:**
+- Error state support
+- Hover border color changes
+- Enhanced focus rings
+- Placeholder styling
+
+### Checkboxes and Switches
+
+```tsx
+import { Checkbox, Switch, Label } from '@/components/ui';
+
+// Checkbox
+<div className="flex items-center space-x-2">
+  <Checkbox id="terms" />
+  <Label htmlFor="terms">Accept terms</Label>
+</div>
+
+// Switch
+<div className="flex items-center space-x-2">
+  <Switch id="notifications" />
+  <Label htmlFor="notifications">Enable notifications</Label>
+</div>
+```
+
+**Features:**
+- Smooth check/toggle animations
+- Hover effects
+- Keyboard accessible
+- ARIA compliant
+
+### Select Dropdowns
+
+```tsx
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+<Select>
+  <SelectTrigger>
+    <SelectValue placeholder="Select option" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="option1">Option 1</SelectItem>
+    <SelectItem value="option2">Option 2</SelectItem>
+    <SelectItem value="option3">Option 3</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+**Features:**
+- Keyboard navigation
+- Scroll buttons for long lists
+- Smooth animations
+- Search/type to filter
+
+### Dialogs/Modals
+
+```tsx
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+
+<Dialog>
+  <DialogTrigger asChild>
+    <Button>Open Modal</Button>
+  </DialogTrigger>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Modal Title</DialogTitle>
+      <DialogDescription>
+        Modal description text
+      </DialogDescription>
+    </DialogHeader>
+    <div>Modal content goes here</div>
+    <DialogFooter>
+      <Button variant="outline">Cancel</Button>
+      <Button>Confirm</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+```
+
+**Features:**
+- ESC key to close (built-in)
+- Click outside to close
+- Focus trapping
+- Backdrop blur
+- Smooth enter/exit animations
+
+### Toast Notifications
+
+```tsx
+import { useToast } from '@/hooks/use-toast';
+import { Toaster } from '@/components/ui/toaster';
+
+function MyComponent() {
+  const { toast } = useToast();
+  
+  return (
+    <>
+      <Button onClick={() => {
+        toast({
+          title: "Success!",
+          description: "Your changes have been saved.",
+          variant: "success"
+        });
+      }}>
+        Show Toast
+      </Button>
+      
+      <Toaster />
+    </>
+  );
+}
+```
+
+**Variants:**
+- `default`: Neutral notifications
+- `success`: Success messages
+- `destructive`: Error messages
+
+**Features:**
+- Auto-dismiss with configurable duration
+- Swipe to dismiss
+- Action buttons
+- Stacking (max 5 toasts)
+
+### Dropdown Menus
+
+```tsx
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+
+<DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <Button variant="ghost">Menu</Button>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent>
+    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem>Profile</DropdownMenuItem>
+    <DropdownMenuItem>Settings</DropdownMenuItem>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem>Logout</DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
+```
+
+**Features:**
+- Keyboard navigation (arrow keys)
+- Checkbox and radio items
+- Nested sub-menus
+- Keyboard shortcuts display
+
+### Cards
+
+```tsx
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+
+// Basic card
+<Card>
+  <CardHeader>
+    <CardTitle>Card Title</CardTitle>
+    <CardDescription>Card description</CardDescription>
+  </CardHeader>
+  <CardContent>
+    <p>Card content</p>
+  </CardContent>
+  <CardFooter>
+    <Button>Action</Button>
+  </CardFooter>
+</Card>
+
+// Interactive card
+<Card hoverable interactive>
+  <CardContent className="p-6">
+    Clickable card with hover effects
+  </CardContent>
+</Card>
+```
+
+**Props:**
+- `hoverable`: Adds hover shadow and border effects
+- `interactive`: Adds cursor pointer and click animation
+
+### Slider
+
+```tsx
+import { Slider } from '@/components/ui/slider';
+
+<Slider 
+  defaultValue={[50]} 
+  max={100} 
+  step={1}
+  onValueChange={(value) => console.log(value)}
+/>
+```
+
+**Features:**
+- Smooth thumb animations
+- Hover scale effect
+- Keyboard support (arrow keys)
+- Range selection support
+
+---
+
+## Accessibility Guidelines
+
+### Keyboard Navigation
+
+All interactive components support full keyboard navigation:
+
+- **Tab**: Move between interactive elements
+- **Enter/Space**: Activate buttons, checkboxes, switches
+- **Arrow keys**: Navigate menus, select options, adjust sliders
+- **ESC**: Close modals, dropdowns, selects
+
+### Focus Management
+
+- Visible focus indicators on all interactive elements
+- Focus trapping in modals and dialogs
+- Proper tab order
+- Skip links for screen readers
+
+### Screen Readers
+
+- Proper ARIA labels and roles
+- Descriptive alt text for images
+- Status announcements for toasts
+- Form error announcements
+
+### Color Contrast
+
+✅ All components meet WCAG 2.1 AA standards (4.5:1 minimum contrast ratio)
+
+Run tests:
+```bash
+npm run test -- colorContrast.test.ts
+```
+
+---
+
 ## References
 
 - [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
 - [8-Point Grid System](https://spec.fm/specifics/8-pt-grid)
+- [shadcn/ui Documentation](https://ui.shadcn.com/)
+- [Radix UI Primitives](https://www.radix-ui.com/primitives)
 
