@@ -86,8 +86,20 @@ class DatabaseConfigService:
                 if setting:
                     setting.set_typed_value(value)
                 else:
-                    # Create new setting with default type and description
-                    setting = SystemSettings(setting_key=key)
+                    # Create new setting - determine type from value
+                    if isinstance(value, bool):
+                        setting_type = SettingType.BOOLEAN
+                    elif isinstance(value, (int, float)):
+                        setting_type = SettingType.NUMBER
+                    elif isinstance(value, (list, dict)):
+                        setting_type = SettingType.JSON
+                    else:
+                        setting_type = SettingType.STRING
+                    
+                    setting = SystemSettings(
+                        setting_key=key,
+                        setting_type=setting_type
+                    )
                     setting.set_typed_value(value)
                     self.db.add(setting)
             
