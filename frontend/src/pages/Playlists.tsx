@@ -149,37 +149,34 @@ export const Playlists: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up">
+        <div className="space-y-4 animate-fade-in-up">
           {playlists.map((playlist) => (
-            <Card
+            <div
               key={playlist.id}
-              className="gallery-item border-0 shadow-lg bg-card/50 backdrop-blur-sm cursor-pointer group hover:shadow-xl transition-all duration-200"
+              className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
               onClick={() => navigate(`/admin/playlists/${playlist.id}`)}
             >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CardTitle className="text-lg">{playlist.name}</CardTitle>
-                      {playlist.is_default && (
-                        <Badge variant="secondary" className="text-xs">
-                          <Star className="w-3 h-3 mr-1" />
-                          Default
-                        </Badge>
-                      )}
-                    </div>
-                    <CardDescription>
-                      {playlist.image_count} images • {playlist.slug}
-                    </CardDescription>
-                  </div>
-                  <div className="p-2 bg-secondary/10 rounded-lg">
-                    <Play className="w-5 h-5 text-secondary" />
-                  </div>
+              <div className="flex items-center space-x-4">
+                {/* Thumbnail placeholder */}
+                <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                  <Play className="w-8 h-8 text-gray-400" />
                 </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                
+                {/* Playlist Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">{playlist.name}</h3>
+                    {playlist.is_default && (
+                      <Badge variant="secondary" className="text-xs">
+                        <Star className="w-3 h-3 mr-1" />
+                        Default
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500 mb-2">
+                    {playlist.image_count} images • {playlist.slug}
+                  </p>
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
                     {playlist.display_mode && playlist.display_mode !== 'default' && (
                       <Badge variant="outline" className="text-xs">
                         {playlist.display_mode === 'auto_sort' ? 'Auto Sort' :
@@ -187,38 +184,40 @@ export const Playlists: React.FC = () => {
                          playlist.display_mode}
                       </Badge>
                     )}
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
                       {playlist.display_time_seconds || 30}s
                     </span>
                   </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSetDefault(playlist);
-                      }}
-                      disabled={playlist.is_default}
-                    >
-                      <Star className="w-3 h-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPlaylistToDelete(playlist);
-                        setShowDeleteModal(true);
-                      }}
-                    >
-                      <Trash2 className="w-3 h-3 text-destructive" />
-                    </Button>
-                  </div>
                 </div>
-              </CardContent>
-            </Card>
+                
+                {/* Actions */}
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSetDefault(playlist);
+                    }}
+                    disabled={playlist.is_default}
+                  >
+                    <Star className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPlaylistToDelete(playlist);
+                      setShowDeleteModal(true);
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       )}

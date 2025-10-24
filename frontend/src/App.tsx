@@ -13,7 +13,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import DisplayView from './pages/DisplayView';
 import DisplayRegistration from './pages/DisplayRegistration';
 import Login from './pages/Login';
-import { Images, ImagesHeader } from './pages/Images';
+import { Images } from './pages/Images';
 import Playlists from './pages/Playlists';
 import PlaylistDetail from './pages/PlaylistDetail';
 import Displays from './pages/Displays';
@@ -21,6 +21,11 @@ import Settings from './pages/Settings';
 import AdminLayout from './components/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
+import AdminDashboardHeader from './components/AdminDashboardHeader';
+import PlaylistDetailHeader from './components/PlaylistDetailHeader';
+import ImagesPageHeader from './components/ImagesHeader';
+import DisplaysHeader from './components/DisplaysHeader';
+import PlaylistsHeader from './components/PlaylistsHeader';
 
 // Wrapper component for Images with custom header
 const ImagesWithHeader: React.FC = () => {
@@ -34,7 +39,7 @@ const ImagesWithHeader: React.FC = () => {
   };
 
   const headerContent = (
-    <ImagesHeader 
+    <ImagesPageHeader 
       images={images} 
       albums={albums} 
       onUploadClick={() => setShowUploadModal(true)} 
@@ -75,11 +80,11 @@ function AppContent() {
             {/* Fully configured - normal app routes */}
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/admin" element={<ProtectedRoute><AdminLayout><AdminDashboard /></AdminLayout></ProtectedRoute>} />
-            <Route path="/admin/images" element={<ProtectedRoute><AdminLayout><Images /></AdminLayout></ProtectedRoute>} />
-            <Route path="/admin/playlists" element={<ProtectedRoute><AdminLayout><Playlists /></AdminLayout></ProtectedRoute>} />
-            <Route path="/admin/playlists/:id" element={<ProtectedRoute><AdminLayout><PlaylistDetail /></AdminLayout></ProtectedRoute>} />
-            <Route path="/admin/displays" element={<ProtectedRoute><AdminLayout><Displays /></AdminLayout></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute><AdminLayout headerContent={<AdminDashboardHeader />}><AdminDashboard /></AdminLayout></ProtectedRoute>} />
+            <Route path="/admin/images" element={<ProtectedRoute><ImagesWithHeader /></ProtectedRoute>} />
+            <Route path="/admin/playlists" element={<ProtectedRoute><AdminLayout headerContent={<PlaylistsHeader />}><Playlists /></AdminLayout></ProtectedRoute>} />
+            <Route path="/admin/playlists/:id" element={<ProtectedRoute><AdminLayout headerContent={<PlaylistDetailHeader />}><PlaylistDetail /></AdminLayout></ProtectedRoute>} />
+            <Route path="/admin/displays" element={<ProtectedRoute><AdminLayout headerContent={<DisplaysHeader />}><Displays /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/settings" element={<AdminProtectedRoute><AdminLayout><Settings /></AdminLayout></AdminProtectedRoute>} />
             <Route path="/display" element={<DisplayRegistration />} />
             <Route path="/display/:slug" element={<DisplayView />} />

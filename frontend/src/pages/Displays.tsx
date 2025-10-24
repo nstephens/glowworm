@@ -97,6 +97,13 @@ const Displays: React.FC = () => {
     fetchPlaylists();
   }, []);
 
+  // Set default tab based on pending devices
+  useEffect(() => {
+    if (pendingDevices.length > 0 && activeTab === 'active') {
+      setActiveTab('pending');
+    }
+  }, [pendingDevices.length, activeTab]);
+
   const handleAuthorizeDevice = async () => {
     if (!deviceToAuthorize) return;
     
@@ -472,16 +479,16 @@ const Displays: React.FC = () => {
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-gray-200">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {currentDevices.map((device) => (
-              <li key={device.id} className="px-6 py-4">
-                <div className="flex items-center justify-between">
+              <div key={device.id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900">
                           {device.device_name || `Device ${device.id}`}
-                        </p>
+                        </h3>
                         <p className="text-sm text-gray-500">
                           Token: {device.device_token.substring(0, 12)}...
                         </p>
@@ -495,21 +502,29 @@ const Displays: React.FC = () => {
                         {device.status}
                       </span>
                     </div>
-                    <div className="mt-2 text-xs text-gray-500">
-                      <p>Created: {formatDate(device.created_at)}</p>
-                      <p>Last seen: {formatDate(device.last_seen)}</p>
-                      {device.authorized_at && (
-                        <p>Authorized: {formatDate(device.authorized_at)}</p>
-                      )}
-                      {device.status === 'authorized' && (
-                        <p className="mt-1">
-                          <span className="font-medium">Playlist:</span> {device.playlist_name || 'None assigned'}
-                        </p>
-                      )}
+                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                      <div>
+                        <p className="font-medium">Created</p>
+                        <p>{formatDate(device.created_at)}</p>
+                      </div>
+                      <div>
+                        <p className="font-medium">Last Seen</p>
+                        <p>{formatDate(device.last_seen)}</p>
+                      </div>
                     </div>
+                    {device.authorized_at && (
+                      <div className="mt-2 text-sm text-gray-600">
+                        <p className="font-medium">Authorized: {formatDate(device.authorized_at)}</p>
+                      </div>
+                    )}
+                    {device.status === 'authorized' && (
+                      <div className="mt-2 text-sm text-gray-600">
+                        <p><span className="font-medium">Playlist:</span> {device.playlist_name || 'None assigned'}</p>
+                      </div>
+                    )}
                   </div>
                   
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-wrap gap-2 mt-4">
                     {device.status === 'pending' && (
                       <>
                         <button
@@ -579,9 +594,9 @@ const Displays: React.FC = () => {
                     )}
                   </div>
                 </div>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </div>
 

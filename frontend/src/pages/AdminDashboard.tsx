@@ -249,43 +249,6 @@ const AdminDashboard: React.FC = () => {
         ))}
       </div>
 
-      {/* Quick Actions */}
-      <div className="animate-fade-in-up">
-        <div className="flex items-center gap-2 mb-6">
-          <Zap className="w-5 h-5 text-accent" />
-          <h2 className="text-xl font-semibold">Quick Actions</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {quickActions.map((action) => (
-            <Card
-              key={action.title}
-              className="gallery-item border-0 shadow-lg bg-card/50 backdrop-blur-sm cursor-pointer group"
-              onClick={action.onClick}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div
-                    className={`p-3 rounded-xl ${action.color} group-hover:scale-110 transition-transform duration-200`}
-                  >
-                    <action.icon className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold mb-1">{action.title}</h3>
-                    <p className="text-sm text-muted-foreground mb-4">{action.description}</p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-primary hover:text-primary-foreground hover:bg-primary"
-                    >
-                      Get Started →
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
 
       {/* Live Display Status */}
       <LiveDisplayStatus />
