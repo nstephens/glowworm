@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -58,6 +58,7 @@ interface DisplaySize {
 
 const Settings: React.FC = () => {
   const { toast } = useToast();
+  const hasLoadedSettings = useRef(false);
   const [settings, setSettings] = useState<SystemSettings>({
     mysql_host: 'localhost',
     mysql_port: 3306,
@@ -94,6 +95,8 @@ const Settings: React.FC = () => {
   }, []);
 
   const loadSettings = async () => {
+    if (hasLoadedSettings.current) return;
+    
     try {
       const response = await apiService.getSettings();
       if (response.success) {
@@ -109,6 +112,7 @@ const Settings: React.FC = () => {
           enableDebugLogging: response.settings.enable_debug_logging
         });
         
+        hasLoadedSettings.current = true;
         toast({
           title: "Settings Loaded",
           description: "Current system settings loaded successfully",
@@ -118,6 +122,7 @@ const Settings: React.FC = () => {
     } catch (err: any) {
       // Settings API not available yet, use defaults
       console.log('Settings API not available, using defaults');
+      hasLoadedSettings.current = true;
       setSettings({
         mysql_host: 'localhost',
         mysql_port: 3306,
