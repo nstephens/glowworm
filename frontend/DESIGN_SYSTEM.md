@@ -10,7 +10,8 @@ Complete reference for the GlowWorm frontend design system, including colors, ty
 2. [Typography](#typography)
 3. [Spacing System](#spacing-system)
 4. [Layout Components](#layout-components)
-5. [Best Practices](#best-practices)
+5. [Accessibility Components](#accessibility-components)
+6. [Best Practices](#best-practices)
 
 ---
 
@@ -292,6 +293,34 @@ import { Flex } from '@/components/ui/layout';
   <Card />
 </Flex>
 ```
+
+---
+
+## Accessibility Components
+
+### Focus Management
+- **useFocusTrap**: Hook for trapping focus within modals and dialogs
+- **useReducedMotion**: Hook for respecting user's motion preferences
+- **useHighContrast**: Hook for managing high contrast mode
+- **VisuallyHidden**: Component for screen reader only content
+- **SkipLinks**: Skip navigation for keyboard users
+
+### Live Regions
+- **LiveRegion**: Component for announcing dynamic content changes
+- **useLiveRegion**: Hook for managing screen reader announcements
+- **useLoadingAnnouncements**: Hook for loading state announcements
+
+### Accessibility Audit
+- **AccessibilityAudit**: Development tool for identifying accessibility issues
+- **AccessibleModal**: Modal component with full accessibility support
+- **AccessibilitySettings**: User preferences for accessibility features
+
+### Key Features
+- **WCAG 2.1 AA Compliance**: All components meet accessibility standards
+- **Keyboard Navigation**: Full keyboard support for all interactions
+- **Screen Reader Support**: Proper ARIA labels and semantic HTML
+- **Focus Management**: Visible focus indicators and logical tab order
+- **User Preferences**: Support for high contrast, reduced motion, font scaling
 
 ---
 
