@@ -106,24 +106,9 @@ def is_configured() -> bool:
     """Check if the application is properly configured"""
     # For Docker deployments, check if we have environment variables set
     if os.getenv('MYSQL_PASSWORD') and os.getenv('SECRET_KEY'):
-        # Running in Docker with environment variables - test database connection
-        try:
-            mysql_host = os.getenv('MYSQL_HOST', 'localhost')
-            mysql_port = int(os.getenv('MYSQL_PORT', '3306'))
-            mysql_user = os.getenv('MYSQL_USER', 'glowworm')
-            mysql_password = os.getenv('MYSQL_PASSWORD', '')
-            mysql_database = os.getenv('MYSQL_DATABASE', 'glowworm')
-            
-            database_url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}:{mysql_port}/{mysql_database}"
-            engine = create_engine(database_url, connect_args={"connect_timeout": 5})
-            
-            # Test the connection
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            
-            return True
-        except Exception:
-            return False
+        # Running in Docker with environment variables - consider bootstrap configured
+        # The database connection test will be done separately to determine if admin user exists
+        return True
     
     # Check file-based configuration (non-Docker deployments)
     try:
@@ -149,6 +134,31 @@ def is_configured() -> bool:
             return False
     except Exception:
         # If database connection fails, consider it not configured
+        return False
+
+def is_database_accessible() -> bool:
+    """Check if the database is accessible (for determining if admin user exists)"""
+    try:
+        # For Docker deployments, use environment variables
+        if os.getenv('MYSQL_PASSWORD') and os.getenv('SECRET_KEY'):
+            mysql_host = os.getenv('MYSQL_HOST', 'localhost')
+            mysql_port = int(os.getenv('MYSQL_PORT', '3306'))
+            mysql_user = os.getenv('MYSQL_USER', 'glowworm')
+            mysql_password = os.getenv('MYSQL_PASSWORD', '')
+            mysql_database = os.getenv('MYSQL_DATABASE', 'glowworm')
+            
+            database_url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}:{mysql_port}/{mysql_database}"
+            engine = create_engine(database_url, connect_args={"connect_timeout": 5})
+            
+            # Test the connection
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            
+            return True
+        else:
+            # For file-based configuration, use the same logic as is_configured
+            return is_configured()
+    except Exception:
         return False
 
 def get_config_file_path() -> Path:

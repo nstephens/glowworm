@@ -8,7 +8,7 @@ import string
 import logging
 import socket
 import psutil
-from config.settings import settings, is_configured, save_config
+from config.settings import settings, is_configured, is_database_accessible, save_config
 from utils.database import db_manager
 from models.database import get_db, Base
 from services.auth_service import AuthService
@@ -96,9 +96,12 @@ async def get_setup_status(db: Session = Depends(get_db)):
     # Check if database/bootstrap is configured
     bootstrap_configured = is_configured()
     
+    # Check if database is accessible (for Docker deployments, this might fail initially)
+    database_accessible = is_database_accessible()
+    
     # Check if admin user exists (for stage 2)
     admin_exists = False
-    if bootstrap_configured:
+    if bootstrap_configured and database_accessible:
         try:
             from models.user import User
             admin_user = db.query(User).filter(User.username == "admin").first()
