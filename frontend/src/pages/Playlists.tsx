@@ -172,8 +172,8 @@ export const Playlists: React.FC = () => {
                       {playlist.image_count} images • {playlist.slug}
                     </CardDescription>
                   </div>
-                  <div className="p-2 bg-chart-3/10 rounded-lg">
-                    <Play className="w-5 h-5 text-chart-3" />
+                  <div className="p-2 bg-secondary/10 rounded-lg">
+                    <Play className="w-5 h-5 text-secondary" />
                   </div>
                 </div>
               </CardHeader>

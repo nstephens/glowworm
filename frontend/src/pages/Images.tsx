@@ -31,7 +31,7 @@ export const ImagesHeader: React.FC<{ images: Image[]; albums: Album[]; onUpload
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-2 h-8 bg-gradient-to-b from-chart-1 to-chart-2 rounded-full" />
+            <div className="w-2 h-8 bg-gradient-to-b from-primary to-accent rounded-full" />
             <h1 className="text-3xl font-bold">Image Library</h1>
           </div>
           <p className="text-muted-foreground">Manage and organize your photo collection</p>
@@ -364,7 +364,7 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
           <div className="flex items-center justify-between mb-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-2 h-8 bg-gradient-to-b from-chart-1 to-chart-2 rounded-full" />
+                <div className="w-2 h-8 bg-gradient-to-b from-primary to-accent rounded-full" />
                 <h1 className="text-3xl font-bold">Image Library</h1>
               </div>
               <p className="text-muted-foreground">Manage and organize your photo collection</p>
@@ -412,7 +412,7 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
       <div className="animate-fade-in-up">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <FolderOpen className="w-5 h-5 text-chart-2" />
+            <FolderOpen className="w-5 h-5 text-accent" />
             Albums
           </h2>
           <Button
@@ -429,7 +429,7 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
           <Card className="gallery-item border-0 shadow-lg bg-card/50 backdrop-blur-sm cursor-pointer" onClick={() => setSelectedAlbum(null)}>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-chart-2 to-chart-3 rounded-lg flex items-center justify-center">
+                <div className="w-12 h-12 bg-gradient-to-br from-accent to-secondary rounded-lg flex items-center justify-center">
                   <FolderOpen className="w-6 h-6 text-white" />
                 </div>
                 <div className="flex-1">
@@ -464,7 +464,7 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
       {/* Images Grid */}
       <div className="animate-fade-in-up">
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <ImageIcon className="w-5 h-5 text-chart-1" />
+          <ImageIcon className="w-5 h-5 text-primary" />
           {selectedAlbum ? selectedAlbum.name : 'All Images'}
         </h2>
         

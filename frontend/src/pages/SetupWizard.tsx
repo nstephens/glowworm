@@ -230,7 +230,7 @@ const SetupWizard: React.FC = () => {
             name="mysql_host"
             value={formData.mysql_host}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
             required
           />
         </div>
@@ -244,7 +244,7 @@ const SetupWizard: React.FC = () => {
             name="mysql_port"
             value={formData.mysql_port}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
             required
           />
         </div>
@@ -258,7 +258,7 @@ const SetupWizard: React.FC = () => {
             name="mysql_root_user"
             value={formData.mysql_root_user}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
             required
           />
         </div>
@@ -272,7 +272,7 @@ const SetupWizard: React.FC = () => {
             name="mysql_root_password"
             value={formData.mysql_root_password}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
             required
           />
         </div>
@@ -294,7 +294,7 @@ const SetupWizard: React.FC = () => {
             name="app_db_user"
             value={formData.app_db_user}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
             required
           />
         </div>
@@ -308,7 +308,7 @@ const SetupWizard: React.FC = () => {
             name="app_db_password"
             value={formData.app_db_password}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
             required
           />
         </div>
@@ -330,7 +330,7 @@ const SetupWizard: React.FC = () => {
             name="admin_password"
             value={formData.admin_password}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
             required
           />
         </div>
@@ -343,7 +343,7 @@ const SetupWizard: React.FC = () => {
             name="server_base_url"
             value={formData.server_base_url}
             onChange={handleSelectChange}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
             required
             disabled={!interfacesLoaded}
           >
@@ -372,7 +372,7 @@ const SetupWizard: React.FC = () => {
               name="backend_port"
               value={formData.backend_port}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="8001"
               min="1024"
               max="65535"
@@ -388,7 +388,7 @@ const SetupWizard: React.FC = () => {
               name="frontend_port"
               value={formData.frontend_port}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="3003"
               min="1024"
               max="65535"
@@ -406,7 +406,7 @@ const SetupWizard: React.FC = () => {
             name="default_display_time_seconds"
             value={formData.default_display_time_seconds}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="30"
             min="1"
             max="300"
@@ -426,7 +426,7 @@ const SetupWizard: React.FC = () => {
             name="upload_directory"
             value={formData.upload_directory}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="uploads"
             required
           />
@@ -445,7 +445,7 @@ const SetupWizard: React.FC = () => {
               name="display_status_check_interval"
               value={formData.display_status_check_interval}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="30"
               min="5"
               max="300"
@@ -461,7 +461,7 @@ const SetupWizard: React.FC = () => {
               name="display_websocket_check_interval"
               value={formData.display_websocket_check_interval}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
               placeholder="5"
               min="1"
               max="60"
@@ -479,7 +479,7 @@ const SetupWizard: React.FC = () => {
               name="log_level"
               value={formData.log_level}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-glowworm-500"
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-primary"
               required
             >
               <option value="CRITICAL">Critical (Errors only)</option>
@@ -519,7 +519,7 @@ const SetupWizard: React.FC = () => {
                   key={step}
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                     step <= currentStep
-                      ? 'bg-glowworm-500 text-white'
+                      ? 'bg-primary text-white'
                       : 'bg-gray-600 text-gray-400'
                   }`}
                 >
@@ -554,7 +554,7 @@ const SetupWizard: React.FC = () => {
                 <button
                   type="button"
                   onClick={nextStep}
-                  className="px-6 py-2 bg-glowworm-500 text-white rounded-md hover:bg-glowworm-600"
+                  className="px-6 py-2 bg-primary text-white rounded-md hover:bg-primary/90"
                 >
                   Next
                 </button>
@@ -562,7 +562,7 @@ const SetupWizard: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="px-6 py-2 bg-glowworm-500 text-white rounded-md hover:bg-glowworm-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <div className="flex items-center">
@@ -602,7 +602,7 @@ const SetupWizard: React.FC = () => {
               </button>
               <button
                 onClick={() => handleUserRecreateConfirm(true)}
-                className="px-4 py-2 bg-glowworm-500 text-white rounded-md hover:bg-glowworm-600"
+                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90"
               >
                 Recreate User
               </button>
