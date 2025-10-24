@@ -6,8 +6,7 @@ import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
 import { Save, Monitor, Database, User, Key, Plus, Trash2, AlertTriangle, Users, Settings as SettingsIcon, Server, Shield } from 'lucide-react';
-import { useAlert } from '../hooks/useAlert';
-import AlertContainer from '../components/AlertContainer';
+import { useToast } from '../hooks/use-toast';
 import { apiService } from '../services/api';
 import { urlResolver } from '../services/urlResolver';
 import { updateLogSettings } from '../utils/logger';
@@ -58,7 +57,7 @@ interface DisplaySize {
 }
 
 const Settings: React.FC = () => {
-  const { alerts, removeAlert, success, error: showError, warning, info } = useAlert();
+  const { toast } = useToast();
   const [settings, setSettings] = useState<SystemSettings>({
     mysql_host: 'localhost',
     mysql_port: 3306,
@@ -110,7 +109,11 @@ const Settings: React.FC = () => {
           enableDebugLogging: response.settings.enable_debug_logging
         });
         
-        info('Settings Loaded', 'Current system settings loaded successfully');
+        toast({
+          title: "Settings Loaded",
+          description: "Current system settings loaded successfully",
+          variant: "default",
+        });
       }
     } catch (err: any) {
       // Settings API not available yet, use defaults
@@ -162,10 +165,18 @@ const Settings: React.FC = () => {
           enableDebugLogging: settings.enable_debug_logging
         });
         
-        success('Settings Saved', 'System settings have been updated successfully');
+        toast({
+          title: "Settings Saved",
+          description: "System settings have been updated successfully",
+          variant: "success",
+        });
       }
     } catch (err: any) {
-      warning('Settings API Not Available', 'Settings API is not available yet. Changes will be saved when the backend is ready.');
+      toast({
+        title: "Settings API Not Available",
+        description: "Settings API is not available yet. Changes will be saved when the backend is ready.",
+        variant: "warning",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -173,7 +184,11 @@ const Settings: React.FC = () => {
 
   const handleAddDisplaySize = () => {
     if (!newDisplaySize.name.trim() || !newDisplaySize.width || !newDisplaySize.height) {
-      warning('Invalid Input', 'Please fill in all fields for the display size');
+      toast({
+        title: "Invalid Input",
+        description: "Please fill in all fields for the display size",
+        variant: "warning",
+      });
       return;
     }
 
@@ -181,7 +196,11 @@ const Settings: React.FC = () => {
     const height = parseInt(newDisplaySize.height);
 
     if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
-      warning('Invalid Dimensions', 'Width and height must be positive numbers');
+      toast({
+        title: "Invalid Dimensions",
+        description: "Width and height must be positive numbers",
+        variant: "warning",
+      });
       return;
     }
 
@@ -195,14 +214,22 @@ const Settings: React.FC = () => {
 
     setDisplaySizes(prev => [...prev, newSize]);
     setNewDisplaySize({ name: '', width: '', height: '' });
-    success('Display Size Added', `"${newSize.name}" has been added to the list`);
+    toast({
+      title: "Display Size Added",
+      description: `"${newSize.name}" has been added to the list`,
+      variant: "success",
+    });
   };
 
   const handleRemoveDisplaySize = (id: string) => {
     const size = displaySizes.find(s => s.id === id);
     if (size) {
       setDisplaySizes(prev => prev.filter(s => s.id !== id));
-      success('Display Size Removed', `"${size.name}" has been removed from the list`);
+      toast({
+        title: "Display Size Removed",
+        description: `"${size.name}" has been removed from the list`,
+        variant: "success",
+      });
     }
   };
 
@@ -710,7 +737,6 @@ const Settings: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <AlertContainer alerts={alerts} onRemove={removeAlert} />
       
       {/* Header */}
 
