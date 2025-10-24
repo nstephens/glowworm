@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, User, Menu, X, Settings, LogOut, Camera } from 'lucide-react';
+import { Search, User, Menu, X, Settings, LogOut, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -29,17 +29,15 @@ export const TopBar: React.FC<TopBarProps> = ({
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [notifications, setNotifications] = useState(0);
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Load user data and notifications
+  // Load user data
   useEffect(() => {
     const loadUserData = async () => {
       try {
         // TODO: Implement user data loading
         setUser({ name: 'Admin User', email: 'admin@glowworm.local' });
-        setNotifications(3); // Mock notifications
       } catch (error) {
         console.error('Failed to load user data:', error);
       }
@@ -140,26 +138,8 @@ export const TopBar: React.FC<TopBarProps> = ({
           </form>
         </div>
 
-        {/* Right section - Notifications and User menu */}
+        {/* Right section - User menu */}
         <div className="flex items-center gap-2">
-          {/* Notifications */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative"
-            aria-label="Notifications"
-          >
-            <Bell className="h-5 w-5" />
-            {notifications > 0 && (
-              <Badge 
-                variant="destructive" 
-                className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-              >
-                {notifications > 9 ? '9+' : notifications}
-              </Badge>
-            )}
-          </Button>
-
           {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
