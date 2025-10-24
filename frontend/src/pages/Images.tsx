@@ -358,55 +358,41 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
 
   return (
     <div className="space-y-8">
-      {/* Page Header - only show if not using custom header content */}
-      {!headerContent && (
+      {/* Page Header - only show if using custom header content */}
+      {headerContent && (
         <div className="animate-fade-in-up">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-2 h-8 bg-gradient-to-b from-primary to-accent rounded-full" />
-                <h1 className="text-3xl font-bold">Image Library</h1>
-              </div>
-              <p className="text-muted-foreground">Manage and organize your photo collection</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Badge variant="secondary" className="px-3 py-1">
-                <ImageIcon className="w-4 h-4 mr-2" />
-                {images.length} images
-              </Badge>
-              <Button className="shadow-lg" onClick={() => setShowUploadModal(true)}>
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Images
-              </Button>
-            </div>
-          </div>
-
-          {/* Controls */}
-          <div className="flex items-center justify-between gap-4 p-4 bg-card/50 backdrop-blur-sm rounded-xl border-0 shadow-lg">
-            <div className="flex items-center gap-4 flex-1">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search images..."
-                  className="pl-10 bg-background/50 border-border/50"
-                />
-              </div>
-              <Button variant="outline" size="sm">
-                <Filter className="w-4 h-4 mr-2" />
-                Filters
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm">
-                <Grid3X3 className="w-4 h-4" />
-              </Button>
-              <Button variant="outline" size="sm">
-                <List className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
+          {headerContent}
         </div>
       )}
+
+      {/* Quick Actions Bar - always show */}
+      <div className="flex items-center justify-between gap-4 p-4 bg-card/50 backdrop-blur-sm rounded-xl border-0 shadow-lg">
+        <div className="flex items-center gap-4 flex-1">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search images..."
+              className="pl-10 bg-background/50 border-border/50"
+            />
+          </div>
+          <Button variant="outline" size="sm">
+            <Filter className="w-4 h-4 mr-2" />
+            Filters
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm">
+            <Grid3X3 className="w-4 h-4" />
+          </Button>
+          <Button variant="outline" size="sm">
+            <List className="w-4 h-4" />
+          </Button>
+          <Button className="shadow-lg" onClick={() => setShowUploadModal(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Upload Images
+          </Button>
+        </div>
+      </div>
 
       {/* Albums Section */}
       <div className="animate-fade-in-up">
