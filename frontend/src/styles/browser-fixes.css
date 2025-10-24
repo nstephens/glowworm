@@ -1,0 +1,400 @@
+/* Browser-Specific CSS Fixes */
+/* Provides fixes for browser-specific issues and inconsistencies */
+
+/* Safari-specific fixes */
+@supports (-webkit-appearance: none) {
+  /* Safari flexbox fixes */
+  .safari-flex-fix {
+    -webkit-flex: 1;
+    flex: 1;
+  }
+  
+  /* Safari input fixes */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  textarea {
+    -webkit-appearance: none;
+    border-radius: 0;
+  }
+  
+  /* Safari button fixes */
+  button {
+    -webkit-appearance: none;
+    border-radius: 0;
+  }
+  
+  /* Safari scrollbar fixes */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Safari form element fixes */
+  select {
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
+  }
+  
+  /* Safari touch fixes */
+  .safari-touch-fix {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* Safari viewport fixes */
+  .safari-viewport-fix {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Firefox-specific fixes */
+@-moz-document url-prefix() {
+  /* Firefox flexbox fixes */
+  .firefox-flex-fix {
+    -moz-flex: 1;
+    flex: 1;
+  }
+  
+  /* Firefox input fixes */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  textarea {
+    -moz-appearance: none;
+  }
+  
+  /* Firefox button fixes */
+  button {
+    -moz-appearance: none;
+  }
+  
+  /* Firefox scrollbar fixes */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  }
+  
+  /* Firefox form element fixes */
+  select {
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
+  }
+}
+
+/* Chrome/Chromium-specific fixes */
+@supports (-webkit-appearance: none) and (not (-moz-appearance: none)) {
+  /* Chrome flexbox fixes */
+  .chrome-flex-fix {
+    -webkit-flex: 1;
+    flex: 1;
+  }
+  
+  /* Chrome input fixes */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  textarea {
+    -webkit-appearance: none;
+  }
+  
+  /* Chrome button fixes */
+  button {
+    -webkit-appearance: none;
+  }
+  
+  /* Chrome scrollbar fixes */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Chrome form element fixes */
+  select {
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
+  }
+}
+
+/* Edge-specific fixes */
+@supports (-ms-ime-align: auto) {
+  /* Edge flexbox fixes */
+  .edge-flex-fix {
+    -ms-flex: 1;
+    flex: 1;
+  }
+  
+  /* Edge input fixes */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  textarea {
+    -ms-appearance: none;
+  }
+  
+  /* Edge button fixes */
+  button {
+    -ms-appearance: none;
+  }
+  
+  /* Edge scrollbar fixes */
+  * {
+    -ms-overflow-style: -ms-autohiding-scrollbar;
+  }
+  
+  /* Edge form element fixes */
+  select {
+    -ms-appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
+  }
+}
+
+/* Mobile-specific fixes */
+@media (max-width: 768px) {
+  /* iOS Safari fixes */
+  @supports (-webkit-touch-callout: none) {
+    /* iOS Safari viewport fixes */
+    .ios-viewport-fix {
+      -webkit-overflow-scrolling: touch;
+      -webkit-transform: translateZ(0);
+    }
+    
+    /* iOS Safari input fixes */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="search"],
+    textarea {
+      -webkit-appearance: none;
+      border-radius: 0;
+      font-size: 16px; /* Prevents zoom on focus */
+    }
+    
+    /* iOS Safari button fixes */
+    button {
+      -webkit-appearance: none;
+      border-radius: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* iOS Safari touch fixes */
+    .ios-touch-fix {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+  }
+  
+  /* Android Chrome fixes */
+  @supports (-webkit-appearance: none) and (not (-moz-appearance: none)) {
+    /* Android Chrome viewport fixes */
+    .android-viewport-fix {
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Android Chrome input fixes */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="search"],
+    textarea {
+      -webkit-appearance: none;
+      border-radius: 0;
+    }
+    
+    /* Android Chrome button fixes */
+    button {
+      -webkit-appearance: none;
+      border-radius: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+  }
+}
+
+/* High DPI/Retina display fixes */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Retina display fixes */
+  .retina-fix {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Retina display image fixes */
+  img {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}
+
+/* Reduced motion fixes */
+@media (prefers-reduced-motion: reduce) {
+  /* Disable animations for users who prefer reduced motion */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode fixes */
+@media (prefers-contrast: high) {
+  /* High contrast mode fixes */
+  .high-contrast-fix {
+    border: 2px solid;
+    background: transparent;
+  }
+  
+  /* High contrast mode button fixes */
+  button {
+    border: 2px solid;
+    background: transparent;
+  }
+  
+  /* High contrast mode input fixes */
+  input,
+  textarea,
+  select {
+    border: 2px solid;
+    background: transparent;
+  }
+}
+
+/* Forced colors mode fixes */
+@media (forced-colors: active) {
+  /* Forced colors mode fixes */
+  .forced-colors-fix {
+    border: 1px solid;
+    background: transparent;
+  }
+  
+  /* Forced colors mode button fixes */
+  button {
+    border: 1px solid;
+    background: transparent;
+  }
+  
+  /* Forced colors mode input fixes */
+  input,
+  textarea,
+  select {
+    border: 1px solid;
+    background: transparent;
+  }
+}
+
+/* Print fixes */
+@media print {
+  /* Print-specific fixes */
+  .print-fix {
+    -webkit-print-color-adjust: exact;
+    color-adjust: exact;
+  }
+  
+  /* Print layout fixes */
+  .print-layout-fix {
+    page-break-inside: avoid;
+  }
+  
+  /* Print image fixes */
+  img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+}
+
+/* Focus management fixes */
+.focus-fix {
+  /* Ensure focus is visible */
+  outline: 2px solid;
+  outline-offset: 2px;
+}
+
+.focus-fix:focus {
+  outline: 2px solid;
+  outline-offset: 2px;
+}
+
+/* Skip link fixes */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #000;
+  color: #fff;
+  padding: 8px;
+  text-decoration: none;
+  z-index: 1000;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* Screen reader fixes */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Live region fixes */
+.live-region {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
