@@ -11,7 +11,6 @@ import {
   Upload, 
   Plus, 
   Settings,
-  TrendingUp, 
   Clock,
   Zap
 } from 'lucide-react';
@@ -183,10 +182,6 @@ const AdminDashboard: React.FC = () => {
                 <div className={`p-3 rounded-xl ${stat.bgColor}`}>
                   <stat.icon className={`w-6 h-6 ${stat.color}`} />
                 </div>
-                <Badge variant="secondary" className="text-xs">
-                  <TrendingUp className="w-3 h-3 mr-1" />
-                  Active
-                </Badge>
               </div>
               <div className="space-y-1">
                 <p className="text-2xl font-bold">{stat.value}</p>
