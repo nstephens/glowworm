@@ -113,11 +113,7 @@ const Settings: React.FC = () => {
         });
         
         hasLoadedSettings.current = true;
-        toast({
-          title: "Settings Loaded",
-          description: "Current system settings loaded successfully",
-          variant: "default",
-        });
+        // Don't show toast on load - only show on user actions
       }
     } catch (err: any) {
       // Settings API not available yet, use defaults
