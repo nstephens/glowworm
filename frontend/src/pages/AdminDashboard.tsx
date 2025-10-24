@@ -21,9 +21,11 @@ import { apiService } from '../services/api';
 import LiveDisplayStatus from '../components/LiveDisplayStatus';
 import ImageUpload from '../components/ImageUpload';
 import type { Image, Album } from '../types';
+import { useToast } from '../hooks/use-toast';
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [stats, setStats] = useState({
     totalImages: 0,
     totalAlbums: 0,
@@ -101,7 +103,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleCreatePlaylistSubmit = async () => {
     if (!newPlaylistName.trim()) return;
-    
+
     try {
       setIsCreatingPlaylist(true);
       await apiService.createPlaylist(newPlaylistName.trim());
@@ -109,8 +111,22 @@ const AdminDashboard: React.FC = () => {
       setShowCreatePlaylistModal(false);
       // Refresh stats to show updated playlist count
       loadStats();
+      
+      // Show success toast
+      toast({
+        title: "Playlist Created",
+        description: `"${newPlaylistName.trim()}" has been created successfully.`,
+        variant: "success",
+      });
     } catch (error) {
       console.error('Failed to create playlist:', error);
+      
+      // Show error toast
+      toast({
+        title: "Failed to Create Playlist",
+        description: "There was an error creating the playlist. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsCreatingPlaylist(false);
     }
@@ -120,6 +136,13 @@ const AdminDashboard: React.FC = () => {
     setShowUploadModal(false);
     // Refresh stats to show updated image count
     loadStats();
+    
+    // Show success toast
+    toast({
+      title: "Images Uploaded",
+      description: `${newImages.length} image${newImages.length === 1 ? '' : 's'} uploaded successfully.`,
+      variant: "success",
+    });
   };
 
   if (loading) {

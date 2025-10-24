@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { SetupProvider, useSetup } from './contexts/SetupContext';
 import { ThemeProvider } from './components/theme-provider';
+import { Toaster } from './components/ui/toaster';
 import './App.css';
 
 // Import pages
@@ -111,6 +112,7 @@ function App() {
         <SetupProvider>
           <AppContent />
         </SetupProvider>
+        <Toaster />
       </Router>
     </ThemeProvider>
   );
