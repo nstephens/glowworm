@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import { 
   Images, 
   FolderOpen,
@@ -12,10 +14,12 @@ import {
   Plus, 
   Settings,
   Clock,
-  Zap
+  Zap,
+  X
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import LiveDisplayStatus from '../components/LiveDisplayStatus';
+import ImageUpload from '../components/ImageUpload';
 import type { Image, Album } from '../types';
 
 const AdminDashboard: React.FC = () => {
@@ -28,6 +32,12 @@ const AdminDashboard: React.FC = () => {
     recentUploads: 0
   });
   const [loading, setLoading] = useState(true);
+  
+  // Modal states
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
 
   useEffect(() => {
     loadStats();
@@ -77,8 +87,8 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleManagePlaylists = () => {
-    navigate('/admin/playlists');
+  const handleCreatePlaylist = () => {
+    setShowCreatePlaylistModal(true);
   };
 
   const handleManageDisplays = () => {
@@ -86,7 +96,30 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleQuickUpload = () => {
-    navigate('/admin/images?upload=true');
+    setShowUploadModal(true);
+  };
+
+  const handleCreatePlaylistSubmit = async () => {
+    if (!newPlaylistName.trim()) return;
+    
+    try {
+      setIsCreatingPlaylist(true);
+      await apiService.createPlaylist(newPlaylistName.trim());
+      setNewPlaylistName('');
+      setShowCreatePlaylistModal(false);
+      // Refresh stats to show updated playlist count
+      loadStats();
+    } catch (error) {
+      console.error('Failed to create playlist:', error);
+    } finally {
+      setIsCreatingPlaylist(false);
+    }
+  };
+
+  const handleUploadComplete = (newImages: Image[]) => {
+    setShowUploadModal(false);
+    // Refresh stats to show updated image count
+    loadStats();
   };
 
   if (loading) {
@@ -150,7 +183,6 @@ const AdminDashboard: React.FC = () => {
       description: 'Add new photos to your library',
       icon: Upload,
       color: 'bg-primary',
-      href: '/admin/images',
       onClick: handleQuickUpload,
     },
     {
@@ -158,15 +190,13 @@ const AdminDashboard: React.FC = () => {
       description: 'Organize images for display',
       icon: Plus,
       color: 'bg-secondary',
-      href: '/admin/playlists',
-      onClick: handleManagePlaylists,
+      onClick: handleCreatePlaylist,
     },
     {
       title: 'Manage Displays',
       description: 'Configure display devices',
       icon: Settings,
       color: 'bg-accent',
-      href: '/admin/displays',
       onClick: handleManageDisplays,
     },
   ];
@@ -236,6 +266,114 @@ const AdminDashboard: React.FC = () => {
 
       {/* Live Display Status */}
       <LiveDisplayStatus />
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto mx-4 border-0 shadow-2xl">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl">Upload Images</CardTitle>
+                  <CardDescription>Add new photos to your library</CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowUploadModal(false)}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ImageUpload
+                onUploadComplete={handleUploadComplete}
+                albums={[]}
+                onCreateAlbum={async () => {}}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Create Playlist Modal */}
+      {showCreatePlaylistModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4 border-0 shadow-2xl">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl">Create Playlist</CardTitle>
+                  <CardDescription>Create a new playlist to organize your content</CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowCreatePlaylistModal(false);
+                    setNewPlaylistName('');
+                  }}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="playlist-name">Playlist Name</Label>
+                <Input
+                  id="playlist-name"
+                  placeholder="Enter playlist name..."
+                  value={newPlaylistName}
+                  onChange={(e) => setNewPlaylistName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleCreatePlaylistSubmit();
+                    }
+                    if (e.key === 'Escape') {
+                      setShowCreatePlaylistModal(false);
+                      setNewPlaylistName('');
+                    }
+                  }}
+                  autoFocus
+                  className="bg-background/50 border-border/50"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowCreatePlaylistModal(false);
+                    setNewPlaylistName('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreatePlaylistSubmit}
+                  disabled={!newPlaylistName.trim() || isCreatingPlaylist}
+                  className="shadow-lg"
+                >
+                  {isCreatingPlaylist ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Playlist
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
