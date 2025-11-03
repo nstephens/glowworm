@@ -11,23 +11,14 @@ export enum DisplayMode {
   AUTO_SORT = 'auto_sort',
   MOVEMENT = 'movement',
   
-  // Phase 1: Tier 1 modes (Raspberry Pi Safe)
+  // Tier 1: Raspberry Pi Safe (30fps)
   KEN_BURNS_PLUS = 'ken_burns_plus',
   SOFT_GLOW = 'soft_glow',
   AMBIENT_PULSE = 'ambient_pulse',
   
-  // Phase 2: Tier 2 modes (Moderate Performance)
+  // Tier 2: Moderate Performance (24-30fps)
   DREAMY_REVEAL = 'dreamy_reveal',
   STACKED_REVEAL = 'stacked_reveal',
-  PARALLAX_DEPTH = 'parallax_depth',
-  
-  // Phase 3: Tier 2 modes (Moderate Performance)
-  COLOR_HARMONY = 'color_harmony',
-  CINEMATIC_BARS = 'cinematic_bars',
-  
-  // Phase 4: Tier 3 modes (High Performance Required)
-  MAGIC_DUST = 'magic_dust',
-  LIQUID_BLEND = 'liquid_blend',
 }
 
 export enum PerformanceTier {
@@ -130,52 +121,6 @@ export const DISPLAY_MODE_CONFIGS: Record<DisplayMode, DisplayModeConfig> = {
     tier: PerformanceTier.TIER_2,
     supportsSplitScreen: true,
     landscapeOnly: true
-  },
-  
-  [DisplayMode.PARALLAX_DEPTH]: {
-    mode: DisplayMode.PARALLAX_DEPTH,
-    displayName: 'Parallax Depth',
-    description: '3D depth with multi-speed layer panning',
-    emotionalTone: 'Dreamy Magic',
-    tier: PerformanceTier.TIER_2,
-    supportsSplitScreen: true
-  },
-  
-  [DisplayMode.COLOR_HARMONY]: {
-    mode: DisplayMode.COLOR_HARMONY,
-    displayName: 'Color Harmony',
-    description: 'Immersive ambient color backgrounds',
-    emotionalTone: 'Dreamy Magic',
-    tier: PerformanceTier.TIER_2
-  },
-  
-  [DisplayMode.CINEMATIC_BARS]: {
-    mode: DisplayMode.CINEMATIC_BARS,
-    displayName: 'Cinematic',
-    description: 'Focused letterbox viewing experience',
-    emotionalTone: 'Modern Elegance',
-    tier: PerformanceTier.TIER_2,
-    landscapeOnly: true
-  },
-  
-  [DisplayMode.MAGIC_DUST]: {
-    mode: DisplayMode.MAGIC_DUST,
-    displayName: 'Magic Dust ⚡',
-    description: 'Ethereal floating particle effects',
-    emotionalTone: 'Dreamy Magic',
-    tier: PerformanceTier.TIER_3,
-    requiresCanvas: true,
-    warningMessage: 'This mode requires high-performance hardware and may not run smoothly on Raspberry Pi devices.'
-  },
-  
-  [DisplayMode.LIQUID_BLEND]: {
-    mode: DisplayMode.LIQUID_BLEND,
-    displayName: 'Liquid Blend ⚡',
-    description: 'Fluid WebGL morphing transitions',
-    emotionalTone: 'Dreamy Magic',
-    tier: PerformanceTier.TIER_3,
-    requiresWebGL: true,
-    warningMessage: 'This mode requires high-performance hardware and may not run smoothly on Raspberry Pi devices.'
   },
 };
 
