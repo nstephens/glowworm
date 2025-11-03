@@ -4,6 +4,7 @@ import { displayLogger } from '../utils/logger';
 import { displayDeviceLogger } from '../services/displayDeviceLogger';
 import { getSmartImageUrlFromImage } from '../utils/imageUrls';
 import { transitionLogger } from '../services/transitionLogger';
+import { KenBurnsPlus } from './effects/KenBurnsPlus';
 
 interface SlideshowSettings {
   interval: number;
@@ -78,6 +79,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const isNextImageLandscape = nextImageData && nextImageData.width && nextImageData.height && nextImageData.width > nextImageData.height;
   const shouldShowSplitScreen = (playlist?.display_mode === 'auto_sort' || playlist?.display_mode === 'default') && isCurrentImageLandscape && isNextImageLandscape;
   const shouldShowMovement = playlist?.display_mode === 'movement' && isCurrentImageLandscape;
+  const shouldShowKenBurns = playlist?.display_mode === 'ken_burns_plus';
   const imageAspectRatio = currentImage && currentImage.width && currentImage.height ? currentImage.width / currentImage.height : 1;
   const displayAspectRatio = window.innerWidth / window.innerHeight;
   const isImageSignificantlyWider = imageAspectRatio > displayAspectRatio * 1.2; // 20% wider than display (less restrictive)
@@ -664,22 +666,78 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
         ) : (
           // Single image display for portrait images or single landscape images
           <>
-            <img
-              src={getSmartImageUrlFromImage(currentImage, deviceToken)}
-              alt={currentImage.original_filename}
-              className="w-full h-full object-cover"
-              style={{ 
-                opacity: imageOpacity,
-                // Hardware acceleration
-                transform: 'translateZ(0)',
-                backfaceVisibility: 'hidden',
-                willChange: 'opacity',
-                // Use object-position for movement instead of transform
-                objectPosition: shouldShowMovement && isCurrentImageLandscape ? movementObjectPosition : 'center',
-                // Smooth transition for opacity and object-position
-                transition: shouldShowMovement && isCurrentImageLandscape ? 
-                  'opacity 300ms ease-out, object-position 30s ease-in-out' : 'opacity 300ms ease-out'
-              }}
+            {shouldShowKenBurns ? (
+              <KenBurnsPlus
+                image={currentImage}
+                isActive={imageOpacity > 0.5}
+                displayInterval={settings.interval}
+                className="w-full h-full"
+              >
+                <img
+                  src={getSmartImageUrlFromImage(currentImage, deviceToken)}
+                  alt={currentImage.original_filename}
+                  className="w-full h-full object-cover"
+                  style={{ 
+                    opacity: imageOpacity,
+                    // Hardware acceleration
+                    transform: 'translateZ(0)',
+                    backfaceVisibility: 'hidden',
+                    willChange: 'opacity',
+                    // Smooth transition for opacity
+                    transition: 'opacity 300ms ease-out'
+                  }}
+                  onLoad={(e) => {
+                    const img = e.target as HTMLImageElement;
+                    displayLogger.debug('✅ Main image loaded (Ken Burns)');
+                    
+                    // Log actual image dimensions for troubleshooting
+                    displayDeviceLogger.logImageDimensions(
+                      currentImage.id,
+                      getSmartImageUrlFromImage(currentImage, deviceToken),
+                      img.naturalWidth,
+                      img.naturalHeight,
+                      img.clientWidth,
+                      img.clientHeight
+                    );
+                    
+                    transitionLogger.logEvent({
+                      timestamp: Date.now(),
+                      eventType: 'image_load_complete',
+                      currentIndex,
+                      currentImageId: currentImage.id,
+                      loadTime: img.complete ? 0 : undefined
+                    });
+                    
+                    setImagesLoaded(prev => new Set([...prev, currentImage.id]));
+                    
+                    // If we're waiting for this image, mark it as ready
+                    if (waitingForLoad) {
+                      setNextImageReady(true);
+                    }
+                  }}
+                  onError={() => {
+                    displayLogger.error('❌ Main image failed to load (Ken Burns)');
+                  }}
+                  loading="eager"
+                />
+              </KenBurnsPlus>
+            ) : (
+              <img
+                src={getSmartImageUrlFromImage(currentImage, deviceToken)}
+                alt={currentImage.original_filename}
+                className="w-full h-full object-cover"
+                style={{ 
+                  opacity: imageOpacity,
+                  // Hardware acceleration
+                  transform: 'translateZ(0)',
+                  backfaceVisibility: 'hidden',
+                  willChange: 'opacity',
+                  // Use object-position for movement instead of transform
+                  objectPosition: shouldShowMovement && isCurrentImageLandscape ? movementObjectPosition : 'center',
+                  // Smooth transition for opacity and object-position
+                  transition: shouldShowMovement && isCurrentImageLandscape ? 
+                    'opacity 300ms ease-out, object-position 30s ease-in-out' : 'opacity 300ms ease-out'
+                }}
               onLoad={(e) => {
                 const img = e.target as HTMLImageElement;
                 displayLogger.debug('✅ Main image loaded');
@@ -714,6 +772,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
               }}
               loading="eager"
             />
+            )}
             {/* Loading indicator for current image */}
             {!imagesLoaded.has(currentImage.id) && imageOpacity > 0 && (
               <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
