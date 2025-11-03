@@ -8,6 +8,7 @@ import { KenBurnsPlus } from './effects/KenBurnsPlus';
 import { SoftGlow } from './effects/SoftGlow';
 import { AmbientPulse } from './effects/AmbientPulse';
 import { DreamyReveal } from './effects/DreamyReveal';
+import { StackedReveal } from './effects/StackedReveal';
 
 interface SlideshowSettings {
   interval: number;
@@ -85,6 +86,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const nextImageData = images[currentIndex + 1];
   const isNextImageLandscape = nextImageData && nextImageData.width && nextImageData.height && nextImageData.width > nextImageData.height;
   const shouldShowSplitScreen = (playlist?.display_mode === 'auto_sort' || playlist?.display_mode === 'default') && isCurrentImageLandscape && isNextImageLandscape;
+  const shouldShowStackedReveal = playlist?.display_mode === 'stacked_reveal' && isCurrentImageLandscape && isNextImageLandscape;
   const shouldShowMovement = playlist?.display_mode === 'movement' && isCurrentImageLandscape;
   const shouldShowKenBurns = playlist?.display_mode === 'ken_burns_plus';
   const shouldShowSoftGlow = playlist?.display_mode === 'soft_glow';
@@ -577,24 +579,77 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
           backfaceVisibility: 'hidden'
         }}
       >
-        {shouldShowSplitScreen ? (
+        {shouldShowSplitScreen || shouldShowStackedReveal ? (
           // Split-screen display for landscape images
           <div className="w-full h-full flex flex-col">
             {/* Top half - current landscape image */}
             <div className="relative w-full h-1/2">
-              <img
-                src={getSmartImageUrlFromImage(currentImage, deviceToken)}
-                alt={currentImage.original_filename}
-                className="w-full h-full object-cover"
-                style={{ 
-                  opacity: topImageOpacity,
-                  transform: topImageTransform,
-                  // Hardware acceleration
-                  backfaceVisibility: 'hidden',
-                  willChange: 'opacity, transform',
-                  // Optimized transition for Pi
-                  transition: 'opacity 300ms ease-out, transform 300ms ease-out'
-                }}
+              {shouldShowStackedReveal ? (
+                <StackedReveal
+                  layer="top"
+                  image={currentImage}
+                  isRevealing={topImageOpacity > 0.5}
+                  className="w-full h-full"
+                >
+                  <img
+                    src={getSmartImageUrlFromImage(currentImage, deviceToken)}
+                    alt={currentImage.original_filename}
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      opacity: topImageOpacity,
+                      // Hardware acceleration
+                      backfaceVisibility: 'hidden',
+                      willChange: 'opacity, transform',
+                      // Base transition (StackedReveal handles transform)
+                      transition: 'opacity 300ms ease-out'
+                    }}
+                    onLoad={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      displayLogger.debug('✅ Top image loaded (Stacked Reveal)');
+                      
+                      displayDeviceLogger.logImageDimensions(
+                        currentImage.id,
+                        getSmartImageUrlFromImage(currentImage, deviceToken),
+                        img.naturalWidth,
+                        img.naturalHeight,
+                        img.clientWidth,
+                        img.clientHeight
+                      );
+                      
+                      transitionLogger.logEvent({
+                        timestamp: Date.now(),
+                        eventType: 'image_load_complete',
+                        currentIndex,
+                        currentImageId: currentImage.id,
+                        loadTime: img.complete ? 0 : undefined
+                      });
+                      
+                      setImagesLoaded(prev => new Set([...prev, currentImage.id]));
+                      
+                      if (waitingForLoad) {
+                        setNextImageReady(true);
+                      }
+                    }}
+                    onError={() => {
+                      displayLogger.error('❌ Top image failed to load (Stacked Reveal)');
+                    }}
+                    loading="eager"
+                  />
+                </StackedReveal>
+              ) : (
+                <img
+                  src={getSmartImageUrlFromImage(currentImage, deviceToken)}
+                  alt={currentImage.original_filename}
+                  className="w-full h-full object-cover"
+                  style={{ 
+                    opacity: topImageOpacity,
+                    transform: topImageTransform,
+                    // Hardware acceleration
+                    backfaceVisibility: 'hidden',
+                    willChange: 'opacity, transform',
+                    // Optimized transition for Pi
+                    transition: 'opacity 300ms ease-out, transform 300ms ease-out'
+                  }}
                 onLoad={(e) => {
                   const img = e.target as HTMLImageElement;
                   displayLogger.debug('✅ Top image loaded');
@@ -629,6 +684,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                 }}
                 loading="eager"
               />
+              )}
             </div>
             
             {/* Horizontal divider */}
@@ -636,19 +692,73 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
             
             {/* Bottom half - next landscape image */}
             <div className="relative w-full h-1/2">
-              <img
-                src={getSmartImageUrlFromImage(nextImageData, deviceToken)}
-                alt={nextImageData.original_filename}
-                className="w-full h-full object-cover"
-                style={{ 
-                  opacity: bottomImageOpacity,
-                  transform: bottomImageTransform,
-                  // Hardware acceleration
-                  backfaceVisibility: 'hidden',
-                  willChange: 'opacity, transform',
-                  // Optimized transition for Pi
-                  transition: 'opacity 300ms ease-out, transform 300ms ease-out'
-                }}
+              {shouldShowStackedReveal ? (
+                <StackedReveal
+                  layer="bottom"
+                  image={nextImageData}
+                  isRevealing={bottomImageOpacity > 0.5}
+                  staggerDelay={300}
+                  className="w-full h-full"
+                >
+                  <img
+                    src={getSmartImageUrlFromImage(nextImageData, deviceToken)}
+                    alt={nextImageData.original_filename}
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      opacity: bottomImageOpacity,
+                      // Hardware acceleration
+                      backfaceVisibility: 'hidden',
+                      willChange: 'opacity, transform',
+                      // Base transition (StackedReveal handles transform)
+                      transition: 'opacity 300ms ease-out'
+                    }}
+                    onLoad={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      displayLogger.debug('✅ Bottom image loaded (Stacked Reveal)');
+                      
+                      displayDeviceLogger.logImageDimensions(
+                        nextImageData.id,
+                        getSmartImageUrlFromImage(nextImageData, deviceToken),
+                        img.naturalWidth,
+                        img.naturalHeight,
+                        img.clientWidth,
+                        img.clientHeight
+                      );
+                      
+                      transitionLogger.logEvent({
+                        timestamp: Date.now(),
+                        eventType: 'image_load_complete',
+                        currentIndex,
+                        currentImageId: nextImageData.id,
+                        loadTime: img.complete ? 0 : undefined
+                      });
+                      
+                      setImagesLoaded(prev => new Set([...prev, nextImageData.id]));
+                      
+                      if (waitingForLoad) {
+                        setNextImageReady(true);
+                      }
+                    }}
+                    onError={() => {
+                      displayLogger.error('❌ Bottom image failed to load (Stacked Reveal)');
+                    }}
+                    loading="eager"
+                  />
+                </StackedReveal>
+              ) : (
+                <img
+                  src={getSmartImageUrlFromImage(nextImageData, deviceToken)}
+                  alt={nextImageData.original_filename}
+                  className="w-full h-full object-cover"
+                  style={{ 
+                    opacity: bottomImageOpacity,
+                    transform: bottomImageTransform,
+                    // Hardware acceleration
+                    backfaceVisibility: 'hidden',
+                    willChange: 'opacity, transform',
+                    // Optimized transition for Pi
+                    transition: 'opacity 300ms ease-out, transform 300ms ease-out'
+                  }}
                 onLoad={(e) => {
                   const img = e.target as HTMLImageElement;
                   displayLogger.debug('✅ Bottom image loaded');
@@ -683,6 +793,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                 }}
                 loading="eager"
               />
+              )}
             </div>
           </div>
         ) : (
