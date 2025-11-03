@@ -270,17 +270,8 @@ export class DeviceWebSocketClient extends WebSocketClient {
   private deviceToken: string;
 
   constructor(deviceToken: string, baseUrl?: string) {
-    // Use dynamic URL from urlResolver - fix malformed URL construction
-    let wsBaseUrl;
-    if (baseUrl) {
-      wsBaseUrl = baseUrl;
-    } else {
-      // Get the server base URL and construct WebSocket URL manually
-      const serverUrl = urlResolver.getServerBaseUrl();
-      const wsProtocol = serverUrl.startsWith('https') ? 'wss' : 'ws';
-      // Fix: Ensure proper protocol replacement with colon
-      wsBaseUrl = serverUrl.replace(/^https?:/, wsProtocol + ':') + '/ws/device';
-    }
+    // Use urlResolver to get proper WebSocket URL with proxy support
+    const wsBaseUrl = baseUrl || urlResolver.getWebSocketUrl('/device');
     
     super({
       url: wsBaseUrl,

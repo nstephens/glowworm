@@ -16,7 +16,8 @@ import {
   ChevronRight,
   CheckCircle,
   AlertCircle,
-  Info
+  Info,
+  Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -131,8 +132,8 @@ export const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
 
   if (visibleRecommendations.length === 0) {
     return (
-      <Card className={cn("p-6", className)}>
-        <div className="text-center">
+      <Card className={cn("w-full", className)}>
+        <CardContent className="text-center">
           <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-muted-foreground mb-2">
             All Caught Up!
@@ -140,23 +141,23 @@ export const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
           <p className="text-sm text-muted-foreground">
             No recommendations at the moment. Keep up the great work!
           </p>
-        </div>
+        </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className={cn("space-y-4", className)}>
-      <div className="flex items-center justify-between">
+    <Card className={cn("w-full", className)}>
+      <CardHeader className="flex-row items-center justify-between">
         <div className="flex items-center gap-2">
           <Lightbulb className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold">Smart Recommendations</h2>
+          <CardTitle>Smart Recommendations</CardTitle>
         </div>
         <Badge variant="secondary" className="text-xs">
           {visibleRecommendations.length} suggestions
         </Badge>
-      </div>
-
+      </CardHeader>
+      <CardContent>
       <div className="space-y-3">
         <AnimatePresence>
           {visibleRecommendations.map((recommendation, index) => (
@@ -261,7 +262,8 @@ export const SmartRecommendations: React.FC<SmartRecommendationsProps> = ({
           ))}
         </AnimatePresence>
       </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -280,25 +282,14 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
   showDismissed = false,
   className,
 }) => {
+  // Just wrap SmartRecommendations without additional Card wrapper
+  // to prevent double wrapping and overflow issues
   return (
-    <Card className={cn("p-6", className)}>
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2">
-          <Lightbulb className="h-5 w-5 text-primary" />
-          {title}
-        </CardTitle>
-        <CardDescription>
-          Personalized suggestions to optimize your experience
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent>
-        <SmartRecommendations
-          recommendations={recommendations}
-          maxItems={maxItems}
-          showDismissed={showDismissed}
-        />
-      </CardContent>
-    </Card>
+    <SmartRecommendations
+      recommendations={recommendations}
+      maxItems={maxItems}
+      showDismissed={showDismissed}
+      className={className}
+    />
   );
 };

@@ -5,11 +5,25 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
-import { Save, Monitor, Database, User, Key, Plus, Trash2, AlertTriangle, Users, Settings as SettingsIcon, Server, Shield } from 'lucide-react';
+import { Save, Monitor, Database, User, Key, Plus, Trash2, AlertTriangle, Users, Settings as SettingsIcon, Server, Shield, Info, RefreshCw, Loader2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { apiService } from '../services/api';
 import { urlResolver } from '../services/urlResolver';
 import { updateLogSettings } from '../utils/logger';
+import { detectDockerEnvironment, shouldDisableInDocker, getDisabledReason } from '../utils/dockerDetection';
+import { RegenerationProgressModal } from '../components/RegenerationProgressModal';
+import { type RegenerationProgress } from '../services/websocketService';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { MobileSettingsWrapper } from '../components/settings/MobileSettingsWrapper';
+import { SettingsSection } from '../components/settings/SettingsSection';
+import { ToggleSwitch } from '../components/settings/ToggleSwitch';
+import { SettingsInput } from '../components/settings/SettingsItem';
+
+interface DockerEnvironment {
+  isDocker: boolean;
+  isDockerCompose: boolean;
+  environment: 'docker' | 'traditional' | 'unknown';
+}
 import UserManagement from '../components/UserManagement';
 
 interface SystemSettings {
@@ -58,6 +72,11 @@ interface DisplaySize {
 
 const Settings: React.FC = () => {
   const { toast } = useToast();
+  const { isMobile } = useResponsiveLayout();
+  const isCoarsePointer = typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches;
+  const isMobileView = isMobile || isCoarsePointer;
   const hasLoadedSettings = useRef(false);
   const [settings, setSettings] = useState<SystemSettings>({
     mysql_host: 'localhost',
@@ -81,6 +100,9 @@ const Settings: React.FC = () => {
   });
 
   const [displaySizes, setDisplaySizes] = useState<DisplaySize[]>([
+    { id: '1080p', name: 'Full HD (1920x1080)', width: 1920, height: 1080, isCustom: false },
+    { id: '2k', name: '2K QHD (2560x1440)', width: 2560, height: 1440, isCustom: false },
+    { id: '4k', name: '4K UHD (3840x2160)', width: 3840, height: 2160, isCustom: false },
     { id: '2k-portrait', name: '2K Portrait (1080x1920)', width: 1080, height: 1920, isCustom: false },
     { id: '4k-portrait', name: '4K Portrait (2160x3840)', width: 2160, height: 3840, isCustom: false }
   ]);
@@ -88,11 +110,72 @@ const Settings: React.FC = () => {
   const [newDisplaySize, setNewDisplaySize] = useState({ name: '', width: '', height: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'database' | 'admin' | 'oauth' | 'displays' | 'general' | 'users'>('general');
+  const [resolutionSuggestions, setResolutionSuggestions] = useState<any[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [dockerEnv, setDockerEnv] = useState<DockerEnvironment>({
+    isDocker: false,
+    isDockerCompose: false,
+    environment: 'unknown'
+  });
 
-  // Load settings on component mount
+  // Regeneration progress state
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [regenerationTaskId, setRegenerationTaskId] = useState<string | null>(null);
+  const [initialProgress, setInitialProgress] = useState<RegenerationProgress | null>(null);
+
+  // Load settings and detect Docker environment on component mount
   useEffect(() => {
     loadSettings();
+    loadResolutionSuggestions();
+    detectDockerEnvironment().then(setDockerEnv);
   }, []);
+
+  const loadResolutionSuggestions = async () => {
+    try {
+      setIsLoadingSuggestions(true);
+      const response = await apiService.getDisplaySizeSuggestions();
+      if (response.success) {
+        setResolutionSuggestions(response.suggestions || []);
+      }
+    } catch (error) {
+      console.error('Failed to load resolution suggestions:', error);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  const handleAddSuggestedResolution = async (resolution: string) => {
+    try {
+      const response = await apiService.addDisplaySize(resolution);
+      
+      if (response.success) {
+        if (response.already_exists) {
+          toast({
+            title: "Already Configured",
+            description: `${resolution} is already in your display sizes`,
+            variant: "default",
+          });
+        } else {
+          toast({
+            title: "Resolution Added",
+            description: `${resolution} has been added to display sizes`,
+            variant: "success",
+          });
+          
+          // Reload settings and suggestions
+          await loadSettings();
+          await loadResolutionSuggestions();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to add resolution:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add resolution. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const loadSettings = async () => {
     if (hasLoadedSettings.current) return;
@@ -153,7 +236,35 @@ const Settings: React.FC = () => {
   const handleSaveSettings = async () => {
     setIsLoading(true);
     try {
-      const response = await apiService.updateSettings(settings);
+      // Handle admin password update separately if provided
+      if (settings.admin_password && settings.admin_password.trim() !== '') {
+        try {
+          // Get current user to find admin user ID
+          const currentUserResponse = await apiService.getCurrentUser();
+          if (currentUserResponse.success && currentUserResponse.data) {
+            const adminUserId = currentUserResponse.data.id;
+            await apiService.resetUserPassword(adminUserId, settings.admin_password);
+            toast({
+              title: "Admin Password Updated",
+              description: "Admin password has been updated successfully",
+              variant: "success",
+            });
+          }
+        } catch (passwordErr: any) {
+          toast({
+            title: "Password Update Failed",
+            description: `Failed to update admin password: ${passwordErr.message}`,
+            variant: "error",
+          });
+          return; // Don't continue with other settings if password update fails
+        }
+      }
+
+      // Update other settings (excluding admin_password)
+      const settingsToUpdate = { ...settings };
+      delete settingsToUpdate.admin_password; // Remove admin_password from settings update
+      
+      const response = await apiService.updateSettings(settingsToUpdate);
       if (response.success) {
         // Update the urlResolver with the new server URL
         if (settings.server_base_url) {
@@ -259,6 +370,42 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleRegenerateResolutions = async () => {
+    setIsLoading(true);
+    try {
+      const response = await apiService.regenerateImageResolutions();
+      
+      // Set up progress tracking
+      setRegenerationTaskId(response.data.task_id);
+      setInitialProgress({
+        task_id: response.data.task_id,
+        status: 'pending',
+        total_images: response.data.total_images,
+        processed_images: 0,
+        error_count: 0,
+        display_sizes: response.data.display_sizes,
+        progress_percentage: 0
+      });
+      
+      // Show progress modal
+      setShowProgressModal(true);
+      
+      toast({
+        title: "Resolution Regeneration Started",
+        description: `Background regeneration started for ${response.data.total_images} images.`,
+        variant: "success",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Failed to Start Regeneration",
+        description: err.message || "Could not start resolution regeneration",
+        variant: "error",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const renderDatabaseSettings = () => (
     <div className="space-y-6">
       <div className="flex items-center gap-3 mb-6">
@@ -280,8 +427,15 @@ const Settings: React.FC = () => {
             type="text"
             value={settings.mysql_host}
             onChange={handleInputChange}
+            disabled={shouldDisableInDocker('mysql_host', dockerEnv)}
             required
           />
+          {shouldDisableInDocker('mysql_host', dockerEnv) && (
+            <div className="flex items-center text-sm text-gray-500">
+              <Info className="w-4 h-4 mr-1" />
+              {getDisabledReason('mysql_host', dockerEnv)}
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -292,8 +446,15 @@ const Settings: React.FC = () => {
             type="number"
             value={settings.mysql_port}
             onChange={handleInputChange}
+            disabled={shouldDisableInDocker('mysql_port', dockerEnv)}
             required
           />
+          {shouldDisableInDocker('mysql_port', dockerEnv) && (
+            <div className="flex items-center text-sm text-gray-500">
+              <Info className="w-4 h-4 mr-1" />
+              {getDisabledReason('mysql_port', dockerEnv)}
+            </div>
+          )}
         </div>
 
         <div>
@@ -427,13 +588,21 @@ const Settings: React.FC = () => {
             name="upload_directory"
             value={settings.upload_directory}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            disabled={shouldDisableInDocker('upload_directory', dockerEnv)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             placeholder="uploads"
             required
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Directory for uploaded files (relative to backend root)
-          </p>
+          {shouldDisableInDocker('upload_directory', dockerEnv) ? (
+            <div className="flex items-center text-sm text-gray-500 mt-1">
+              <Info className="w-4 h-4 mr-1" />
+              {getDisabledReason('upload_directory', dockerEnv)}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500 mt-1">
+              Directory for uploaded files (relative to backend root)
+            </p>
+          )}
         </div>
 
         <div>
@@ -445,15 +614,23 @@ const Settings: React.FC = () => {
             name="backend_port"
             value={settings.backend_port}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            disabled={shouldDisableInDocker('backend_port', dockerEnv)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             placeholder="8001"
             min="1024"
             max="65535"
             required
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Port for the backend API server
-          </p>
+          {shouldDisableInDocker('backend_port', dockerEnv) ? (
+            <div className="flex items-center text-sm text-gray-500 mt-1">
+              <Info className="w-4 h-4 mr-1" />
+              {getDisabledReason('backend_port', dockerEnv)}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500 mt-1">
+              Port for the backend API server
+            </p>
+          )}
         </div>
 
         <div>
@@ -465,15 +642,23 @@ const Settings: React.FC = () => {
             name="frontend_port"
             value={settings.frontend_port}
             onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            disabled={shouldDisableInDocker('frontend_port', dockerEnv)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             placeholder="3003"
             min="1024"
             max="65535"
             required
           />
-          <p className="text-xs text-gray-500 mt-1">
-            Port for the frontend development server
-          </p>
+          {shouldDisableInDocker('frontend_port', dockerEnv) ? (
+            <div className="flex items-center text-sm text-gray-500 mt-1">
+              <Info className="w-4 h-4 mr-1" />
+              {getDisabledReason('frontend_port', dockerEnv)}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500 mt-1">
+              Port for the frontend development server
+            </p>
+          )}
         </div>
 
         <div>
@@ -659,6 +844,63 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
+      {/* Suggested Resolutions from Devices */}
+      {resolutionSuggestions.length > 0 && (
+        <div className="border-t pt-6">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-medium text-gray-700">
+              Suggested Resolutions from Your Devices
+            </h4>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={loadResolutionSuggestions}
+              disabled={isLoadingSuggestions}
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoadingSuggestions ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {resolutionSuggestions.map((suggestion) => (
+              <div
+                key={suggestion.resolution}
+                className={`flex items-center justify-between p-3 border rounded-lg ${
+                  suggestion.is_configured
+                    ? 'border-green-200 bg-green-50'
+                    : 'border-blue-200 bg-blue-50'
+                }`}
+              >
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium text-gray-900">
+                      {suggestion.resolution}
+                    </span>
+                    {suggestion.is_configured && (
+                      <Badge className="bg-green-100 text-green-800">
+                        Configured
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    {suggestion.device_count} device{suggestion.device_count > 1 ? 's' : ''}: {suggestion.devices.join(', ')}
+                  </div>
+                </div>
+                {!suggestion.is_configured && (
+                  <Button
+                    onClick={() => handleAddSuggestedResolution(suggestion.resolution)}
+                    size="sm"
+                    className="ml-4"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Add Custom Display Size */}
       <div className="border-t pt-6">
         <h4 className="text-sm font-medium text-gray-700 mb-3">Add Custom Display Size</h4>
@@ -724,6 +966,37 @@ const Settings: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Regenerate Resolutions Button */}
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="text-sm font-medium text-green-900">Resolution Management</h4>
+            <p className="text-sm text-green-700 mt-1">
+              Regenerate resolution variants for all existing images in the background. 
+              Processing will continue even if you navigate away from this page.
+            </p>
+          </div>
+          <Button
+            onClick={handleRegenerateResolutions}
+            disabled={isLoading}
+            variant="outline"
+            className="border-green-300 text-green-700 hover:bg-green-100"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Starting...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Regenerate Resolutions
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 
@@ -736,6 +1009,84 @@ const Settings: React.FC = () => {
     { id: 'displays', label: 'Displays', icon: Monitor }
   ];
 
+  // Mobile layout with collapsible sections
+  if (isMobileView) {
+    return (
+      <MobileSettingsWrapper
+        onSave={handleSaveSettings}
+        isLoading={isLoading}
+        hasChanges={true}
+      >
+        <div className="space-y-4">
+          <SettingsSection
+            title="General Settings"
+            description="Server and display configuration"
+            icon={<Monitor className="w-5 h-5" />}
+            defaultExpanded={activeTab === 'general'}
+          >
+            {renderGeneralSettings()}
+          </SettingsSection>
+
+          <SettingsSection
+            title="User Management"
+            description="Manage users and permissions"
+            icon={<Users className="w-5 h-5" />}
+            defaultExpanded={activeTab === 'users'}
+          >
+            <UserManagement />
+          </SettingsSection>
+
+          <SettingsSection
+            title="Database Configuration"
+            description="MySQL database connection settings"
+            icon={<Database className="w-5 h-5" />}
+            defaultExpanded={activeTab === 'database'}
+          >
+            {renderDatabaseSettings()}
+          </SettingsSection>
+
+          <SettingsSection
+            title="Admin Settings"
+            description="Admin password and security"
+            icon={<Shield className="w-5 h-5" />}
+            defaultExpanded={activeTab === 'admin'}
+          >
+            {renderAdminSettings()}
+          </SettingsSection>
+
+          <SettingsSection
+            title="OAuth Configuration"
+            description="Google OAuth settings"
+            icon={<Key className="w-5 h-5" />}
+            defaultExpanded={activeTab === 'oauth'}
+          >
+            {renderOAuthSettings()}
+          </SettingsSection>
+
+          <SettingsSection
+            title="Display Settings"
+            description="Display sizes and resolutions"
+            icon={<Monitor className="w-5 h-5" />}
+            defaultExpanded={activeTab === 'displays'}
+          >
+            {renderDisplaySettings()}
+          </SettingsSection>
+        </div>
+
+        {/* Regeneration Progress Modal */}
+        {regenerationTaskId && (
+          <RegenerationProgressModal
+            isOpen={showProgressModal}
+            onClose={() => setShowProgressModal(false)}
+            taskId={regenerationTaskId}
+            initialProgress={initialProgress}
+          />
+        )}
+      </MobileSettingsWrapper>
+    );
+  }
+
+  // Desktop layout with tabs
   return (
     <div className="space-y-8">
       
@@ -788,6 +1139,16 @@ const Settings: React.FC = () => {
           {isLoading ? 'Saving...' : 'Save Settings'}
         </Button>
       </div>
+
+      {/* Regeneration Progress Modal */}
+      {regenerationTaskId && (
+        <RegenerationProgressModal
+          isOpen={showProgressModal}
+          onClose={() => setShowProgressModal(false)}
+          taskId={regenerationTaskId}
+          initialProgress={initialProgress}
+        />
+      )}
     </div>
   );
 };

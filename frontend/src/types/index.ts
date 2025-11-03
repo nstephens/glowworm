@@ -57,6 +57,7 @@ export interface Playlist {
   sequence: number[] | null;
   display_time_seconds: number;
   display_mode: DisplayMode;
+  show_image_info?: boolean;
   created_at: string;
   updated_at: string;
   image_count: number;

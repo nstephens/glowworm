@@ -9,11 +9,11 @@ from sqlalchemy import create_engine, text
 class Settings(BaseSettings):
     # Database settings (Pydantic automatically reads from matching env vars)
     # Env var MYSQL_PASSWORD maps to app_db_password via validation_alias
-    mysql_host: str = Field(default="localhost", description="MySQL host")
-    mysql_port: int = Field(default=3306, description="MySQL port")
+    mysql_host: str = Field(default="localhost", description="MySQL host", validation_alias="MYSQL_HOST")
+    mysql_port: int = Field(default=3306, description="MySQL port", validation_alias="MYSQL_PORT")
     app_db_user: str = Field(default="glowworm", description="Application database username", validation_alias="MYSQL_USER")
     app_db_password: str = Field(default="", description="Application database password", validation_alias="MYSQL_PASSWORD")
-    mysql_database: str = Field(default="glowworm", description="MySQL database name")
+    mysql_database: str = Field(default="glowworm", description="MySQL database name", validation_alias="MYSQL_DATABASE")
     
     # Legacy field mapping for backward compatibility
     @property
@@ -88,8 +88,23 @@ settings = Settings(
 )
 
 def get_fresh_settings() -> Settings:
-    """Get a fresh Settings instance with current configuration from file"""
+    """Get a fresh Settings instance with current configuration from file or environment"""
     try:
+        # For Docker deployments, use environment variables
+        if os.getenv('MYSQL_PASSWORD') and os.getenv('SECRET_KEY'):
+            # Running in Docker with environment variables
+            return Settings(
+                mysql_host=os.getenv("MYSQL_HOST", "localhost"),
+                mysql_port=int(os.getenv("MYSQL_PORT", "3306")),
+                app_db_user=os.getenv("MYSQL_USER", "glowworm"),
+                app_db_password=os.getenv("MYSQL_PASSWORD", ""),
+                mysql_database=os.getenv("MYSQL_DATABASE", "glowworm"),
+                secret_key=os.getenv("SECRET_KEY", ""),
+                server_base_url=os.getenv("SERVER_BASE_URL", "http://localhost:8001"),
+                upload_path=os.getenv("UPLOAD_PATH", "../uploads"),
+            )
+        
+        # For traditional deployments, read from config file
         config_file = get_config_file_path()
         if config_file.exists():
             with open(config_file, 'r') as f:

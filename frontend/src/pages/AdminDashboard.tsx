@@ -22,6 +22,8 @@ import LiveDisplayStatus from '../components/LiveDisplayStatus';
 import ImageUpload from '../components/ImageUpload';
 import type { Image, Album } from '../types';
 import { useToast } from '../hooks/use-toast';
+import { Dashboard } from '../components/dashboard/Dashboard';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -224,31 +226,67 @@ const AdminDashboard: React.FC = () => {
     },
   ];
 
+  // Convert stats to Dashboard component format
+  const dashboardData = {
+    stats: {
+      totalFiles: stats.totalImages,
+      totalStorage: 2.4 * 1024 * 1024 * 1024, // Mock storage data
+      totalUsers: stats.totalDisplays,
+      totalDownloads: stats.recentUploads,
+      uploadsToday: Math.floor(stats.recentUploads / 7),
+      downloadsToday: Math.floor(stats.recentUploads / 7),
+    },
+    storage: {
+      used: 1.8 * 1024 * 1024 * 1024,
+      total: 5 * 1024 * 1024 * 1024,
+      breakdown: {
+        images: 1.2 * 1024 * 1024 * 1024,
+        videos: 0.4 * 1024 * 1024 * 1024,
+        documents: 0.15 * 1024 * 1024 * 1024,
+        other: 0.05 * 1024 * 1024 * 1024,
+      },
+    },
+    trends: {
+      uploads: {
+        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        values: [12, 19, 8, 15, 22, 18, 14],
+        trend: 'up' as const,
+      },
+      downloads: {
+        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        values: [8, 15, 12, 18, 25, 20, 16],
+        trend: 'up' as const,
+      },
+    },
+    activities: [
+      {
+        id: '1',
+        type: 'upload' as const,
+        title: 'New photos uploaded',
+        description: `${stats.recentUploads} photos added recently`,
+        timestamp: new Date(Date.now() - 1000 * 60 * 30),
+        user: 'Admin',
+        metadata: {
+          fileSize: '2.4 MB',
+          fileType: 'image/jpeg',
+          albumName: 'Recent Uploads',
+          tags: ['recent', 'upload'],
+        },
+      },
+    ],
+    recommendations: [
+      // Remove storage upgrade recommendation
+    ],
+  };
+
   return (
     <div className="space-y-8">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in-up">
-        {statsData.map((stat, index) => (
-          <Card key={stat.title} className="gallery-item border-0 shadow-lg bg-card/50 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-xl ${stat.bgColor}`}>
-                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {stat.change}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
+      {/* Use the new mobile-optimized Dashboard component */}
+      <Dashboard 
+        data={dashboardData} 
+        loading={loading}
+        className="animate-fade-in-up"
+      />
 
       {/* Live Display Status */}
       <LiveDisplayStatus />

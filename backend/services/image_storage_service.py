@@ -54,11 +54,35 @@ class ImageStorageService:
             
             for size_str in display_sizes:
                 try:
-                    # Parse size string like "1080x1920" or "1920x1080"
+                    # Parse size string like "1080x1920", "1920x1080", "2k", "2k-portrait", "4k", "4k-portrait"
                     if 'x' in size_str:
+                        # Direct format like "1080x1920" or "2560x1440"
                         width, height = map(int, size_str.split('x'))
                         parsed_sizes.append((width, height))
                         logger.info(f"Parsed size: {size_str} -> ({width}, {height})")
+                    elif size_str == "2k" or size_str == "2k-landscape":
+                        # 2K landscape resolution (QHD/1440p)
+                        parsed_sizes.append((2560, 1440))
+                        logger.info(f"Parsed size: {size_str} -> (2560, 1440)")
+                    elif size_str == "2k-portrait":
+                        # 2K portrait resolution (1080p rotated)
+                        parsed_sizes.append((1080, 1920))
+                        logger.info(f"Parsed size: {size_str} -> (1080, 1920)")
+                    elif size_str == "4k" or size_str == "4k-landscape":
+                        # 4K landscape resolution (UHD)
+                        parsed_sizes.append((3840, 2160))
+                        logger.info(f"Parsed size: {size_str} -> (3840, 2160)")
+                    elif size_str == "4k-portrait":
+                        # 4K portrait resolution
+                        parsed_sizes.append((2160, 3840))
+                        logger.info(f"Parsed size: {size_str} -> (2160, 3840)")
+                    elif size_str == "1080p" or size_str == "fullhd":
+                        # Full HD landscape
+                        parsed_sizes.append((1920, 1080))
+                        logger.info(f"Parsed size: {size_str} -> (1920, 1080)")
+                    else:
+                        logger.warning(f"Unknown display size format: {size_str}")
+                        continue
                 except ValueError:
                     logger.warning(f"Invalid display size format: {size_str}")
                     continue
@@ -145,10 +169,72 @@ class ImageStorageService:
             # For any other type, convert to string
             return str(value)
     
+    def _apply_exif_orientation(self, img: PILImage.Image) -> PILImage.Image:
+        """Apply EXIF orientation to correct image rotation for mobile photos"""
+        if img is None:
+            logger.warning("Cannot apply EXIF orientation: image is None")
+            return img
+            
+        try:
+            # Check if image has EXIF data
+            exif = None
+            if hasattr(img, '_getexif'):
+                exif = img._getexif()
+            elif hasattr(img, 'getexif'):
+                # Pillow 8.0+ uses getexif()
+                try:
+                    exif_dict = img.getexif()
+                    if exif_dict:
+                        # Convert to dict for compatibility
+                        exif = {tag: value for tag, value in exif_dict.items()}
+                except Exception:
+                    pass
+            
+            if exif is not None:
+                # EXIF orientation tag (0x0112 or 274)
+                orientation = exif.get(274) or exif.get(0x0112)
+                
+                if orientation and orientation != 1:  # 1 is normal, no rotation needed
+                    try:
+                        if orientation == 2:
+                            # Mirror horizontal
+                            img = img.transpose(PILImage.FLIP_LEFT_RIGHT)
+                        elif orientation == 3:
+                            # Rotate 180 degrees
+                            img = img.rotate(180, expand=True)
+                        elif orientation == 4:
+                            # Mirror vertical
+                            img = img.transpose(PILImage.FLIP_TOP_BOTTOM)
+                        elif orientation == 5:
+                            # Mirror horizontal + rotate 90 degrees counter-clockwise
+                            img = img.transpose(PILImage.FLIP_LEFT_RIGHT).rotate(90, expand=True)
+                        elif orientation == 6:
+                            # Rotate 90 degrees clockwise
+                            img = img.rotate(-90, expand=True)
+                        elif orientation == 7:
+                            # Mirror horizontal + rotate 90 degrees clockwise
+                            img = img.transpose(PILImage.FLIP_LEFT_RIGHT).rotate(-90, expand=True)
+                        elif orientation == 8:
+                            # Rotate 90 degrees counter-clockwise
+                            img = img.rotate(90, expand=True)
+                        
+                        logger.debug(f"Applied EXIF orientation {orientation} to image")
+                    except Exception as rotate_error:
+                        logger.warning(f"Failed to apply rotation for orientation {orientation}: {rotate_error}")
+                        # Return image unchanged if rotation fails
+                        return img
+        except Exception as e:
+            logger.warning(f"Failed to apply EXIF orientation: {e}")
+        
+        return img
+    
     def _generate_thumbnail(self, image_bytes: bytes, size: str = 'medium') -> bytes:
-        """Generate thumbnail from image bytes"""
+        """Generate thumbnail from image bytes with EXIF orientation handling"""
         try:
             with PILImage.open(io.BytesIO(image_bytes)) as img:
+                # Handle EXIF orientation for mobile photos
+                img = self._apply_exif_orientation(img)
+                
                 # Convert to RGB if necessary (for JPEG compatibility)
                 if img.mode in ('RGBA', 'LA', 'P'):
                     img = img.convert('RGB')
@@ -169,6 +255,9 @@ class ImageStorageService:
         """Generate a scaled version of the image optimized for target dimensions with movement support"""
         try:
             with PILImage.open(io.BytesIO(image_bytes)) as img:
+                # Handle EXIF orientation for mobile photos
+                img = self._apply_exif_orientation(img)
+                
                 # Convert to RGB if necessary
                 if img.mode in ('RGBA', 'LA', 'P'):
                     img = img.convert('RGB')
@@ -317,21 +406,109 @@ class ImageStorageService:
         storage_path = self._get_storage_path(filename, user_id)
         
         # Process image
-        with PILImage.open(io.BytesIO(file_bytes)) as img:
-            # Get image metadata
-            width, height = img.size
-            format_name = img.format
-            mode = img.mode
+        original_file_bytes = file_bytes  # Keep original for fallback
+        processed_image = None
+        
+        try:
+            with PILImage.open(io.BytesIO(file_bytes)) as img:
+                # Extract EXIF data BEFORE applying orientation (need original orientation tag)
+                exif_data = self._extract_exif_data(img)
+                
+                # Apply EXIF orientation correction for mobile photos
+                # Make a copy to avoid modifying the original image object in the context manager
+                try:
+                    # Copy the image so we can process it outside the context manager
+                    processed_image = img.copy()
+                except Exception as e:
+                    logger.warning(f"Failed to copy image, processing in-place: {e}")
+                    processed_image = img
+                
+                # Apply orientation to the copy
+                processed_image = self._apply_exif_orientation(processed_image)
+                
+                # Get image metadata AFTER orientation correction
+                width, height = processed_image.size
+                format_name = processed_image.format
+                mode = processed_image.mode
+        except Exception as e:
+            logger.error(f"Failed to open/process image: {e}")
+            # Fallback: process without EXIF orientation
+            logger.info("Falling back to processing without EXIF orientation")
+            with PILImage.open(io.BytesIO(original_file_bytes)) as img:
+                exif_data = self._extract_exif_data(img)
+                processed_image = img.copy()
+                width, height = processed_image.size
+                format_name = processed_image.format
+                mode = processed_image.mode
+        
+        # Now process the image object (outside the context manager)
+        try:
+            img = processed_image
             
-            # Extract EXIF data
-            exif_data = self._extract_exif_data(img)
+            # Normalize MPO to JPEG for broad client compatibility (serve first frame)
+            if format_name and format_name.upper() == 'MPO':
+                try:
+                    img.seek(0)  # ensure first frame
+                except Exception:
+                    pass
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    img = img.convert('RGB')
+                format_name = 'JPEG'
+                # Ensure stored filename uses .jpg extension
+                try:
+                    filename = Path(filename).with_suffix('.jpg').name
+                    storage_path = self._get_storage_path(filename, user_id)
+                except Exception:
+                    # Fallback keeps existing filename if path manipulation fails
+                    pass
+                mode = 'RGB' if img.mode != 'RGB' else img.mode
             
             # Convert to RGB for consistent storage
             if img.mode in ('RGBA', 'LA', 'P'):
-                img = img.convert('RGB')
-                format_name = 'JPEG'
+                try:
+                    img = img.convert('RGB')
+                    format_name = 'JPEG'
+                except Exception as e:
+                    logger.warning(f"Failed to convert image to RGB: {e}, keeping original mode")
+            
+            # Save corrected image with orientation applied and EXIF orientation tag removed
+            # This prevents browsers from double-rotating the image
+            output = io.BytesIO()
+            
+            # Save image without EXIF to prevent double-rotation
+            # Since we've already physically rotated the image based on EXIF orientation,
+            # we save without EXIF to prevent browsers from applying rotation again
+            # The EXIF metadata is already extracted and stored in database, so we don't lose information
+            save_kwargs = {'format': format_name, 'optimize': True}
+            if format_name == 'JPEG':
+                save_kwargs['quality'] = 90
+                # Don't pass exif parameter - this saves without EXIF data
+                # This prevents browsers from double-rotating the already-corrected image
+            
+            try:
+                img.save(output, **save_kwargs)
+                file_bytes = output.getvalue()
+            except Exception as e:
+                logger.error(f"Failed to save processed image: {e}")
+                # Fallback to original image if save fails
+                logger.info("Falling back to original image bytes")
+                file_bytes = original_file_bytes
+                # Re-extract metadata from original
+                with PILImage.open(io.BytesIO(original_file_bytes)) as fallback_img:
+                    width, height = fallback_img.size
+                    format_name = fallback_img.format or 'JPEG'
+                    mode = fallback_img.mode
+        except Exception as e:
+            logger.error(f"Failed to process image after EXIF orientation: {e}")
+            # Complete fallback: use original image
+            logger.info("Falling back to original image bytes completely")
+            file_bytes = original_file_bytes
+            with PILImage.open(io.BytesIO(original_file_bytes)) as fallback_img:
+                width, height = fallback_img.size
+                format_name = fallback_img.format or 'JPEG'
+                mode = fallback_img.mode
         
-        # Save original image
+        # Save corrected image
         with open(storage_path, 'wb') as f:
             f.write(file_bytes)
         
@@ -441,6 +618,44 @@ class ImageStorageService:
         """Get the full path to a thumbnail"""
         thumbnail_path = self._get_thumbnail_path(filename, size)
         return thumbnail_path if thumbnail_path.exists() else None
+    
+    def get_available_resolutions(self, filename: str) -> List[Dict[str, Any]]:
+        """Get available resolution variants for an image"""
+        try:
+            from pathlib import Path
+            
+            # Get the base filename without extension
+            base_name = Path(filename).stem
+            extension = Path(filename).suffix
+            
+            # Get configured display sizes
+            display_sizes = self._load_display_sizes()
+            available_variants = []
+            
+            for width, height in display_sizes:
+                # Check if scaled version exists
+                scaled_filename = f"{base_name}_{width}x{height}{extension}"
+                scaled_path = self.upload_path / "scaled" / scaled_filename
+                
+                if scaled_path.exists():
+                    # Get file size
+                    file_size = scaled_path.stat().st_size
+                    
+                    available_variants.append({
+                        "dimensions": f"{width}x{height}",
+                        "width": width,
+                        "height": height,
+                        "filename": scaled_filename,
+                        "url": f"/api/images/scaled/{scaled_filename}",
+                        "file_size": file_size,
+                        "file_size_mb": round(file_size / (1024 * 1024), 2)
+                    })
+            
+            return available_variants
+            
+        except Exception as e:
+            logger.error(f"Error getting available resolutions for {filename}: {e}")
+            return []
 
 # Global instance
 image_storage_service = ImageStorageService()

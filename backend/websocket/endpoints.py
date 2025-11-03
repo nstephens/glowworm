@@ -1,4 +1,4 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, Request
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session
 import json
 import logging
@@ -13,7 +13,7 @@ from .manager import connection_manager
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/ws", tags=["websocket"])
+router = APIRouter(prefix="/api/ws", tags=["websocket"])
 
 @router.websocket("/device")
 async def websocket_device_endpoint(websocket: WebSocket):
@@ -305,8 +305,13 @@ async def broadcast_to_devices(message: dict):
     return {"message": "Broadcast sent", "device_count": connection_manager.get_device_count()}
 
 @router.post("/device/{device_token}/command")
-async def send_device_command_endpoint(device_token: str, command: str, data: dict = None):
+async def send_device_command_endpoint(
+    device_token: str, 
+    command: str = Query(..., description="Command to send to device (e.g., 'refresh_browser')"),
+    data: dict = None
+):
     """Send a command to a specific device via HTTP"""
+    logger.info(f"Sending command '{command}' to device {device_token[:8]}...")
     await connection_manager.send_device_command(device_token, command, data or {})
     return {
         "message": "Command sent",

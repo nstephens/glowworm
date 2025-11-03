@@ -18,41 +18,43 @@ export const ResponsiveGrid: React.FC<ResponsiveGridProps> = ({
   columns,
   gap,
   autoFit = false,
-  minItemWidth = 200,
+  minItemWidth = 160,
   equalHeight = false,
 }) => {
   const { getGridColumns, getSpacing, getResponsiveClasses } = useResponsiveLayout();
 
   const gridColumns = getGridColumns(columns || {
-    sm: 1,
-    md: 2,
-    lg: 3,
+    // Compact mobile-first defaults
+    sm: 2,
+    md: 3,
+    lg: 4,
+    xl: 5,
+    '2xl': 6,
+  });
+
+  const gridGap = getSpacing(gap || {
+    // Tighter gaps on mobile for compact layouts
+    sm: 2,
+    md: 3,
+    lg: 4,
     xl: 4,
     '2xl': 5,
   });
 
-  const gridGap = getSpacing(gap || {
-    sm: 4,
-    md: 6,
-    lg: 8,
-    xl: 8,
-    '2xl': 10,
-  });
-
   const gridClasses = getResponsiveClasses({
-    sm: 'grid-cols-1',
-    md: 'grid-cols-2',
-    lg: 'grid-cols-3',
-    xl: 'grid-cols-4',
-    '2xl': 'grid-cols-5',
+    sm: 'grid-cols-2',
+    md: 'grid-cols-3',
+    lg: 'grid-cols-4',
+    xl: 'grid-cols-5',
+    '2xl': 'grid-cols-6',
   });
 
   const gapClasses = getResponsiveClasses({
-    sm: 'gap-4',
-    md: 'gap-6',
-    lg: 'gap-8',
-    xl: 'gap-8',
-    '2xl': 'gap-10',
+    sm: 'gap-2',
+    md: 'gap-3',
+    lg: 'gap-4',
+    xl: 'gap-4',
+    '2xl': 'gap-5',
   });
 
   const gridStyle = autoFit ? {
@@ -63,9 +65,8 @@ export const ResponsiveGrid: React.FC<ResponsiveGridProps> = ({
   return (
     <div
       className={cn(
-        'grid',
-        !autoFit && gridClasses,
-        !autoFit && gapClasses,
+        // Use CSS custom properties for better performance and consistency
+        autoFit ? 'responsive-grid-auto' : 'responsive-grid',
         equalHeight && 'items-stretch',
         className
       )}

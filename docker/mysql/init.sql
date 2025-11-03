@@ -5,7 +5,7 @@
 CREATE DATABASE IF NOT EXISTS glowworm CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Create the application user
-CREATE USER IF NOT EXISTS 'glowworm'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
+CREATE USER IF NOT EXISTS 'glowworm'@'%' IDENTIFIED BY 'asfkakdkakas93ikkass';
 
 -- Grant privileges
 GRANT ALL PRIVILEGES ON glowworm.* TO 'glowworm'@'%';

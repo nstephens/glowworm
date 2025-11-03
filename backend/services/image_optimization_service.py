@@ -91,6 +91,47 @@ class ImageOptimizationService:
         # Fall back to original format
         return original_format.lower()
     
+    def _apply_exif_orientation(self, img: PILImage.Image) -> PILImage.Image:
+        """Apply EXIF orientation to correct image rotation for mobile photos"""
+        try:
+            # Check if image has EXIF data
+            if hasattr(img, '_getexif'):
+                exif = img._getexif()
+                if exif is not None:
+                    # EXIF orientation tag
+                    orientation = exif.get(274)  # 0x0112
+                    
+                    if orientation == 1:
+                        # Normal orientation - no rotation needed
+                        pass
+                    elif orientation == 2:
+                        # Mirror horizontal
+                        img = img.transpose(PILImage.FLIP_LEFT_RIGHT)
+                    elif orientation == 3:
+                        # Rotate 180 degrees
+                        img = img.rotate(180, expand=True)
+                    elif orientation == 4:
+                        # Mirror vertical
+                        img = img.transpose(PILImage.FLIP_TOP_BOTTOM)
+                    elif orientation == 5:
+                        # Mirror horizontal + rotate 90 degrees counter-clockwise
+                        img = img.transpose(PILImage.FLIP_LEFT_RIGHT).rotate(90, expand=True)
+                    elif orientation == 6:
+                        # Rotate 90 degrees clockwise
+                        img = img.rotate(-90, expand=True)
+                    elif orientation == 7:
+                        # Mirror horizontal + rotate 90 degrees clockwise
+                        img = img.transpose(PILImage.FLIP_LEFT_RIGHT).rotate(-90, expand=True)
+                    elif orientation == 8:
+                        # Rotate 90 degrees counter-clockwise
+                        img = img.rotate(90, expand=True)
+                    
+                    logger.debug(f"Applied EXIF orientation {orientation} to image")
+        except Exception as e:
+            logger.warning(f"Failed to apply EXIF orientation: {e}")
+        
+        return img
+    
     def _optimize_image(
         self, 
         image_bytes: bytes, 
@@ -102,6 +143,9 @@ class ImageOptimizationService:
         """Optimize image with format conversion and resizing"""
         try:
             with PILImage.open(io.BytesIO(image_bytes)) as img:
+                # Handle EXIF orientation for mobile photos
+                img = self._apply_exif_orientation(img)
+                
                 # Convert to RGB if necessary
                 if img.mode in ('RGBA', 'LA', 'P'):
                     if output_format in ['jpeg', 'webp']:

@@ -17,18 +17,39 @@ class CookieManager:
     DISPLAY_COOKIE = "glowworm_display"
     
     @staticmethod
-    def _get_cookie_config() -> Dict[str, Any]:
+    def _get_cookie_config(request: Optional[Request] = None) -> Dict[str, Any]:
         """Get secure cookie configuration"""
         # Don't set explicit cookie domain - this allows cookies to work
         # regardless of whether accessed via IP, localhost, or custom domain
         # Cookies will be scoped to the exact hostname used to access the app
         
+        # Detect iOS web app (standalone mode)
+        # iOS web apps have issues with SameSite="lax" cookies
+        # We'll use "lax" for normal browsers, but can adjust for iOS web apps
+        is_ios_webapp = False
+        if request:
+            user_agent = request.headers.get("user-agent", "").lower()
+            # Check for iOS devices (Safari on iOS)
+            # Note: iOS web apps don't reliably send "standalone" in user-agent
+            # So we detect any iOS device which might be using web app mode
+            is_ios_webapp = (
+                ("iphone" in user_agent or "ipad" in user_agent) and
+                "safari" in user_agent
+            )
+        
         config = {
             "httponly": True,  # Always HttpOnly for security
             "secure": settings.cookie_secure,  # Secure in production
-            "samesite": "lax",  # Balance security and functionality
+            "samesite": "lax",  # Balance security and functionality (works better for iOS web apps than "strict")
             "path": "/",  # Restrict to application root
         }
+        
+        # For iOS web apps, we might need "none" with Secure, but that requires HTTPS
+        # For now, "lax" should work better than "strict" for iOS web apps
+        # If using HTTPS, we could use "none" for better iOS compatibility
+        if is_ios_webapp and settings.cookie_secure:
+            # iOS web apps work better with "none" when Secure is True
+            config["samesite"] = "none"
         
         # Not setting 'domain' allows cookies to work with:
         # - Direct IP access (http://10.10.10.2:3003)
@@ -43,7 +64,8 @@ class CookieManager:
         session_token: str,
         refresh_token: Optional[str] = None,
         max_age: Optional[int] = None,
-        csrf_token: Optional[str] = None
+        csrf_token: Optional[str] = None,
+        request: Optional[Request] = None
     ) -> None:
         """Set authentication cookies with enhanced security"""
         if max_age is None:
@@ -51,7 +73,7 @@ class CookieManager:
         
         logger.debug(f"Setting auth cookies - session: {session_token[:8]}..., max_age: {max_age}")
         
-        cookie_config = CookieManager._get_cookie_config()
+        cookie_config = CookieManager._get_cookie_config(request)
         
         # Set session cookie
         response.set_cookie(

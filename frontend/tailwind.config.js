@@ -90,14 +90,15 @@ export default {
         mono: ["JetBrains Mono", "SF Mono", "Consolas", "Liberation Mono", "Menlo", "Courier", "monospace"],
       },
       fontSize: {
-        // Typography scale with line heights
-        'xs': ['0.75rem', { lineHeight: '1rem' }],      // 12px / 16px
-        'sm': ['0.875rem', { lineHeight: '1.25rem' }],  // 14px / 20px
-        'base': ['1rem', { lineHeight: '1.5rem' }],     // 16px / 24px
-        'lg': ['1.125rem', { lineHeight: '1.75rem' }],  // 18px / 28px
-        'xl': ['1.25rem', { lineHeight: '1.75rem' }],   // 20px / 28px
-        '2xl': ['1.5rem', { lineHeight: '2rem' }],      // 24px / 32px
-        '3xl': ['1.875rem', { lineHeight: '2.25rem' }], // 30px / 36px
+        // Mobile-first typography scale with CSS variables
+        'xs': ['var(--font-size-xs)', { lineHeight: 'var(--line-height-normal)' }],      // 12px
+        'sm': ['var(--font-size-sm)', { lineHeight: 'var(--line-height-normal)' }],     // 14px
+        'base': ['var(--font-size-base)', { lineHeight: 'var(--line-height-relaxed)' }], // 16px
+        'lg': ['var(--font-size-lg)', { lineHeight: 'var(--line-height-relaxed)' }],    // 18px
+        'xl': ['var(--font-size-xl)', { lineHeight: 'var(--line-height-tight)' }],      // 24px
+        '2xl': ['var(--font-size-2xl)', { lineHeight: 'var(--line-height-tight)' }],    // 30px
+        '3xl': ['var(--font-size-3xl)', { lineHeight: 'var(--line-height-tight)' }],    // 36px
+        // Legacy sizes for backward compatibility
         '4xl': ['2.25rem', { lineHeight: '2.5rem' }],   // 36px / 40px
         '5xl': ['3rem', { lineHeight: '1' }],           // 48px
         '6xl': ['3.75rem', { lineHeight: '1' }],        // 60px

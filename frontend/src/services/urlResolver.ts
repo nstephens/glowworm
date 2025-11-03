@@ -31,7 +31,7 @@ class UrlResolver {
     }
 
     // Try to get from environment variables
-    const envUrl = import.meta.env.VITE_SERVER_BASE_URL;
+    const envUrl = import.meta.env.VITE_SERVER_BASE_URL || import.meta.env.VITE_BACKEND_URL;
     if (envUrl) {
       this.serverBaseUrl = envUrl;
       return;
@@ -100,11 +100,25 @@ class UrlResolver {
    * Get WebSocket URL
    */
   public getWebSocketUrl(endpoint: string = ''): string {
+    // Always use current window location for WebSocket connections
+    // This ensures WebSockets work through reverse proxy in production
+    // and through Vite proxy in development
+    if (typeof window !== 'undefined') {
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsHost = window.location.host; // includes port if present
+      
+      // Construct the WebSocket path
+      // If endpoint already starts with /api/ws, use it directly
+      const wsPath = endpoint.startsWith('/api/ws') ? endpoint : `/api/ws${endpoint}`;
+      
+      return `${wsProtocol}://${wsHost}${wsPath}`;
+    }
+    
+    // Fallback for SSR or non-browser environments (shouldn't happen in practice)
     const baseUrl = this.serverBaseUrl;
     const wsProtocol = baseUrl.startsWith('https') ? 'wss' : 'ws';
-    const wsBaseUrl = baseUrl.replace(/^https?:/, wsProtocol);
-    
-    const wsPath = endpoint.startsWith('/ws') ? endpoint : `/ws${endpoint}`;
+    const wsBaseUrl = baseUrl.replace(/^https?:/, wsProtocol + ':');
+    const wsPath = endpoint.startsWith('/api/ws') ? endpoint : `/api/ws${endpoint}`;
     return `${wsBaseUrl}${wsPath}`;
   }
 

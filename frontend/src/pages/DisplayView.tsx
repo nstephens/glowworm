@@ -5,6 +5,7 @@ import { FullscreenSlideshowOptimized } from '../components/FullscreenSlideshowO
 import { DeviceWebSocketClient } from '../services/websocket';
 import { apiService } from '../services/api';
 import { applyDeviceOptimizations } from '../utils/deviceDetection';
+import { displayDeviceLogger } from '../services/displayDeviceLogger';
 import type { Image, Playlist } from '../types';
 
 interface DeviceStatus {
@@ -26,6 +27,7 @@ const DisplayView: React.FC = () => {
   const [deviceStatus, setDeviceStatus] = useState<DeviceStatus | null>(null);
   const [currentPlaylist, setCurrentPlaylist] = useState<Playlist | null>(null);
   const [playlistImages, setPlaylistImages] = useState<Image[]>([]);
+  const [displayResolution, setDisplayResolution] = useState<{width: number, height: number} | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
@@ -77,8 +79,81 @@ const DisplayView: React.FC = () => {
     const deviceInfo = applyDeviceOptimizations();
     console.log('Applied device optimizations:', deviceInfo);
     
+    // Log device startup
+    displayDeviceLogger.logStartup({
+      userAgent: navigator.userAgent,
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
+      screen: `${window.screen.width}x${window.screen.height}`,
+      devicePixelRatio: window.devicePixelRatio,
+      deviceInfo
+    });
+    
     return () => {
       document.body.classList.remove('display-mode', 'pi-mode', 'low-power-mode');
+    };
+  }, []);
+
+  // Detect and report screen resolution on every connection and window resize
+  useEffect(() => {
+    const reportResolution = async () => {
+      try {
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        
+        console.log(`📱 Browser window size detected: ${screenWidth}x${screenHeight} (DPR: ${devicePixelRatio})`);
+        console.log(`🖥️ System screen size: ${window.screen.width}x${window.screen.height} (DPR: ${window.devicePixelRatio})`);
+        
+        // Send resolution info to backend
+        const response = await fetch(urlResolver.getApiUrl('/display-devices/update-resolution'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            screen_width: screenWidth,
+            screen_height: screenHeight,
+            device_pixel_ratio: devicePixelRatio.toString()
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Resolution updated successfully:', data);
+          console.log(`📊 Device resolution stored: ${data.device?.screen_width || 'unknown'}x${data.device?.screen_height || 'unknown'}`);
+          
+          // Log resolution to remote logger
+          displayDeviceLogger.logResolution(screenWidth, screenHeight, devicePixelRatio);
+        } else {
+          console.warn('⚠️ Failed to update resolution:', response.status);
+          displayDeviceLogger.error('Failed to update resolution', { status: response.status });
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to report resolution:', error);
+        displayDeviceLogger.error('Failed to report resolution', { error: String(error) });
+      }
+    };
+    
+    // Report resolution immediately on every connection
+    reportResolution();
+    
+    // Add window resize listener to update resolution when browser window is resized
+    // Debounce to avoid too many API calls during active resizing
+    let resizeTimeout: NodeJS.Timeout;
+    const handleResize = () => {
+      console.log('🔄 Browser window resized, updating resolution...');
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        reportResolution();
+      }, 500); // Wait 500ms after resize stops
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimeout);
     };
   }, []);
 
@@ -146,6 +221,13 @@ const DisplayView: React.FC = () => {
         if (registerResponse.ok) {
           const registrationData = await registerResponse.json();
           console.log('Device registered:', registrationData);
+          
+          // Log device registration
+          displayDeviceLogger.info('Device registered successfully', {
+            device_id: registrationData.device_id,
+            device_token: registrationData.device_token.substring(0, 8) + '...',
+            status: registrationData.status
+          });
           
           // Create a temporary device status object from registration response
           const tempDeviceStatus: DeviceStatus = {
@@ -220,11 +302,15 @@ const DisplayView: React.FC = () => {
         client.on('connected', () => {
           console.log('WebSocket connected');
           setConnectionStatus('connected');
+          displayDeviceLogger.logWebSocketStatus('connected', {
+            device_token: deviceToken.substring(0, 8) + '...'
+          });
         });
 
         client.on('disconnected', () => {
           console.log('WebSocket disconnected');
           setConnectionStatus('disconnected');
+          displayDeviceLogger.logWebSocketStatus('disconnected');
         });
 
         client.on('connecting', () => {
@@ -372,23 +458,63 @@ const DisplayView: React.FC = () => {
   const loadPlaylistAndImages = async (playlistId: number) => {
     try {
       console.log('Loading playlist and images for playlist ID:', playlistId);
+      displayDeviceLogger.logPlaylist('loading', { playlist_id: playlistId });
       
-      // Load playlist details using public endpoint for display devices
-      const playlistResponse = await fetch(urlResolver.getApiUrl('/playlists/public'), {
+      // Load playlist details using smart endpoint for resolution-optimized playlists
+      const playlistResponse = await fetch(urlResolver.getApiUrl(`/playlists/${playlistId}/smart`), {
         credentials: 'include',
       });
       
       if (!playlistResponse.ok) {
-        throw new Error(`Failed to fetch playlists: ${playlistResponse.status}`);
+        throw new Error(`Failed to fetch smart playlist: ${playlistResponse.status}`);
       }
       
       const playlistData = await playlistResponse.json();
-      const playlists = playlistData.data || [];
-      console.log('Available playlists:', playlists.map(p => ({ id: p.id, name: p.name })));
+      console.log('🎯 Smart playlist response:', playlistData);
+      console.log(`📱 Device resolution: ${playlistData.device_resolution}`);
+      console.log(`📊 Effective resolution: ${playlistData.effective_resolution}`);
+      console.log(`🎬 Variant type: ${playlistData.variant?.variant_type || 'original'}`);
+      console.log(`🖼️ Optimized image count: ${playlistData.variant?.image_count || playlistData.playlist?.image_count || 'unknown'}`);
       
-      const playlist = playlists.find(p => p.id === playlistId);
-      console.log('Found playlist:', playlist);
-      console.log('🎯 Playlist sequence from backend:', playlist?.sequence);
+      // Log variant selection details
+      const availableVariants = playlistData.available_variants || [];
+      const hasNoVariants = !availableVariants || availableVariants.length === 0;
+      
+      displayDeviceLogger.logVariantSelection({
+        device_resolution: playlistData.device_resolution,
+        effective_resolution: playlistData.effective_resolution,
+        variant_type: playlistData.variant?.variant_type || 'original',
+        variant_id: playlistData.variant?.id || null,
+        variant_target: playlistData.variant ? `${playlistData.variant.target_width}x${playlistData.variant.target_height}` : null,
+        available_variants: availableVariants,
+        playlist_id: playlistId,
+        needs_generation: hasNoVariants
+      });
+      
+      // Log warning if no variants exist
+      if (hasNoVariants) {
+        displayDeviceLogger.warning('No variants exist for this playlist - serving original high-res images', {
+          playlist_id: playlistId,
+          playlist_name: playlistData.playlist?.name,
+          action_required: 'Generate variants from admin panel: POST /api/playlists/' + playlistId + '/generate-variants'
+        });
+      }
+      
+      const playlist = playlistData.playlist;
+      console.log('Found smart playlist:', playlist);
+      console.log('🎯 Optimized sequence from backend:', playlist?.sequence);
+      
+      // Store the display resolution from variant if available
+      if (playlistData.variant?.target_width && playlistData.variant?.target_height) {
+        setDisplayResolution({
+          width: playlistData.variant.target_width,
+          height: playlistData.variant.target_height
+        });
+        console.log(`📏 Display resolution: ${playlistData.variant.target_width}x${playlistData.variant.target_height}`);
+      } else {
+        setDisplayResolution(null);
+        console.log('📏 No variant resolution, using original dimensions');
+      }
       
       if (playlist) {
         setCurrentPlaylist(playlist);
@@ -438,16 +564,38 @@ const DisplayView: React.FC = () => {
           }
           setPlaylistImages(sortedImages);
           console.log('Set sorted playlist images:', sortedImages.length);
+          
+          // Log successful playlist load
+          displayDeviceLogger.logPlaylist('loaded', {
+            playlist_id: playlistId,
+            playlist_name: playlist.name,
+            image_count: sortedImages.length,
+            has_sequence: true,
+            variant_type: playlistData.variant?.variant_type || 'original'
+          });
         } else {
           console.log('⚠️ DisplayView: No sequence found, using original order');
           setPlaylistImages(images);
           console.log('Set playlist images:', images.length);
+          
+          // Log successful playlist load
+          displayDeviceLogger.logPlaylist('loaded', {
+            playlist_id: playlistId,
+            playlist_name: playlist.name,
+            image_count: images.length,
+            has_sequence: false
+          });
         }
       } else {
         console.error('Playlist not found for ID:', playlistId);
+        displayDeviceLogger.error('Playlist not found', { playlist_id: playlistId });
       }
     } catch (err) {
       console.error('Failed to load playlist:', err);
+      displayDeviceLogger.error('Failed to load playlist', {
+        playlist_id: playlistId,
+        error: String(err)
+      });
     }
   };
 
@@ -573,7 +721,7 @@ const DisplayView: React.FC = () => {
         <div className="text-center text-white">
           <div className="flex items-center justify-center space-x-4 mb-8">
             <img 
-              src="/glowworm_icon.png" 
+              src="/glowworm-logo.svg" 
               alt="Glowworm Logo" 
               className="w-16 h-16 object-contain"
             />
@@ -592,7 +740,7 @@ const DisplayView: React.FC = () => {
         <div className="text-center text-white">
           <div className="flex items-center justify-center space-x-4 mb-8">
             <img 
-              src="/glowworm_icon.png" 
+              src="/glowworm-logo.svg" 
               alt="Glowworm Logo" 
               className="w-16 h-16 object-contain"
             />
@@ -614,7 +762,7 @@ const DisplayView: React.FC = () => {
         <div className="text-center text-white">
           <div className="flex items-center justify-center space-x-4 mb-8">
             <img 
-              src="/glowworm_icon.png" 
+              src="/glowworm-logo.svg" 
               alt="Glowworm Logo" 
               className="w-16 h-16 object-contain"
             />
@@ -634,7 +782,7 @@ const DisplayView: React.FC = () => {
           <div className="text-center text-white max-w-6xl mx-auto px-4">
             <div className="flex items-center justify-center space-x-4 mb-8">
               <img 
-                src="/glowworm_icon.png" 
+                src="/glowworm-logo.svg" 
                 alt="Glowworm Logo" 
                 className="w-16 h-16 object-contain"
               />
@@ -680,7 +828,7 @@ const DisplayView: React.FC = () => {
           <div className="text-center text-white">
             <div className="flex items-center justify-center space-x-4 mb-8">
               <img 
-                src="/glowworm_icon.png" 
+                src="/glowworm-logo.svg" 
                 alt="Glowworm Logo" 
                 className="w-16 h-16 object-contain"
               />
@@ -708,7 +856,7 @@ const DisplayView: React.FC = () => {
           <div className="text-center text-white">
             <div className="flex items-center justify-center space-x-4 mb-8">
               <img 
-                src="/glowworm_icon.png" 
+                src="/glowworm-logo.svg" 
                 alt="Glowworm Logo" 
                 className="w-16 h-16 object-contain"
               />
@@ -730,7 +878,7 @@ const DisplayView: React.FC = () => {
           <div className="text-center text-white">
             <div className="flex items-center justify-center space-x-4 mb-8">
               <img 
-                src="/glowworm_icon.png" 
+                src="/glowworm-logo.svg" 
                 alt="Glowworm Logo" 
                 className="w-16 h-16 object-contain"
               />
@@ -748,7 +896,7 @@ const DisplayView: React.FC = () => {
           <div className="text-center text-white">
             <div className="flex items-center justify-center space-x-4 mb-8">
               <img 
-                src="/glowworm_icon.png" 
+                src="/glowworm-logo.svg" 
                 alt="Glowworm Logo" 
                 className="w-16 h-16 object-contain"
               />
@@ -772,10 +920,12 @@ const DisplayView: React.FC = () => {
             images={playlistImages}
             playlist={currentPlaylist || undefined}
             initialSettings={{ 
-              showInfo: false,
+              showInfo: currentPlaylist?.show_image_info || false,
               interval: currentPlaylist?.display_time_seconds || 30
             }}
             onClose={stopSlideshow}
+            deviceToken={deviceStatus?.device_token}
+            displayResolution={displayResolution}
           />
         </>
       )}

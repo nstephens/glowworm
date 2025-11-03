@@ -25,13 +25,42 @@ class ApiService {
       return config;
     });
 
-    // Add response interceptor for error handling
+    // Add response interceptor for error handling with automatic refresh
     this.api.interceptors.response.use(
       (response) => response,
-      (error) => {
-        if (error.response?.status === 401) {
-          // window.location.href = "/login"; // Commented out - App component handles auth state
+      async (error) => {
+        const originalRequest = error.config;
+        
+        // If 401 and we haven't already tried refreshing
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          originalRequest._retry = true;
+          
+          try {
+            // Try to refresh the session
+            const refreshResponse = await axios.post(
+              `${this.api.defaults.baseURL}/auth/refresh`,
+              {},
+              {
+                withCredentials: true,
+                timeout: 5000
+              }
+            );
+            
+            if (refreshResponse.data.success) {
+              // Retry the original request
+              return this.api(originalRequest);
+            }
+          } catch (refreshError) {
+            // Refresh failed, user needs to login again
+            // Clear any cached auth state
+            try {
+              localStorage.removeItem('glowworm_last_auth');
+            } catch (e) {
+              // Ignore localStorage errors
+            }
+          }
         }
+        
         return Promise.reject(error);
       }
     );
@@ -87,19 +116,53 @@ class ApiService {
     };
   }
 
+  async refreshSession(): Promise<ApiResponse<User>> {
+    const response = await this.api.post('/auth/refresh');
+    return {
+      success: response.data.success,
+      message: response.data.message || "Session refreshed successfully",
+      data: response.data.user,
+      status_code: response.status
+    };
+  }
+
   async register(username: string, password: string, email?: string): Promise<ApiResponse<{ user: User; message: string }>> {
     const response = await this.api.post('/auth/register', { username, password, email });
     return response.data;
   }
 
   // Image endpoints
-  async uploadImage(formData: FormData): Promise<ApiResponse<Image>> {
-    const response = await this.api.post('/images/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
+  async uploadImage(
+    formData: FormData,
+    options?: {
+      onUploadProgress?: (progressEvent: { loaded: number; total: number }) => void;
+      signal?: AbortSignal;
+    }
+  ): Promise<ApiResponse<Image>> {
+    try {
+      const response = await this.api.post('/images/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 120000, // 120 seconds (2 minutes) for large images with processing
+        onUploadProgress: options?.onUploadProgress,
+        signal: options?.signal,
+      });
+      return response.data;
+    } catch (error: any) {
+      // Enhance error messages for better debugging
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        throw new Error('Upload timeout - image may be too large or server is processing');
+      }
+      if (error.response?.status === 413) {
+        throw new Error('Image too large - maximum size is 15MB');
+      }
+      if (error.response?.status === 401) {
+        throw new Error('Authentication expired - please refresh and try again');
+      }
+      // Re-throw with original message if we have one
+      throw error;
+    }
   }
 
   async getImages(albumId?: number, playlistId?: number, limit?: number): Promise<ApiResponse<Image[]>> {
@@ -108,7 +171,9 @@ class ApiService {
     if (playlistId) params.append('playlist_id', playlistId.toString());
     if (limit) params.append('limit', limit.toString());
 
-    const response = await this.api.get(`/images/?${params.toString()}`);
+    const queryString = params.toString();
+    const url = queryString ? `/images/?${queryString}` : '/images/';
+    const response = await this.api.get(url);
     return response.data;
   }
 
@@ -147,6 +212,15 @@ class ApiService {
 
   async checkDuplicateImage(fileHash: string): Promise<{ is_duplicate: boolean; existing_image?: Image; message: string }> {
     const response = await this.api.post('/images/check-duplicate', { file_hash: fileHash });
+    return response.data;
+  }
+
+  async checkDuplicatesBatch(fileHashes: string[]): Promise<{ 
+    results: Record<string, { is_duplicate: boolean; existing_image?: Image; message: string }>;
+    total_checked: number;
+    duplicates_found: number;
+  }> {
+    const response = await this.api.post('/images/check-duplicates-batch', { file_hashes: fileHashes });
     return response.data;
   }
 
@@ -199,22 +273,52 @@ class ApiService {
   // Playlist endpoints
   async getPlaylists(): Promise<ApiResponse<Playlist[]>> {
     const response = await this.api.get('/playlists/');
-    return response.data;
+    // Backend returns {success: true, playlists: [...], count: N}
+    return {
+      message: "Playlists retrieved successfully",
+      data: response.data.playlists,
+      status_code: 200
+    };
   }
 
   async getPlaylist(id: number): Promise<ApiResponse<Playlist>> {
     const response = await this.api.get(`/playlists/${id}`);
-    return response.data;
+    // Backend returns {success: true, playlist: {...}}
+    return {
+      message: "Playlist retrieved successfully",
+      data: response.data.playlist,
+      status_code: 200
+    };
+  }
+
+  async getPlaylistBySlug(slug: string): Promise<ApiResponse<Playlist>> {
+    const response = await this.api.get(`/playlists/slug/${slug}`);
+    // Backend returns {success: true, playlist: {...}}
+    return {
+      message: "Playlist retrieved successfully",
+      data: response.data.playlist,
+      status_code: 200
+    };
   }
 
   async getPlaylistImages(id: number): Promise<ApiResponse<Image[]>> {
     const response = await this.api.get(`/playlists/${id}/images`);
-    return response.data;
+    // Backend returns {success: true, images: [...], count: N}
+    return {
+      message: "Playlist images retrieved successfully",
+      data: response.data.images,
+      status_code: 200
+    };
   }
 
   async getDefaultPlaylist(): Promise<ApiResponse<Playlist>> {
     const response = await this.api.get('/playlists/default');
-    return response.data;
+    // Backend returns {success: true, playlist: {...}}
+    return {
+      message: "Default playlist retrieved successfully",
+      data: response.data.playlist,
+      status_code: 200
+    };
   }
 
   async createPlaylist(name: string, isDefault = false): Promise<ApiResponse<Playlist>> {
@@ -222,8 +326,8 @@ class ApiService {
     return response.data;
   }
 
-  async updatePlaylist(id: number, name?: string, isDefault?: boolean, displayTimeSeconds?: number, displayMode?: string): Promise<ApiResponse<Playlist>> {
-    const response = await this.api.put(`/playlists/${id}`, { name, is_default: isDefault, display_time_seconds: displayTimeSeconds, display_mode: displayMode });
+  async updatePlaylist(id: number, name?: string, isDefault?: boolean, displayTimeSeconds?: number, displayMode?: string, showImageInfo?: boolean): Promise<ApiResponse<Playlist>> {
+    const response = await this.api.put(`/playlists/${id}`, { name, is_default: isDefault, display_time_seconds: displayTimeSeconds, display_mode: displayMode, show_image_info: showImageInfo });
     return response.data;
   }
 
@@ -259,6 +363,35 @@ class ApiService {
 
   async bulkDeletePlaylists(playlistIds: number[]): Promise<ApiResponse<any>> {
     const response = await this.api.delete('/playlists/bulk', { data: { playlist_ids: playlistIds } });
+    return response.data;
+  }
+
+  // Playlist Variant endpoints
+  async generatePlaylistVariants(playlistId: number): Promise<ApiResponse<any>> {
+    // Variant generation can take a while, especially for large playlists
+    // Use a 60 second timeout instead of the default 10 seconds
+    const response = await this.api.post(`/playlists/${playlistId}/generate-variants`, {}, {
+      timeout: 60000
+    });
+    return response.data;
+  }
+
+  async generateAllPlaylistVariants(): Promise<ApiResponse<any>> {
+    // Generating variants for all playlists can take several minutes
+    // Use a 5 minute timeout
+    const response = await this.api.post('/playlists/generate-all-variants', {}, {
+      timeout: 300000
+    });
+    return response.data;
+  }
+
+  async getPlaylistVariants(playlistId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/playlists/${playlistId}/variants`);
+    return response.data;
+  }
+
+  async getPlaylistSmart(playlistId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/playlists/${playlistId}/smart`);
     return response.data;
   }
 
@@ -327,6 +460,26 @@ class ApiService {
 
   async updateDisplaySizes(displaySizes: string[]): Promise<ApiResponse<any>> {
     const response = await this.api.put('/settings/display-sizes', displaySizes);
+    return response.data;
+  }
+
+  async getDisplaySizeSuggestions(): Promise<ApiResponse<any>> {
+    const response = await this.api.get('/settings/display-sizes/suggestions');
+    return response.data;
+  }
+
+  async addDisplaySize(resolution: string): Promise<ApiResponse<any>> {
+    const response = await this.api.post('/settings/display-sizes/add', { resolution });
+    return response.data;
+  }
+
+  async regenerateImageResolutions(): Promise<ApiResponse<any>> {
+    const response = await this.api.post('/images/regenerate-resolutions');
+    return response.data;
+  }
+
+  async getImageResolutions(imageId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/images/${imageId}/resolutions`);
     return response.data;
   }
 

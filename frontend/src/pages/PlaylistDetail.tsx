@@ -11,15 +11,19 @@ import {
   GripVertical,
   Search,
   Filter,
-  Shuffle
+  Shuffle,
+  Sparkles
 } from 'lucide-react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { apiService } from '../services/api';
 import { AdminWebSocketClient } from '../services/websocket';
 import { ConfirmationModal } from '../components/ConfirmationModal';
+import { VariantGenerationModal } from '../components/VariantGenerationModal';
 import { getThumbnailUrl } from '../utils/imageUrls';
 import { playlistLogger } from '../utils/logger';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { cn } from '../lib/utils';
 import type { Playlist, Image, Album, DisplayDevice, DisplayMode } from '../types';
 
 // Draggable Image Item Component
@@ -97,8 +101,9 @@ const DraggableImageItem: React.FC<{
 };
 
 const PlaylistDetail: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const { isMobile } = useResponsiveLayout();
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
   const [playlistImages, setPlaylistImages] = useState<Image[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -107,6 +112,10 @@ const PlaylistDetail: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showAddImages, setShowAddImages] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isGeneratingVariants, setIsGeneratingVariants] = useState(false);
+  const [showVariantModal, setShowVariantModal] = useState(false);
+  const [variantGenerationError, setVariantGenerationError] = useState<string | null>(null);
+  const [variantCount, setVariantCount] = useState<number | undefined>(undefined);
   const [imageToDelete, setImageToDelete] = useState<Image | null>(null);
   const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
@@ -117,6 +126,7 @@ const PlaylistDetail: React.FC = () => {
   const [editDisplayMode, setEditDisplayMode] = useState<DisplayMode>('default');
   const [editDisplayTime, setEditDisplayTime] = useState(30);
   const [editIsDefault, setEditIsDefault] = useState(false);
+  const [editShowImageInfo, setEditShowImageInfo] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const wsRef = useRef<AdminWebSocketClient | null>(null);
 
@@ -130,10 +140,10 @@ const PlaylistDetail: React.FC = () => {
 
   // Load playlist data
   useEffect(() => {
-    if (id) {
+    if (slug) {
       loadPlaylist();
     }
-  }, [id]);
+  }, [slug]);
 
   // WebSocket connection
   useEffect(() => {
@@ -152,35 +162,51 @@ const PlaylistDetail: React.FC = () => {
       const displayModeChanged = editDisplayMode !== (playlist.display_mode || 'default');
       const displayTimeChanged = editDisplayTime !== (playlist.display_time_seconds || 30);
       const isDefaultChanged = editIsDefault !== playlist.is_default;
+      const showImageInfoChanged = editShowImageInfo !== (playlist.show_image_info || false);
       
-      setHasChanges(nameChanged || displayModeChanged || displayTimeChanged || isDefaultChanged);
+      setHasChanges(nameChanged || displayModeChanged || displayTimeChanged || isDefaultChanged || showImageInfoChanged);
     }
-  }, [editName, editDisplayMode, editDisplayTime, editIsDefault, playlist]);
+  }, [editName, editDisplayMode, editDisplayTime, editIsDefault, editShowImageInfo, playlist]);
 
   const loadPlaylist = async () => {
+    if (!slug) return;
+    
     try {
-      const response = await apiService.get(`/playlists/${id}`);
+      console.log('🔍 Loading playlist with slug:', slug);
+      const response = await apiService.getPlaylistBySlug(slug);
+      console.log('📡 API Response:', response);
+      
+      if (!response || !response.data) {
+        console.error('❌ No response or data');
+        return;
+      }
+      
       const playlistData = response.data;
+      console.log('✅ Playlist data:', playlistData);
+      
       setPlaylist(playlistData);
       setEditName(playlistData.name);
       setEditDisplayMode(playlistData.display_mode || 'default');
       setEditDisplayTime(playlistData.display_time_seconds || 30);
       setEditIsDefault(playlistData.is_default || false);
+      setEditShowImageInfo(playlistData.show_image_info || false);
       
       // Load playlist images
-      const imagesResponse = await apiService.get(`/playlists/${id}/images`);
-      setPlaylistImages(imagesResponse.data);
+      const imagesResponse = await apiService.getPlaylistImages(playlistData.id);
+      console.log('📡 Images Response:', imagesResponse);
+      setPlaylistImages(imagesResponse.data || []);
     } catch (error) {
       console.error('Error loading playlist:', error);
-      playlistLogger.error('Failed to load playlist', { error, playlistId: id });
+      playlistLogger.error('Failed to load playlist', { error, playlistSlug: slug });
     }
   };
 
   const loadAlbums = async () => {
     setLoadingAlbums(true);
     try {
-      const response = await apiService.get('/albums');
-      setAlbums(response.data);
+      const response = await apiService.getAlbums();
+      console.log('📡 Albums Response:', response);
+      setAlbums(response.data || []);
     } catch (error) {
       console.error('Error loading albums:', error);
     } finally {
@@ -190,8 +216,9 @@ const PlaylistDetail: React.FC = () => {
 
   const loadAllImages = async () => {
     try {
-      const response = await apiService.get('/images');
-      setAllImages(response.data);
+      const response = await apiService.getImages();
+      console.log('📡 All Images Response:', response);
+      setAllImages(response.data || []);
     } catch (error) {
       console.error('Error loading images:', error);
     }
@@ -214,10 +241,18 @@ const PlaylistDetail: React.FC = () => {
         name: editName.trim(),
         display_mode: editDisplayMode,
         display_time_seconds: editDisplayTime,
-        is_default: editIsDefault
+        is_default: editIsDefault,
+        show_image_info: editShowImageInfo
       };
       
-      await apiService.put(`/playlists/${playlist.id}`, updateData);
+      await apiService.updatePlaylist(
+        playlist.id,
+        updateData.name,
+        updateData.is_default,
+        updateData.display_time_seconds,
+        updateData.display_mode,
+        updateData.show_image_info
+      );
       
       // Update local state
       setPlaylist(prev => prev ? { ...prev, ...updateData } : null);
@@ -239,6 +274,7 @@ const PlaylistDetail: React.FC = () => {
       setEditDisplayMode(playlist.display_mode || 'default');
       setEditDisplayTime(playlist.display_time_seconds || 30);
       setEditIsDefault(playlist.is_default || false);
+      setEditShowImageInfo(playlist.show_image_info || false);
     }
     setIsEditing(false);
     setHasChanges(false);
@@ -248,7 +284,7 @@ const PlaylistDetail: React.FC = () => {
     if (!playlist) return;
     
     try {
-      await apiService.post(`/playlists/${playlist.id}/randomize`);
+      await apiService.randomizePlaylist(playlist.id);
       await loadPlaylist(); // Reload to get new order
       playlistLogger.info('Playlist randomized', { playlistId: playlist.id });
     } catch (error) {
@@ -261,12 +297,7 @@ const PlaylistDetail: React.FC = () => {
     if (!playlist) return;
     
     try {
-      await apiService.post(`/playlists/${playlist.id}/images/reorder`, {
-        dragged_id: draggedId,
-        target_id: targetId
-      });
-      
-      // Update local state
+      // Update local state first
       const draggedIndex = playlistImages.findIndex(img => img.id === draggedId);
       const targetIndex = playlistImages.findIndex(img => img.id === targetId);
       
@@ -275,6 +306,10 @@ const PlaylistDetail: React.FC = () => {
         const [draggedImage] = newImages.splice(draggedIndex, 1);
         newImages.splice(targetIndex, 0, draggedImage);
         setPlaylistImages(newImages);
+        
+        // Send the new order to the API
+        const newImageIds = newImages.map(img => img.id);
+        await apiService.reorderPlaylist(playlist.id, newImageIds);
       }
       
       playlistLogger.info('Image reordered', { playlistId: playlist.id, draggedId, targetId });
@@ -289,7 +324,11 @@ const PlaylistDetail: React.FC = () => {
     
     try {
       const imageIds = Array.from(selectedImages);
-      await apiService.post(`/playlists/${playlist.id}/images`, { image_ids: imageIds });
+      
+      // Add each image individually
+      for (const imageId of imageIds) {
+        await apiService.addImageToPlaylist(playlist.id, imageId);
+      }
       
       // Reload playlist images
       await loadPlaylist();
@@ -312,7 +351,7 @@ const PlaylistDetail: React.FC = () => {
     if (!playlist || !imageToDelete) return;
     
     try {
-      await apiService.delete(`/playlists/${playlist.id}/images/${imageToDelete.id}`);
+      await apiService.removeImageFromPlaylist(playlist.id, imageToDelete.id);
       
       // Update local state
       setPlaylistImages(prev => prev.filter(img => img.id !== imageToDelete.id));
@@ -343,13 +382,65 @@ const PlaylistDetail: React.FC = () => {
     setSelectedAlbum(albumId);
     if (albumId) {
       try {
-        const response = await apiService.get(`/albums/${albumId}/images`);
-        setAlbumImages(response.data);
+        const response = await apiService.getImages(albumId);
+        console.log('📡 Album Images Response:', response);
+        setAlbumImages(response.data || []);
       } catch (error) {
         console.error('Error loading album images:', error);
       }
     } else {
       setAlbumImages([]);
+    }
+  };
+
+  const handleGenerateVariants = async () => {
+    if (!playlist) return;
+    
+    try {
+      setIsGeneratingVariants(true);
+      setShowVariantModal(true);
+      setVariantGenerationError(null);
+      setVariantCount(undefined);
+      
+      playlistLogger.info('Generating variants for playlist:', playlist.name);
+      
+      const response = await apiService.generatePlaylistVariants(playlist.id);
+      
+      playlistLogger.info('Variant generation response:', response);
+      
+      // Check diagnostic info
+      if ((response as any).diagnostic) {
+        const diag = (response as any).diagnostic;
+        playlistLogger.info('Diagnostic info:', diag);
+        
+        if (diag.configured_count === 0) {
+          throw new Error('No display sizes configured in settings. Please add display sizes in Settings → Display Sizes first.');
+        }
+        
+        if (diag.variants_generated === 0 && diag.configured_count > 0) {
+          let errorMsg = `No variants generated despite having ${diag.configured_count} display size(s) configured: ${diag.configured_display_sizes.join(', ')}.`;
+          
+          if (diag.errors && diag.errors.length > 0) {
+            errorMsg += '\n\nErrors:\n' + diag.errors.join('\n');
+          } else {
+            errorMsg += '\n\nNo specific errors reported. This may indicate a database or image scaling issue.';
+          }
+          
+          throw new Error(errorMsg);
+        }
+      }
+      
+      if ((response as any).success) {
+        playlistLogger.info('Variants generated successfully:', response);
+        setVariantCount((response as any).count || 0);
+      } else {
+        throw new Error((response as any).message || 'Failed to generate variants');
+      }
+    } catch (error: any) {
+      playlistLogger.error('Failed to generate variants:', error);
+      setVariantGenerationError(error.message || 'Failed to generate variants. Please try again.');
+    } finally {
+      setIsGeneratingVariants(false);
     }
   };
 
@@ -380,30 +471,47 @@ const PlaylistDetail: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Playlist Info */}
-      <div className="bg-card/50 backdrop-blur-sm rounded-xl border-0 shadow-lg p-6">
-        <div className="flex items-start justify-between">
+      <div className={cn(
+        "bg-card/50 backdrop-blur-sm rounded-xl border-0 shadow-lg",
+        isMobile ? "p-4" : "p-6"
+      )}>
+        <div className={cn(
+          "flex items-start justify-between",
+          isMobile ? "flex-col space-y-4" : ""
+        )}>
           <div className="flex-1">
             {isEditing ? (
-              <div className="space-y-4">
+              <div className={cn("space-y-4", isMobile && "space-y-3")}>
                 {/* Playlist Name */}
                 <div>
                   <input
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="text-2xl font-bold text-gray-900 bg-transparent border-b-2 border-blue-500 focus:outline-none"
+                    className={cn(
+                      "font-bold text-gray-900 bg-transparent border-b-2 border-blue-500 focus:outline-none",
+                      isMobile ? "text-xl w-full" : "text-2xl"
+                    )}
                   />
                 </div>
                 
                 {/* Settings Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className={cn(
+                  "grid gap-4",
+                  isMobile ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+                )}>
                   {/* Display Mode */}
                   <div className="space-y-3">
-                    <label className="text-sm font-medium text-gray-700">Display Mode</label>
+                    <label className={cn("font-medium text-gray-700", isMobile ? "text-base" : "text-sm")}>
+                      Display Mode
+                    </label>
                     <select
                       value={editDisplayMode}
                       onChange={(e) => handleDisplayModeChange(e.target.value as DisplayMode)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={cn(
+                        "w-full border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500",
+                        isMobile ? "px-4 py-3 text-base" : "px-3 py-2 text-sm"
+                      )}
                     >
                       {displayModeOptions.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -411,62 +519,106 @@ const PlaylistDetail: React.FC = () => {
                         </option>
                       ))}
                     </select>
-                    <p className="text-xs text-gray-500">
+                    <p className={cn("text-gray-500", isMobile ? "text-sm" : "text-xs")}>
                       {displayModeOptions.find(opt => opt.value === editDisplayMode)?.description}
                     </p>
                   </div>
 
                   {/* Display Time */}
                   <div className="space-y-3">
-                    <label className="text-sm font-medium text-gray-700">Display Time</label>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="number"
-                        min="1"
-                        max="300"
-                        value={editDisplayTime}
-                        onChange={(e) => setEditDisplayTime(parseInt(e.target.value) || 30)}
-                        className="w-20 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-600">seconds</span>
-                    </div>
+                    <label className={cn("font-medium text-gray-700", isMobile ? "text-base" : "text-sm")}>
+                      Display Time
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="300"
+                      value={editDisplayTime}
+                      onChange={(e) => setEditDisplayTime(parseInt(e.target.value) || 30)}
+                      className={cn(
+                        "border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500",
+                        isMobile ? "w-32 px-4 py-3 text-base" : "w-20 px-3 py-2 text-sm"
+                      )}
+                    />
+                    <p className={cn("text-gray-500", isMobile ? "text-sm" : "text-xs")}>
+                      How long each image is displayed (1-300 seconds)
+                    </p>
                   </div>
 
                   {/* Default Playlist */}
                   <div className="space-y-3">
-                    <label className="text-sm font-medium text-gray-700">Settings</label>
+                    <label className={cn("font-medium text-gray-700", isMobile ? "text-base" : "text-sm")}>
+                      Settings
+                    </label>
                     <div className="flex items-center space-x-2">
                       <input
                         type="checkbox"
                         checked={editIsDefault}
                         onChange={(e) => setEditIsDefault(e.target.checked)}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                        className={cn("text-blue-600 rounded focus:ring-blue-500", isMobile ? "w-5 h-5" : "w-4 h-4")}
                       />
-                      <span className="text-sm text-gray-600">Default Playlist</span>
+                      <span className={cn("text-gray-600", isMobile ? "text-base" : "text-sm")}>
+                        Default Playlist
+                      </span>
                     </div>
+                  </div>
+
+                  {/* Show Image Info */}
+                  <div className="space-y-3">
+                    <label className={cn("font-medium text-gray-700", isMobile ? "text-base" : "text-sm")}>
+                      Display Options
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={editShowImageInfo}
+                        onChange={(e) => setEditShowImageInfo(e.target.checked)}
+                        className={cn("text-blue-600 rounded focus:ring-blue-500", isMobile ? "w-5 h-5" : "w-4 h-4")}
+                      />
+                      <span className={cn("text-gray-600", isMobile ? "text-base" : "text-sm")}>
+                        Show Image Info
+                      </span>
+                    </div>
+                    <p className={cn("text-gray-500", isMobile ? "text-sm" : "text-xs")}>
+                      Display image name, resolution, and date on screen
+                    </p>
                   </div>
                 </div>
               </div>
             ) : (
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 flex items-center space-x-2 mb-2">
-                  <span>{playlist.name}</span>
-                  {playlist.is_default && (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      Default
-                    </span>
-                  )}
-                  {playlist.display_mode && playlist.display_mode !== 'default' && (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {displayModeOptions.find(opt => opt.value === playlist.display_mode)?.label}
-                    </span>
-                  )}
+                <h1 className={cn(
+                  "font-bold text-gray-900 mb-2",
+                  isMobile ? "text-xl flex-wrap" : "text-2xl"
+                )}>
+                  <div className={cn("flex items-center", isMobile ? "flex-wrap gap-2" : "space-x-2")}>
+                    <span>{playlist.name}</span>
+                    {playlist.is_default && (
+                      <span className={cn(
+                        "inline-flex items-center rounded-full font-medium bg-green-100 text-green-800",
+                        isMobile ? "px-2 py-1 text-xs" : "px-2 py-1 text-xs"
+                      )}>
+                        Default
+                      </span>
+                    )}
+                    {playlist.display_mode && playlist.display_mode !== 'default' && (
+                      <span className={cn(
+                        "inline-flex items-center rounded-full font-medium bg-blue-100 text-blue-800",
+                        isMobile ? "px-2 py-1 text-xs" : "px-2 py-1 text-xs"
+                      )}>
+                        {displayModeOptions.find(opt => opt.value === playlist.display_mode)?.label}
+                      </span>
+                    )}
+                  </div>
                 </h1>
-                <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
+                <div className={cn(
+                  "flex items-center text-gray-600 mb-3",
+                  isMobile ? "flex-wrap gap-x-2 gap-y-1 text-sm" : "space-x-4 text-sm"
+                )}>
                   <span>{playlistImages.length} images</span>
-                  <span>•</span>
-                  <span>Slug: {playlist.slug}</span>
-                  {playlist.display_time_seconds && (
+                  {!isMobile && <span>•</span>}
+                  {!isMobile && <span>Slug: {playlist.slug}</span>}
+                  {!isMobile && playlist.display_time_seconds && (
                     <>
                       <span>•</span>
                       <span>{playlist.display_time_seconds}s display time</span>
@@ -474,69 +626,101 @@ const PlaylistDetail: React.FC = () => {
                   )}
                 </div>
                 {/* Display Mode Info */}
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <span className="font-medium">Display Mode:</span>
-                  <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
-                    {displayModeOptions.find(opt => opt.value === (playlist.display_mode || 'default'))?.label || 'Default'}
-                  </span>
-                  <span className="text-gray-500">
-                    - {displayModeOptions.find(opt => opt.value === (playlist.display_mode || 'default'))?.description}
-                  </span>
-                </div>
+                {!isMobile && (
+                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                    <span className="font-medium">Display Mode:</span>
+                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
+                      {displayModeOptions.find(opt => opt.value === (playlist.display_mode || 'default'))?.label || 'Default'}
+                    </span>
+                    <span className="text-gray-500">
+                      - {displayModeOptions.find(opt => opt.value === (playlist.display_mode || 'default'))?.description}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center space-x-2 ml-6">
+          <div className={cn(
+            "flex items-center",
+            isMobile ? "w-full flex-col space-y-2" : "space-x-2 ml-6"
+          )}>
             {isEditing ? (
-              <>
+              <div className={cn("flex items-center", isMobile ? "w-full flex-col space-y-2" : "space-x-2")}>
                 <button
                   onClick={handleSave}
                   disabled={isSaving || !editName.trim() || !hasChanges}
-                  className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className={cn(
+                    "flex items-center justify-center space-x-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
+                    isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
+                  )}
                 >
-                  <Save className="w-4 h-4" />
+                  <Save className={cn(isMobile ? "w-5 h-5" : "w-4 h-4")} />
                   <span>{isSaving ? 'Saving...' : 'Save'}</span>
                 </button>
                 <button
                   onClick={handleCancelEdit}
-                  className="flex items-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+                  className={cn(
+                    "flex items-center justify-center space-x-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors",
+                    isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
+                  )}
                 >
-                  <X className="w-4 h-4" />
+                  <X className={cn(isMobile ? "w-5 h-5" : "w-4 h-4")} />
                   <span>Cancel</span>
                 </button>
                 {/* Randomize Button - only show when not auto_sort and playlist has multiple images */}
                 {editDisplayMode !== 'auto_sort' && playlistImages.length > 1 && (
                   <button
                     onClick={handleRandomizePlaylist}
-                    className="flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors"
+                    className={cn(
+                      "flex items-center justify-center space-x-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors",
+                      isMobile ? "w-full px-4 py-3 text-base" : "px-3 py-2 text-sm"
+                    )}
                     title="Randomize the order of images in this playlist"
                   >
-                    <Shuffle className="w-4 h-4" />
-                    <span>Randomize Order</span>
+                    <Shuffle className={cn(isMobile ? "w-5 h-5" : "w-4 h-4")} />
+                    <span>Randomize</span>
                   </button>
                 )}
-              </>
+              </div>
             ) : (
-              <div className="flex items-center space-x-2">
+              <div className={cn("flex items-center", isMobile ? "w-full flex-col space-y-2" : "space-x-2")}>
                 <button
                   onClick={() => {
                     setShowAddImages(true);
                     loadAlbums();
                     loadAllImages();
                   }}
-                  className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                  className={cn(
+                    "flex items-center justify-center space-x-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors",
+                    isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
+                  )}
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className={cn(isMobile ? "w-5 h-5" : "w-4 h-4")} />
                   <span>Add Images</span>
                 </button>
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="flex items-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+                  className={cn(
+                    "flex items-center justify-center space-x-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors",
+                    isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
+                  )}
                 >
-                  <Edit className="w-4 h-4" />
+                  <Edit className={cn(isMobile ? "w-5 h-5" : "w-4 h-4")} />
                   <span>Edit</span>
+                </button>
+                <button
+                  onClick={handleGenerateVariants}
+                  disabled={isGeneratingVariants}
+                  className={cn(
+                    "flex items-center justify-center space-x-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
+                    isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
+                  )}
+                  title="Generate resolution-optimized variants for display devices"
+                >
+                  <Sparkles className={cn(isMobile ? "w-5 h-5" : "w-4 h-4")} />
+                  <span>{isGeneratingVariants ? 'Generating...' : 'Generate Variants'}</span>
                 </button>
               </div>
             )}
@@ -605,9 +789,18 @@ const PlaylistDetail: React.FC = () => {
       {/* Add Images Modal */}
       {showAddImages && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Add Images to Playlist</h3>
+          <div className={cn(
+            "bg-white w-full max-h-[90vh] overflow-hidden flex flex-col",
+            isMobile ? "h-full rounded-none" : "rounded-lg p-6 max-w-4xl"
+          )}>
+            <div className={cn(
+              "flex items-center justify-between mb-4",
+              isMobile ? "p-4 border-b" : ""
+            )}>
+              <h3 className={cn(
+                "font-semibold text-gray-900",
+                isMobile ? "text-lg" : "text-lg"
+              )}>Add Images to Playlist</h3>
               <button
                 onClick={() => {
                   setShowAddImages(false);
@@ -616,21 +809,34 @@ const PlaylistDetail: React.FC = () => {
                   setSelectedAlbum(null);
                   setAlbumImages([]);
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className={cn(
+                  "text-gray-400 hover:text-gray-600",
+                  isMobile && "w-10 h-10 flex items-center justify-center"
+                )}
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
             {/* Album Selection */}
-            <div className="mb-4">
-              <div className="flex items-center space-x-3 mb-3">
-                <Filter className="w-4 h-4 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700">Add from Album:</span>
+            <div className={cn("mb-4", isMobile ? "px-4" : "")}>
+              <div className={cn(
+                "flex items-center mb-3",
+                isMobile ? "flex-col space-y-2" : "space-x-3"
+              )}>
+                <div className={cn("flex items-center", isMobile ? "w-full space-x-2" : "space-x-3")}>
+                  <Filter className={cn("text-gray-500", isMobile ? "w-5 h-5" : "w-4 h-4")} />
+                  <span className={cn("font-medium text-gray-700", isMobile ? "text-base" : "text-sm")}>
+                    {isMobile ? "Album:" : "Add from Album:"}
+                  </span>
+                </div>
                 <select
                   value={selectedAlbum || ''}
                   onChange={(e) => handleAlbumSelect(e.target.value ? parseInt(e.target.value) : null)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className={cn(
+                    "border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500",
+                    isMobile ? "w-full px-4 py-3 text-base" : "flex-1 px-3 py-2 text-sm"
+                  )}
                   disabled={loadingAlbums}
                 >
                   <option value="">All Images</option>
@@ -642,26 +848,105 @@ const PlaylistDetail: React.FC = () => {
                 </select>
               </div>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className={cn(
+                  "absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400",
+                  isMobile ? "w-5 h-5" : "w-4 h-4"
+                )} />
                 <input
                   type="text"
                   placeholder="Search images..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className={cn(
+                    "w-full border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500",
+                    isMobile ? "pl-12 pr-4 py-3 text-base" : "pl-10 pr-4 py-2 text-sm"
+                  )}
                 />
               </div>
             </div>
 
-            {/* Image Gallery for adding images */}
-            <div className="h-[calc(90vh-200px)] overflow-y-auto pr-2">
-              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {/* Action Buttons */}
+            <div className={cn(
+              "mb-4 bg-gray-50 rounded-lg",
+              isMobile ? "mx-4 p-3" : "p-4"
+            )}>
+              <div className={cn(
+                "flex items-center",
+                isMobile ? "flex-col space-y-2" : "flex-wrap gap-3 justify-between"
+              )}>
+                <div className={cn("flex items-center", isMobile ? "w-full flex-col space-y-2" : "flex-wrap gap-3")}>
+                  {selectedAlbum && albumImages.length > 0 && (
+                    <button
+                      onClick={() => {
+                        const allAlbumImageIds = new Set(albumImages.map(img => img.id));
+                        setSelectedImages(allAlbumImageIds);
+                      }}
+                      className={cn(
+                        "bg-green-600 text-white rounded-md hover:bg-green-700 font-medium",
+                        isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
+                      )}
+                    >
+                      Select All from Album ({albumImages.length})
+                    </button>
+                  )}
+                  {selectedImages.size > 0 && (
+                    <button
+                      onClick={() => setSelectedImages(new Set())}
+                      className={cn(
+                        "bg-gray-500 text-white rounded-md hover:bg-gray-600",
+                        isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
+                      )}
+                    >
+                      Clear Selection
+                    </button>
+                  )}
+                </div>
+                <div className={cn("flex items-center", isMobile ? "w-full space-y-2" : "flex-wrap gap-3")}>
+                  <button
+                    onClick={() => {
+                      setShowAddImages(false);
+                      setSelectedImages(new Set());
+                      setSearchTerm('');
+                      setSelectedAlbum(null);
+                      setAlbumImages([]);
+                    }}
+                    className={cn(
+                      "bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300",
+                      isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
+                    )}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddSelectedImages}
+                    disabled={selectedImages.size === 0}
+                    className={cn(
+                      "bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium",
+                      isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
+                    )}
+                  >
+                    Add {selectedImages.size} Image{selectedImages.size === 1 ? '' : 's'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Image Gallery */}
+            <div className={cn(
+              "overflow-y-auto pr-2",
+              isMobile ? "flex-1 px-4" : "h-[calc(90vh-300px)]"
+            )}>
+              <div className={cn(
+                "grid gap-4",
+                isMobile ? "grid-cols-2" : "grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+              )}>
                 {filteredImages.map((image) => (
                   <div
                     key={image.id}
-                    className={`relative group rounded-lg overflow-hidden cursor-pointer ${
+                    className={cn(
+                      "relative group rounded-lg overflow-hidden cursor-pointer",
                       selectedImages.has(image.id) ? 'ring-2 ring-blue-500' : ''
-                    }`}
+                    )}
                     onClick={() => handleToggleImageSelection(image.id)}
                   >
                     <img
@@ -671,12 +956,19 @@ const PlaylistDetail: React.FC = () => {
                     />
                     {selectedImages.has(image.id) && (
                       <div className="absolute inset-0 bg-blue-500 bg-opacity-50 flex items-center justify-center">
-                        <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-                          <span className="text-blue-600 font-bold">✓</span>
+                        <div className={cn(
+                          "bg-white rounded-full flex items-center justify-center",
+                          isMobile ? "w-10 h-10" : "w-8 h-8"
+                        )}>
+                          <span className={cn("text-blue-600 font-bold", isMobile ? "text-lg" : "")}>✓</span>
                         </div>
                       </div>
                     )}
-                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white p-1 text-xs truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className={cn(
+                      "absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white truncate",
+                      "opacity-0 group-hover:opacity-100 transition-opacity",
+                      isMobile ? "p-2 text-xs" : "p-1 text-xs"
+                    )}>
                       {image.filename}
                     </div>
                   </div>
@@ -684,27 +976,6 @@ const PlaylistDetail: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-4 flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowAddImages(false);
-                  setSelectedImages(new Set());
-                  setSearchTerm('');
-                  setSelectedAlbum(null);
-                  setAlbumImages([]);
-                }}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddSelectedImages}
-                disabled={selectedImages.size === 0}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Add {selectedImages.size} Image{selectedImages.size === 1 ? '' : 's'}
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -719,6 +990,20 @@ const PlaylistDetail: React.FC = () => {
         confirmText="Remove"
         cancelText="Cancel"
         variant="danger"
+      />
+
+      {/* Variant Generation Modal */}
+      <VariantGenerationModal
+        isOpen={showVariantModal}
+        isGenerating={isGeneratingVariants}
+        playlistName={playlist?.name}
+        variantCount={variantCount}
+        error={variantGenerationError}
+        onClose={() => {
+          setShowVariantModal(false);
+          setVariantGenerationError(null);
+          setVariantCount(undefined);
+        }}
       />
     </div>
   );

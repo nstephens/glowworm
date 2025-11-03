@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, Request
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, Request, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -99,6 +99,10 @@ async def upload_image(
 class DuplicateCheckRequest(BaseModel):
     file_hash: str
 
+# Request model for batch duplicate check
+class BatchDuplicateCheckRequest(BaseModel):
+    file_hashes: List[str]
+
 @router.post("/check-duplicate")
 async def check_duplicate_image(
     request_data: DuplicateCheckRequest,
@@ -127,6 +131,48 @@ async def check_duplicate_image(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Duplicate check failed"
+        )
+
+@router.post("/check-duplicates-batch")
+async def check_duplicates_batch(
+    request_data: BatchDuplicateCheckRequest,
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """Check multiple images for duplicates in a single request"""
+    try:
+        image_service = ImageService(db)
+        results = {}
+        
+        # Get all existing images with the provided hashes in one query
+        existing_images = db.query(Image).filter(Image.file_hash.in_(request_data.file_hashes)).all()
+        existing_hashes = {img.file_hash: img for img in existing_images}
+        
+        # Check each hash
+        for file_hash in request_data.file_hashes:
+            if file_hash in existing_hashes:
+                results[file_hash] = {
+                    "is_duplicate": True,
+                    "existing_image": existing_hashes[file_hash].to_dict(),
+                    "message": "Image already exists"
+                }
+            else:
+                results[file_hash] = {
+                    "is_duplicate": False,
+                    "message": "Image is unique"
+                }
+        
+        return {
+            "results": results,
+            "total_checked": len(request_data.file_hashes),
+            "duplicates_found": sum(1 for r in results.values() if r["is_duplicate"])
+        }
+            
+    except Exception as e:
+        logger.error(f"Batch duplicate check error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Batch duplicate check failed"
         )
 
 # Public endpoint for display devices (must be before / route)
@@ -247,6 +293,234 @@ async def get_image(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve image"
         )
+
+@router.get("/{image_id}/resolutions")
+async def get_image_resolutions(
+    image_id: int,
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """Get available resolution variants for a specific image"""
+    try:
+        image_service = ImageService(db)
+        image = image_service.get_image_by_id(image_id)
+        
+        if not image:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Image not found"
+            )
+        
+        # Get available resolution variants
+        from services.image_storage_service import image_storage_service
+        available_resolutions = image_storage_service.get_available_resolutions(image.filename)
+        
+        return {
+            "message": "Image resolutions retrieved successfully",
+            "data": {
+                "image_id": image_id,
+                "original": {
+                    "dimensions": f"{image.width}x{image.height}",
+                    "width": image.width,
+                    "height": image.height,
+                    "filename": image.filename,
+                    "url": f"/api/images/{image_id}/file"
+                },
+                "variants": available_resolutions
+            },
+            "status_code": 200
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get image resolutions error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve image resolutions"
+        )
+
+@router.post("/regenerate-resolutions")
+async def regenerate_image_resolutions(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """Start background regeneration of resolution variants for all images"""
+    try:
+        logger.info("🔄 Starting background image resolution regeneration...")
+        
+        # Get all images count for estimation
+        image_service = ImageService(db)
+        images = image_service.get_all_images(limit=10000)
+        
+        if not images:
+            return {
+                "message": "No images found to regenerate",
+                "data": {"total_images": 0, "status": "completed", "task_id": None},
+                "status_code": 200
+            }
+        
+        # Get current display sizes
+        display_sizes = image_storage_service._load_display_sizes()
+        display_size_strings = [f"{w}x{h}" for w, h in display_sizes]
+        logger.info(f"🔍 Display sizes loaded: {display_sizes}")
+        logger.info(f"🔍 Display size strings: {display_size_strings}")
+        
+        # Generate unique task ID
+        import uuid
+        task_id = str(uuid.uuid4())
+        
+        # Start progress tracking
+        from services.regeneration_progress_service import regeneration_progress_service
+        regeneration_progress_service.start_task(task_id, len(images), display_size_strings)
+        
+        # Clean up existing scaled images first
+        logger.info(f"🧹 Cleaning up existing scaled images...")
+        _cleanup_scaled_images()
+        
+        # Start background task
+        logger.info(f"🚀 About to start background task for {len(images)} images with task ID: {task_id}")
+        background_tasks.add_task(_regenerate_resolutions_background, task_id, images, display_sizes)
+        
+        logger.info(f"🚀 Background regeneration started for {len(images)} images with task ID: {task_id}")
+        
+        return {
+            "message": "Resolution regeneration started in background",
+            "data": {
+                "task_id": task_id,
+                "total_images": len(images),
+                "display_sizes": [f"{w}x{h}" for w, h in display_sizes],
+                "status": "started"
+            },
+            "status_code": 200
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to start resolution regeneration: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start resolution regeneration: {str(e)}"
+        )
+
+def _cleanup_scaled_images():
+    """Clean up existing scaled images directory"""
+    try:
+        from pathlib import Path
+        from services.image_storage_service import image_storage_service
+        
+        scaled_dir = image_storage_service.upload_path / "scaled"
+        if scaled_dir.exists():
+            # Count existing files
+            existing_files = list(scaled_dir.glob("*"))
+            file_count = len(existing_files)
+            
+            if file_count > 0:
+                logger.info(f"🗑️ Removing {file_count} existing scaled images...")
+                
+                # Remove all files in scaled directory
+                for file_path in existing_files:
+                    try:
+                        file_path.unlink()
+                    except Exception as e:
+                        logger.warning(f"Failed to delete {file_path}: {e}")
+                
+                logger.info(f"✅ Cleaned up {file_count} scaled images")
+            else:
+                logger.info("📁 No existing scaled images to clean up")
+        else:
+            logger.info("📁 Scaled directory doesn't exist, nothing to clean up")
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to cleanup scaled images: {e}")
+
+def _regenerate_resolutions_background(task_id: str, images, display_sizes):
+    """Background task to regenerate image resolutions with progress tracking"""
+    from services.regeneration_progress_service import regeneration_progress_service
+    
+    try:
+        logger.info(f"🔄 Background task {task_id}: Processing {len(images)} images...")
+        logger.info(f"🔍 Display sizes: {display_sizes}")
+        logger.info(f"🔍 First image: {images[0].filename if images else 'No images'}")
+        
+        processed_count = 0
+        error_count = 0
+        
+        for i, image in enumerate(images):
+            try:
+                # Update progress (sync version - no WebSocket broadcast)
+                regeneration_progress_service.update_progress_sync(
+                    task_id, 
+                    processed_count, 
+                    error_count, 
+                    image.filename
+                )
+                
+                logger.info(f"🖼️ Processing image {i+1}/{len(images)}: {image.filename}")
+                
+                # Get original image file
+                image_path = image_storage_service.get_image_path(image.filename)
+                if not image_path or not image_path.exists():
+                    logger.warning(f"⚠️ Original image file not found: {image.filename}")
+                    error_count += 1
+                    continue
+                
+                # Read original image bytes
+                with open(image_path, 'rb') as f:
+                    original_bytes = f.read()
+                
+                # Generate new scaled versions (only scale down, never up)
+                for target_width, target_height in display_sizes:
+                    try:
+                        # Skip if target resolution is larger than original (scale up)
+                        if target_width > image.width or target_height > image.height:
+                            logger.info(f"⏭️ Skipping {target_width}x{target_height} for {image.filename} (would scale up from {image.width}x{image.height})")
+                            continue
+                        
+                        # Generate scaled image (only scale down)
+                        scaled_bytes = image_storage_service._generate_scaled_image(
+                            original_bytes, target_width, target_height
+                        )
+                        
+                        # Save scaled version to scaled subdirectory
+                        scaled_filename = f"{Path(image.filename).stem}_{target_width}x{target_height}{Path(image.filename).suffix}"
+                        scaled_dir = image_storage_service.upload_path / "scaled"
+                        scaled_dir.mkdir(parents=True, exist_ok=True)
+                        scaled_path = scaled_dir / scaled_filename
+                        
+                        with open(scaled_path, 'wb') as f:
+                            f.write(scaled_bytes)
+                        
+                        logger.info(f"✅ Created {target_width}x{target_height} variant for {image.filename} at {scaled_path}")
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Failed to generate {target_width}x{target_height} for {image.filename}: {e}")
+                        error_count += 1
+                
+                processed_count += 1
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to process image {image.id}: {e}")
+                error_count += 1
+        
+        # Final progress update
+        regeneration_progress_service.update_progress_sync(
+            task_id, 
+            processed_count, 
+            error_count, 
+            "Completed"
+        )
+        
+        # Mark task as completed (sync version)
+        regeneration_progress_service.complete_task_sync(task_id, success=True)
+        
+        logger.info(f"🎉 Background regeneration {task_id} complete! Processed: {processed_count}, Errors: {error_count}")
+        
+    except Exception as e:
+        logger.error(f"❌ Background regeneration {task_id} failed: {e}")
+        import traceback
+        logger.error(f"❌ Background regeneration {task_id} traceback: {traceback.format_exc()}")
+        regeneration_progress_service.complete_task_sync(task_id, success=False, error_message=str(e))
 
 @router.get("/{image_id}/scaled-versions")
 async def get_scaled_versions(
@@ -385,9 +659,16 @@ async def get_image_file(
         # Add Vary header for format negotiation
         headers["Vary"] = "Accept"
         
+        # Ensure inline display in browsers
+        headers["Content-Disposition"] = f'inline; filename="{image.original_filename}"'
+        
+        # Normalize MPO content-type to JPEG to avoid breaking clients
+        media_type = (image.mime_type or "image/jpeg")
+        if media_type.lower() == "image/mpo":
+            media_type = "image/jpeg"
         return FileResponse(
             path=str(file_path),
-            media_type=image.mime_type,
+            media_type=media_type,
             filename=image.original_filename,
             headers=headers
         )
@@ -400,6 +681,125 @@ async def get_image_file(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve image file"
         )
+
+@router.get("/{image_id}/smart")
+async def get_image_smart(
+    image_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get image with smart resolution matching based on display device"""
+    try:
+        image_service = ImageService(db)
+        image = image_service.get_image_by_id(image_id)
+        
+        if not image:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Image not found"
+            )
+        
+        # Get device token from query parameters, headers, or cookies
+        cookie_manager = CookieManager()
+        device_token = (request.query_params.get('device_token') or 
+                       request.headers.get('X-Device-Token') or
+                       cookie_manager.get_display_device_cookie(request))
+        
+        if not device_token:
+            # No device token provided, serve original image
+            logger.info(f"No device token provided for image {image_id}, serving original")
+            return await get_image_file(image_id, "original", db)
+        
+        # Get device information
+        from services.display_device_service import DisplayDeviceService
+        device_service = DisplayDeviceService(db)
+        device = device_service.get_device_by_token(device_token)
+        
+        if not device:
+            logger.warning(f"Device token {device_token[:8]}... not found, serving original")
+            return await get_image_file(image_id, "original", db)
+        
+        # Get device resolution
+        display_width = device.screen_width or 1920
+        display_height = device.screen_height or 1080
+        device_pixel_ratio = float(device.device_pixel_ratio or "1.0")
+        
+        # Calculate effective resolution
+        effective_width = int(display_width * device_pixel_ratio)
+        effective_height = int(display_height * device_pixel_ratio)
+        
+        # Find the best matching playlist variant for this device
+        from services.playlist_variant_service import PlaylistVariantService
+        variant_service = PlaylistVariantService(db)
+        
+        # Get the playlist this image belongs to
+        playlist = db.query(Playlist).filter(Playlist.id == image.playlist_id).first()
+        if not playlist:
+            logger.warning(f"Image {image_id} has no associated playlist, serving original")
+            return await get_image_file(image_id, "original", db)
+        
+        # Get the best variant for this device
+        best_variant = variant_service.get_best_variant_for_device(
+            playlist.id, display_width, display_height, device_pixel_ratio
+        )
+        
+        from models.playlist_variant import PlaylistVariantType
+        
+        if not best_variant or best_variant.variant_type == PlaylistVariantType.ORIGINAL:
+            logger.info(f"No suitable variant found for device {device_token[:8]}..., serving original")
+            return await get_image_file(image_id, "original", db)
+        
+        # Look for the pre-scaled image for this resolution
+        target_width = best_variant.target_width
+        target_height = best_variant.target_height
+        
+        if not target_width or not target_height:
+            logger.warning(f"Variant {best_variant.variant_type.value} has no target resolution, serving original")
+            return await get_image_file(image_id, "original", db)
+        
+        # Construct the expected scaled filename
+        scaled_filename = f"{image.filename.rsplit('.', 1)[0]}_{target_width}x{target_height}.{image.filename.rsplit('.', 1)[1]}"
+        scaled_path = image_storage_service.upload_path / "scaled" / scaled_filename
+        
+        if not scaled_path.exists():
+            logger.warning(f"Pre-scaled image {scaled_filename} not found on disk, serving original")
+            return await get_image_file(image_id, "original", db)
+        
+        logger.info(f"Serving pre-scaled image {scaled_filename} for device {device_token[:8]}... (variant: {best_variant.variant_type.value}, display: {display_width}x{display_height})")
+        
+        # Set up caching headers for scaled images
+        headers = {
+            "Cache-Control": "public, max-age=31536000, immutable",  # Cache scaled images for 1 year
+            "Expires": (datetime.utcnow() + timedelta(days=365)).strftime("%a, %d %b %Y %H:%M:%S GMT"),
+            "ETag": f'"{scaled_filename}_{image.uploaded_at.timestamp()}"',
+            "Last-Modified": image.uploaded_at.strftime("%a, %d %b %Y %H:%M:%S GMT"),
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "SAMEORIGIN",
+            "X-Cache": "HIT",
+            "Vary": "Accept",
+            "X-Resolution-Match": f"{target_width}x{target_height}",
+            "X-Variant-Type": best_variant.variant_type.value
+        }
+        # Ensure inline display in browsers
+        headers["Content-Disposition"] = f'inline; filename="{image.original_filename}"'
+        
+        # Normalize MPO content-type to JPEG for scaled variants
+        media_type = (image.mime_type or "image/jpeg")
+        if media_type.lower() == "image/mpo":
+            media_type = "image/jpeg"
+        return FileResponse(
+            path=str(scaled_path),
+            media_type=media_type,
+            filename=image.original_filename,
+            headers=headers
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Smart image serving error: {e}")
+        # Fallback to original image on error
+        return await get_image_file(image_id, "original", db)
 
 @router.put("/{image_id}")
 async def update_image(
@@ -579,9 +979,14 @@ async def get_optimized_image(
                 "Last-Modified": image.uploaded_at.strftime("%a, %d %b %Y %H:%M:%S GMT")
             }
             
+            media_type = (image.mime_type or "image/jpeg")
+            if media_type.lower() == "image/mpo":
+                media_type = "image/jpeg"
+            # Ensure inline display in browsers
+            headers["Content-Disposition"] = f'inline; filename="{image.original_filename}"'
             return FileResponse(
                 path=str(file_path),
-                media_type=image.mime_type,
+                media_type=media_type,
                 filename=image.original_filename,
                 headers=headers
             )
@@ -595,9 +1000,14 @@ async def get_optimized_image(
             "Last-Modified": image.uploaded_at.strftime("%a, %d %b %Y %H:%M:%S GMT")
         }
         
+        media_type = (image.mime_type or "image/jpeg")
+        if media_type.lower() == "image/mpo":
+            media_type = "image/jpeg"
+        # Ensure inline display in browsers
+        headers["Content-Disposition"] = f'inline; filename="{image.original_filename}"'
         return FileResponse(
             path=str(file_path),
-            media_type=image.mime_type,
+            media_type=media_type,
             filename=image.original_filename,
             headers=headers
         )

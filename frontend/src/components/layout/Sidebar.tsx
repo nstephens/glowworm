@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiService } from '@/services/api';
@@ -42,13 +43,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       try {
         const [imagesResponse, playlistsResponse, devicesResponse] = await Promise.all([
           apiService.getImages(undefined, undefined, 1000).catch(() => ({ data: [] })),
-          apiService.getPlaylists().catch(() => ({ playlists: [] })),
+          apiService.getPlaylists().catch(() => ({ data: [] })),
           apiService.getDevices().catch(() => []),
         ]);
 
         setCounts({
           images: imagesResponse.data?.length || 0,
-          playlists: playlistsResponse.playlists?.length || playlistsResponse.count || 0,
+          playlists: playlistsResponse.data?.length || 0,
           displays: Array.isArray(devicesResponse) ? devicesResponse.filter(d => d.status === 'authorized').length : 0,
         });
       } catch (error) {
@@ -92,6 +93,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: counts.displays > 0 ? counts.displays.toString() : undefined,
     },
     {
+      name: 'Logs',
+      href: '/admin/logs',
+      icon: FileText,
+      description: 'View system logs and activity',
+    },
+    {
       name: 'Settings',
       href: '/admin/settings',
       icon: Settings,
@@ -115,22 +122,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className={cn(
-      "bg-sidebar border-r border-sidebar-border transition-all duration-300 z-50",
-      isMobile 
-        ? "fixed inset-y-0 left-0 w-64" 
-        : isCollapsed 
-          ? "w-16" 
-          : "w-64",
-      className
-    )}>
+    <aside 
+      className={cn(
+        "bg-sidebar border-r border-sidebar-border transition-all duration-300 z-50",
+        isMobile 
+          ? "fixed inset-y-0 left-0 w-64" 
+          : isCollapsed 
+            ? "w-16" 
+            : "w-64",
+        className
+      )}
+      role="complementary"
+      aria-label="Main navigation"
+    >
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="p-6 border-b border-sidebar-border">
+        <header className="p-6 border-b border-sidebar-border" role="banner">
           <div className="flex items-center justify-between">
             {(!isCollapsed || isMobile) && (
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center" aria-hidden="true">
                   <Sparkles className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <div>
@@ -146,19 +157,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onToggle}
                 className="h-8 w-8 p-0 hover:bg-sidebar-accent"
                 aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-expanded={!isCollapsed}
               >
                 {isCollapsed ? (
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-4 h-4" aria-hidden="true" />
                 ) : (
-                  <ChevronLeft className="w-4 h-4" />
+                  <ChevronLeft className="w-4 h-4" aria-hidden="true" />
                 )}
               </Button>
             )}
           </div>
-        </div>
+        </header>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2">
+        <nav 
+          className="flex-1 p-4 space-y-2"
+          role="navigation"
+          aria-label="Main navigation"
+        >
           {navigation.map((item) => {
             const active = isActive(item.href);
             return (
@@ -174,11 +190,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
                 onClick={() => handleNavigation(item.href)}
                 title={isCollapsed && !isMobile ? item.description : undefined}
+                aria-label={item.description}
+                aria-current={active ? 'page' : undefined}
+                role="link"
               >
-                <item.icon className={cn(
-                  'w-5 h-5 flex-shrink-0',
-                  isCollapsed && !isMobile ? '' : 'mr-3'
-                )} />
+                <item.icon 
+                  className={cn(
+                    'w-5 h-5 flex-shrink-0',
+                    isCollapsed && !isMobile ? '' : 'mr-3'
+                  )}
+                  aria-hidden="true"
+                />
                 {(!isCollapsed || isMobile) && (
                   <>
                     <span className="flex-1 text-left truncate">{item.name}</span>
@@ -186,6 +208,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <Badge 
                         variant={active ? 'secondary' : 'outline'} 
                         className="ml-auto text-xs flex-shrink-0"
+                        aria-label={`${item.badge} ${item.name}`}
                       >
                         {item.badge}
                       </Badge>

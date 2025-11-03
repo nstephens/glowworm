@@ -1,0 +1,54 @@
+{
+  "name": "glowworm-cross-browser-tests",
+  "version": "1.0.0",
+  "description": "Cross-browser testing suite for Glowworm mobile application",
+  "scripts": {
+    "test": "node run-tests.js",
+    "test:all": "node run-tests.js all",
+    "test:mobile": "node run-tests.js suite mobile",
+    "test:touch": "node run-tests.js suite touch",
+    "test:performance": "node run-tests.js suite performance",
+    "test:accessibility": "node run-tests.js suite accessibility",
+    "test:visual": "node run-tests.js suite visual",
+    "test:safari": "node run-tests.js browser safari-ios-15",
+    "test:chrome": "node run-tests.js browser chrome-android-11",
+    "test:samsung": "node run-tests.js browser samsung-internet-android-12",
+    "test:firefox": "node run-tests.js browser firefox-android-11",
+    "test:ci": "node run-tests.js all --ci",
+    "test:report": "allure serve test-results/allure-results",
+    "test:clean": "rm -rf test-results/*",
+    "test:setup": "npm install && node setup-tests.js"
+  },
+  "dependencies": {
+    "@wdio/cli": "^8.0.0",
+    "@wdio/local-runner": "^8.0.0",
+    "@wdio/mocha-framework": "^8.0.0",
+    "@wdio/spec-reporter": "^8.0.0",
+    "@wdio/junit-reporter": "^8.0.0",
+    "@wdio/allure-reporter": "^8.0.0",
+    "@wdio/browserstack-service": "^8.0.0",
+    "webdriverio": "^8.0.0",
+    "jest-image-snapshot": "^6.0.0",
+    "allure-commandline": "^2.20.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.0.0",
+    "@types/node": "^18.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "testing",
+    "cross-browser",
+    "mobile",
+    "webdriverio",
+    "browserstack"
+  ],
+  "author": "Glowworm Team",
+  "license": "MIT"
+}
+
+
+
+

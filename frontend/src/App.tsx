@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { SetupProvider, useSetup } from './contexts/SetupContext';
 import { ThemeProvider } from './components/theme-provider';
 import { Toaster } from './components/ui/toaster';
+import { OfflineIndicator } from './components/ui/OfflineIndicator';
+import { registerServiceWorker } from './utils/serviceWorker';
 import './App.css';
 
 // Import pages
@@ -17,6 +19,8 @@ import { Images } from './pages/Images';
 import Playlists from './pages/Playlists';
 import PlaylistDetail from './pages/PlaylistDetail';
 import Displays from './pages/Displays';
+import DisplayLogs from './pages/DisplayLogs';
+import AdminLogs from './pages/AdminLogs';
 import Settings from './pages/Settings';
 import AdminLayout from './components/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -82,9 +86,11 @@ function AppContent() {
             <Route path="/login" element={<Login />} />
             <Route path="/admin" element={<ProtectedRoute><AdminLayout headerContent={<AdminDashboardHeader />}><AdminDashboard /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/images" element={<ProtectedRoute><ImagesWithHeader /></ProtectedRoute>} />
-            <Route path="/admin/playlists" element={<ProtectedRoute><AdminLayout headerContent={<PlaylistsHeader />}><Playlists /></AdminLayout></ProtectedRoute>} />
-            <Route path="/admin/playlists/:id" element={<ProtectedRoute><AdminLayout headerContent={<PlaylistDetailHeader />}><PlaylistDetail /></AdminLayout></ProtectedRoute>} />
+            <Route path="/admin/playlists" element={<ProtectedRoute><AdminLayout><Playlists /></AdminLayout></ProtectedRoute>} />
+            <Route path="/admin/playlists/:slug" element={<ProtectedRoute><AdminLayout headerContent={<PlaylistDetailHeader />}><PlaylistDetail /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/displays" element={<ProtectedRoute><AdminLayout headerContent={<DisplaysHeader />}><Displays /></AdminLayout></ProtectedRoute>} />
+            <Route path="/admin/displays/logs" element={<ProtectedRoute><AdminLayout><DisplayLogs /></AdminLayout></ProtectedRoute>} />
+            <Route path="/admin/logs" element={<AdminProtectedRoute><AdminLayout><AdminLogs /></AdminLayout></AdminProtectedRoute>} />
             <Route path="/admin/settings" element={<AdminProtectedRoute><AdminLayout><Settings /></AdminLayout></AdminProtectedRoute>} />
             <Route path="/display" element={<DisplayRegistration />} />
             <Route path="/display/:slug" element={<DisplayView />} />
@@ -111,13 +117,44 @@ function AppContent() {
 }
 
 function App() {
+  useEffect(() => {
+    // Register service worker
+    registerServiceWorker({
+      onUpdate: (registration) => {
+        console.log('New content available, please refresh');
+        // You could show a notification to the user here
+        if (confirm('New version available! Refresh to update?')) {
+          window.location.reload();
+        }
+      },
+      onSuccess: (registration) => {
+        console.log('Service Worker is ready');
+      },
+      onOffline: () => {
+        console.log('App is offline');
+      },
+      onOnline: () => {
+        console.log('App is online');
+      },
+    });
+  }, []);
+
   return (
     <ThemeProvider defaultTheme="system" storageKey="glowworm-theme">
       <Router>
+        {/* Skip to main content link for keyboard navigation */}
+        <a 
+          href="#main-content" 
+          className="sr-only"
+          aria-label="Skip to main content"
+        >
+          Skip to main content
+        </a>
         <SetupProvider>
           <AppContent />
         </SetupProvider>
         <Toaster />
+        <OfflineIndicator showWhenOnline={true} autoHide={true} />
       </Router>
     </ThemeProvider>
   );

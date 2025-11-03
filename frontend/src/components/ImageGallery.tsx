@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Grid, 
   List, 
@@ -15,10 +15,16 @@ import {
   SortDesc,
   Eye,
   ZoomIn,
-  Plus
+  Plus,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import type { Image, Album } from '../types';
 import { ConfirmationModal } from './ConfirmationModal';
+import { apiService } from '../services/api';
+import { MobileMasonryGallery } from './gallery/MobileMasonryGallery';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { ImageGallerySkeleton } from './gallery/ImageGallerySkeleton';
 
 interface ImageGalleryProps {
   images: Image[];
@@ -57,6 +63,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   onUploadClick,
   loading = false
 }) => {
+  const { isMobile } = useResponsiveLayout();
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
@@ -77,6 +84,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   });
   const [showFullSizeModal, setShowFullSizeModal] = useState(false);
   const [fullSizeImage, setFullSizeImage] = useState<Image | null>(null);
+  const [resolutionData, setResolutionData] = useState<any>(null);
+  const [loadingResolutions, setLoadingResolutions] = useState(false);
 
   // Helper function to get file extension
   const getFileExtension = (filename: string) => {
@@ -86,6 +95,20 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   // Helper function to format file size for comparison
   const getFileSizeInBytes = (fileSize: number) => {
     return fileSize;
+  };
+
+  // Fetch resolution data for an image
+  const fetchResolutionData = async (imageId: number) => {
+    setLoadingResolutions(true);
+    try {
+      const response = await apiService.getImageResolutions(imageId);
+      setResolutionData(response.data);
+    } catch (error) {
+      console.error('Failed to fetch resolution data:', error);
+      setResolutionData(null);
+    } finally {
+      setLoadingResolutions(false);
+    }
   };
 
   // Filter and sort images
@@ -156,6 +179,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       onImageSelect?.(image);
     }
   };
+
 
   const handleSelectAll = () => {
     if (selectedImages.size === filteredAndSortedImages.length) {
@@ -234,19 +258,8 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     e.stopPropagation();
     setFullSizeImage(image);
     setShowFullSizeModal(true);
-    
-    // Fetch scaled versions
-    try {
-      const response = await api.getImageScaledVersions(image.id);
-      if (response.success && response.data) {
-        setFullSizeImage(prev => prev ? {
-          ...prev,
-          scaledVersions: response.data.scaled_versions
-        } : null);
-      }
-    } catch (error) {
-      console.error('Failed to fetch scaled versions:', error);
-    }
+    setResolutionData(null); // Reset resolution data
+    fetchResolutionData(image.id);
   };
 
   const confirmBulkDelete = () => {
@@ -268,25 +281,41 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
     return dateString ? new Date(dateString).toLocaleDateString() : "Unknown";
   };
 
+  // Render mobile gallery on mobile devices (do not fall through to desktop on error)
+  if (isMobile) {
+    console.log('🔍 Mobile detected, rendering MobileMasonryGallery', {
+      isMobile,
+      imageCount: filteredAndSortedImages.length,
+      albumCount: albums.length
+    });
+
+    return (
+      <div className="mobile-masonry-gallery">
+        <MobileMasonryGallery
+          images={filteredAndSortedImages}
+          albums={albums}
+          selectedAlbum={propSelectedAlbum}
+          onImageSelect={onImageSelect}
+          onImageDelete={onImageDelete}
+          onBulkDelete={onBulkDelete}
+          onImageMove={onImageMove}
+          onUploadClick={onUploadClick}
+          loading={loading}
+        />
+      </div>
+    );
+  }
+  
+  console.log('🖥️ Desktop mode, rendering standard gallery', { isMobile });
+
   if (loading) {
     return (
-      <div className="space-y-4">
-        {/* Loading Skeleton */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-6 sm:gap-8">
-          {Array.from({ length: 12 }).map((_, index) => (
-            <div key={index} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="aspect-square bg-gray-200 animate-pulse" />
-              <div className="p-4 space-y-3">
-                <div className="h-4 bg-gray-200 rounded animate-pulse" />
-                <div className="space-y-2">
-                  <div className="h-3 bg-gray-200 rounded animate-pulse w-3/4" />
-                  <div className="h-3 bg-gray-200 rounded animate-pulse w-1/2" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <ImageGallerySkeleton 
+        columns={isMobile ? 2 : 4}
+        items={12}
+        showAlbumBadges={true}
+        showActionButtons={true}
+      />
     );
   }
 
@@ -538,7 +567,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
           )}
         </div>
       ) : (
-        <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-6 sm:gap-8' : 'space-y-3'}>
+        <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-6 sm:gap-8' : 'space-y-3'}>
           {filteredAndSortedImages.map((image) => (
             <div
               key={image.id}
@@ -554,7 +583,15 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 ${draggedImage?.id === image.id ? 'opacity-50 scale-95 cursor-grabbing' : ''}
                 ${viewMode === 'list' ? 'flex items-center space-x-4 p-4' : 'p-0'}
               `}
-              onClick={(e) => handleImageSelect(image, e)}
+              onClick={(e) => {
+                if (e.detail === 2) {
+                  // Double click - open full size
+                  handleViewFullSize(image, e);
+                } else {
+                  // Single click - select
+                  handleImageSelect(image, e);
+                }
+              }}
             >
               {/* Image Container */}
               <div className={viewMode === 'grid' ? 'aspect-square relative' : 'w-20 h-20 flex-shrink-0 relative'}>
@@ -642,7 +679,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
 
       {/* Bulk Actions */}
       {selectedImages.size > 0 && (
-        <div className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:transform sm:-translate-x-1/2 bg-white border border-gray-200 rounded-xl shadow-xl p-4 backdrop-blur-sm bg-white/95">
+        <div className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:transform sm:-translate-x-1/2 bg-white border border-gray-200 rounded-xl shadow-xl p-4 backdrop-blur-sm bg-white/95 bulk-actions-mobile sm:bulk-actions-mobile">
           <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-6">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
@@ -752,7 +789,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       {/* Full Size Image Modal */}
       {showFullSizeModal && fullSizeImage && (
         <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
-          <div className="relative max-w-7xl max-h-full w-full h-full flex flex-col">
+          <div className="relative max-w-7xl max-h-full w-full h-full flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between mb-4 text-white">
               <div className="flex items-center space-x-4">
@@ -775,13 +812,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             </div>
 
             {/* Image Container */}
-            <div className="flex-1 flex items-center justify-center min-h-0">
+            <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
               <div className="relative max-w-full max-h-full">
                 <img
                   src={fullSizeImage.url}
                   alt={fullSizeImage.original_filename}
                   className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                  style={{ maxHeight: 'calc(100vh - 120px)' }}
+                  style={{ maxHeight: 'calc(100vh - 200px)' }}
                 />
                 
                 {/* Zoom indicator */}
@@ -793,7 +830,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             </div>
 
             {/* Footer with image details */}
-            <div className="mt-4 text-white text-sm">
+            <div className="mt-4 text-white text-sm bg-black/20 backdrop-blur-sm rounded-lg p-4 flex-shrink-0">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <div>
@@ -820,15 +857,23 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     <span className="text-gray-400 block">Available Sizes:</span>
                     <div className="font-medium text-gray-300">
                       <div className="mb-1">Original: {fullSizeImage.width} × {fullSizeImage.height}</div>
-                      {fullSizeImage.scaledVersions && fullSizeImage.scaledVersions.length > 0 ? (
-                        fullSizeImage.scaledVersions.map((version, index) => (
-                          <div key={index} className="text-sm">
-                            {version.dimensions}
-                          </div>
-                        ))
+                      {loadingResolutions ? (
+                        <div className="flex items-center space-x-2 text-sm text-gray-500">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Loading resolution variants...</span>
+                        </div>
+                      ) : resolutionData?.variants && resolutionData.variants.length > 0 ? (
+                        <div className="space-y-1">
+                          {resolutionData.variants.map((variant: any, index: number) => (
+                            <div key={index} className="text-sm flex items-center justify-between">
+                              <span>{variant.dimensions}</span>
+                              <span className="text-gray-500">({variant.file_size_mb} MB)</span>
+                            </div>
+                          ))}
+                        </div>
                       ) : (
                         <div className="text-sm italic text-gray-500">
-                          Scaled versions will appear here when generated
+                          No resolution variants available. Use "Regenerate Resolutions" in Settings to create them.
                         </div>
                       )}
                     </div>

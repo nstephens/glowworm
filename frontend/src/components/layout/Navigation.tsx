@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
 import { Breadcrumb } from './Breadcrumb';
 import { MobileBottomNav } from './MobileBottomNav';
 import { cn } from '@/lib/utils';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 
 interface NavigationProps {
   children: React.ReactNode;
@@ -19,47 +20,11 @@ export const Navigation: React.FC<NavigationProps> = ({
 }) => {
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Handle responsive behavior
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-      if (window.innerWidth >= 1024) {
-        setMobileMenuOpen(false);
-      }
-    };
-
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [location.pathname]);
-
-  // Close mobile menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (mobileMenuOpen && isMobile) {
-        const target = event.target as HTMLElement;
-        if (!target.closest('[data-mobile-menu]') && !target.closest('[data-mobile-trigger]')) {
-          setMobileMenuOpen(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [mobileMenuOpen, isMobile]);
+  const { isMobile, isHydrated } = useResponsiveLayout();
 
   const handleSidebarToggle = () => {
-    if (isMobile) {
-      setMobileMenuOpen(!mobileMenuOpen);
-    } else {
+    // Only toggle on desktop since sidebar never appears on mobile
+    if (!isMobile) {
       setSidebarCollapsed(!sidebarCollapsed);
     }
   };
@@ -86,6 +51,8 @@ export const Navigation: React.FC<NavigationProps> = ({
         return 'Create and organize your playlists';
       case 'displays':
         return 'Manage your display devices';
+      case 'logs':
+        return 'View system logs and activity';
       case 'settings':
         return 'Configure system settings and preferences';
       default:
@@ -94,86 +61,82 @@ export const Navigation: React.FC<NavigationProps> = ({
   };
 
   return (
-    <div className={cn("flex min-h-screen bg-background", className)}>
-      {/* Desktop Sidebar */}
-      {!isMobile && (
-        <Sidebar
-          isCollapsed={sidebarCollapsed}
-          onToggle={handleSidebarToggle}
-          isMobile={false}
-        />
-      )}
-
-      {/* Mobile Sidebar Overlay */}
-      {isMobile && mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden" />
-      )}
-
-      {/* Mobile Sidebar */}
-      {isMobile && (
-        <div
-          className={cn(
-            "fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out",
-            mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-          )}
-          data-mobile-menu
-        >
+    <div className={cn("flex min-h-screen bg-background", className)} role="application">
+      {/* Desktop Sidebar - ALWAYS Hidden on mobile devices */}
+      {(!isMobile && isHydrated) && (
+        <aside className="desktop-only sidebar-container" role="complementary">
           <Sidebar
-            isCollapsed={false}
+            isCollapsed={sidebarCollapsed}
             onToggle={handleSidebarToggle}
-            isMobile={true}
+            isMobile={false}
           />
-        </div>
+        </aside>
       )}
 
       {/* Main Content Area */}
       <div className={cn(
         "flex-1 flex flex-col transition-all duration-300",
-        !isMobile && (sidebarCollapsed ? "ml-16" : "ml-64")
+        !isMobile && (sidebarCollapsed ? "ml-16" : "ml-64"),
+        "pb-[calc(64px+env(safe-area-inset-bottom,0px)+constant(safe-area-inset-bottom,0px))] lg:pb-0" // Add padding for mobile bottom nav
       )}>
-        {/* Top Bar */}
-        <TopBar
-          onMenuToggle={handleSidebarToggle}
-          isMobile={isMobile}
-        />
+        {/* Top Bar / Header - Hidden on mobile to save space */}
+        {(!isMobile && isHydrated) && (
+          <header role="banner" className="desktop-only topbar-container">
+            <TopBar
+              onMenuToggle={handleSidebarToggle}
+              isMobile={isMobile}
+            />
+          </header>
+        )}
 
         {/* Main Content */}
-        <main className={cn(
-          "flex-1 p-6",
-          isMobile && "pb-20" // Add padding for mobile bottom nav
-        )}>
-          <div className="max-w-7xl mx-auto">
-            {/* Breadcrumb */}
-            <div className="mb-6">
-              <Breadcrumb />
-            </div>
+        <main 
+          id="main-content"
+          className="flex-1 px-2 py-4 lg:px-6 lg:py-6 overflow-y-auto"
+          role="main"
+          aria-label={`${getPageTitle()} page`}
+        >
+          <div className={cn(
+            "mx-auto",
+            isMobile ? "max-w-[320px] w-full" : "max-w-full sm:max-w-7xl"
+          )}>
+            {/* Breadcrumb Navigation - Hidden on mobile */}
+            {(!isMobile && isHydrated) && (
+              <nav aria-label="Breadcrumb" className="mb-6 desktop-only">
+                <Breadcrumb />
+              </nav>
+            )}
 
             {/* Header Content or Page Title */}
             {headerContent ? (
-              <div className="mb-8">
+              <header className="mb-8" role="region" aria-label="Page header">
                 {headerContent}
-              </div>
+              </header>
             ) : (
-              <div className="mb-8 animate-fade-in-up">
+              <header className={cn("mb-8 animate-fade-in-up", isMobile && "mb-4")} role="region" aria-label="Page header">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-2 h-8 bg-gradient-to-b from-primary to-accent rounded-full" />
-                  <h1 className="text-3xl font-bold text-balance">{getPageTitle()}</h1>
+                  <div className="w-2 h-8 bg-gradient-to-b from-primary to-accent rounded-full" aria-hidden="true" />
+                  <h1 className="text-2xl lg:text-3xl font-bold text-balance">{getPageTitle()}</h1>
                 </div>
-                <p className="text-muted-foreground text-lg">
+                <p className="text-muted-foreground text-base lg:text-lg">
                   {getPageDescription()}
                 </p>
-              </div>
+              </header>
             )}
 
             {/* Page Content */}
-            <div className="animate-fade-in-up">
+            <div className="animate-fade-in-up" role="region" aria-label="Main content">
               {children}
             </div>
           </div>
         </main>
 
-        {/* Mobile Bottom Navigation */}
-        {isMobile && <MobileBottomNav />}
+        {/* Mobile Bottom Navigation - Always visible on mobile */}
+        {isMobile && (
+          <div className="mobile-only">
+            <MobileBottomNav />
+          </div>
+        )}
       </div>
     </div>
   );

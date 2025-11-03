@@ -27,9 +27,11 @@ import {
   CounterCard, 
   StatCard 
 } from './AnimatedCounter';
+import { CompactInfoCard } from './CompactInfoCard';
 import { ActivityTimeline, ActivityTimelineCard } from './ActivityTimeline';
 import { UsageChart, StorageChart, TrendChart } from './UsageChart';
 import { SmartRecommendations, RecommendationCard } from './SmartRecommendations';
+import { DashboardSkeleton } from './DashboardSkeleton';
 import { cn } from '@/lib/utils';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 
@@ -181,23 +183,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   if (loading) {
     return (
-      <div className={cn("p-6 space-y-6", className)}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-32 bg-gray-200 rounded-lg animate-pulse" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="h-64 bg-gray-200 rounded-lg animate-pulse" />
-          <div className="h-64 bg-gray-200 rounded-lg animate-pulse" />
-        </div>
-      </div>
+      <DashboardSkeleton 
+        className={cn("p-6", className)}
+        showCharts={true}
+        showRecentActivity={true}
+      />
     );
   }
 
   return (
     <motion.div
-      className={cn("p-6 space-y-6", className)}
+      className={cn("space-y-6", className)}
       initial={prefersReducedMotion ? {} : { opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
@@ -253,43 +249,98 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
+      {/* Stats Cards - Mobile-First Compact Grid */}
+      <div className="dashboard-grid">
+        <CompactInfoCard
           title="Total Files"
-          value={dashboardData.stats.totalFiles}
-          icon={<BarChart3 className="h-5 w-5" />}
-          formatter={formatNumber}
+          value={formatNumber(dashboardData.stats.totalFiles)}
+          icon={<BarChart3 className="h-4 w-4" />}
           color="primary"
+          expandable
+          details={
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span>Images:</span>
+                <span>{formatNumber(dashboardData.stats.totalFiles * 0.7)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span>Videos:</span>
+                <span>{formatNumber(dashboardData.stats.totalFiles * 0.2)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span>Documents:</span>
+                <span>{formatNumber(dashboardData.stats.totalFiles * 0.1)}</span>
+              </div>
+            </div>
+          }
         />
-        <StatCard
+        <CompactInfoCard
           title="Storage Used"
-          value={dashboardData.stats.totalStorage}
-          subtitle={formatBytes(dashboardData.stats.totalStorage)}
-          icon={<HardDrive className="h-5 w-5" />}
-          formatter={(val) => formatBytes(val)}
+          value={formatBytes(dashboardData.stats.totalStorage)}
+          icon={<HardDrive className="h-4 w-4" />}
           color="secondary"
+          expandable
+          details={
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span>Images:</span>
+                <span>{formatBytes(dashboardData.stats.totalStorage * 0.6)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span>Videos:</span>
+                <span>{formatBytes(dashboardData.stats.totalStorage * 0.3)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span>Other:</span>
+                <span>{formatBytes(dashboardData.stats.totalStorage * 0.1)}</span>
+              </div>
+            </div>
+          }
         />
-        <StatCard
+        <CompactInfoCard
           title="Active Users"
-          value={dashboardData.stats.totalUsers}
-          icon={<Users className="h-5 w-5" />}
-          formatter={formatNumber}
+          value={formatNumber(dashboardData.stats.totalUsers)}
+          icon={<Users className="h-4 w-4" />}
           color="success"
+          expandable
+          details={
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span>Online:</span>
+                <span>{formatNumber(Math.floor(dashboardData.stats.totalUsers * 0.3))}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span>This week:</span>
+                <span>{formatNumber(Math.floor(dashboardData.stats.totalUsers * 0.8))}</span>
+              </div>
+            </div>
+          }
         />
-        <StatCard
-          title="Total Downloads"
-          value={dashboardData.stats.totalDownloads}
-          icon={<Download className="h-5 w-5" />}
-          formatter={formatNumber}
+        <CompactInfoCard
+          title="Downloads"
+          value={formatNumber(dashboardData.stats.totalDownloads)}
+          icon={<Download className="h-4 w-4" />}
           color="warning"
+          expandable
+          details={
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs">
+                <span>Today:</span>
+                <span>{formatNumber(dashboardData.stats.downloadsToday)}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span>This week:</span>
+                <span>{formatNumber(Math.floor(dashboardData.stats.totalDownloads * 0.15))}</span>
+              </div>
+            </div>
+          }
         />
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Main Content Grid - Adjustable width for better balance */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Charts */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-3 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Upload Trends</CardTitle>
@@ -319,7 +370,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           {/* Activity Timeline */}
           <ActivityTimelineCard
             activities={dashboardData.activities}

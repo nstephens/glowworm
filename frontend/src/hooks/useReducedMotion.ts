@@ -10,7 +10,12 @@ export function useReducedMotion(options: ReducedMotionOptions = {}) {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
-    if (forceReduced) {
+    // Global runtime overrides via query or localStorage
+    const search = typeof window !== 'undefined' ? window.location.search : '';
+    const urlForcesReduced = /(?:[?&])noanim=1\b/i.test(search) || /(?:[?&])nomotion=1\b/i.test(search);
+    const storedNoMotion = typeof window !== 'undefined' ? (window.localStorage?.getItem('NO_MOTION') === '1') : false;
+
+    if (forceReduced || urlForcesReduced || storedNoMotion) {
       setPrefersReducedMotion(true);
       return;
     }

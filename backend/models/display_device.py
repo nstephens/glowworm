@@ -33,6 +33,11 @@ class DisplayDevice(Base):
     ip_address = Column(String(45), nullable=True)  # IPv6 compatible
     last_seen = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
+    # Display resolution information
+    screen_width = Column(Integer, nullable=True)
+    screen_height = Column(Integer, nullable=True)
+    device_pixel_ratio = Column(String(10), nullable=True)  # e.g., "2.0", "1.5"
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -63,4 +68,7 @@ class DisplayDevice(Base):
             "last_seen": self.last_seen.isoformat() if self.last_seen else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "screen_width": self.screen_width,
+            "screen_height": self.screen_height,
+            "device_pixel_ratio": self.device_pixel_ratio,
         }

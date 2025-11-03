@@ -92,7 +92,7 @@ class PlaylistService:
     
     def update_playlist(self, playlist_id: int, name: Optional[str] = None, 
                        is_default: Optional[bool] = None, display_time_seconds: Optional[int] = None, 
-                       display_mode: Optional[str] = None) -> Optional[Playlist]:
+                       display_mode: Optional[str] = None, show_image_info: Optional[bool] = None) -> Optional[Playlist]:
         """Update playlist"""
         try:
             playlist = self.get_playlist_by_id(playlist_id)
@@ -135,6 +135,10 @@ class PlaylistService:
                 except Exception as e:
                     logger.error(f"Error setting display_mode: {e}")
                     playlist.display_mode = DisplayMode.DEFAULT
+            
+            # Update show_image_info if provided
+            if show_image_info is not None:
+                playlist.show_image_info = show_image_info
             
             self.db.commit()
             self.db.refresh(playlist)

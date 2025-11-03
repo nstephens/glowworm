@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Image, Playlist } from '../types';
 import { displayLogger } from '../utils/logger';
+import { displayDeviceLogger } from '../services/displayDeviceLogger';
+import { getSmartImageUrlFromImage } from '../utils/imageUrls';
+import { transitionLogger } from '../services/transitionLogger';
 
 interface SlideshowSettings {
   interval: number;
@@ -15,6 +18,8 @@ interface FullscreenSlideshowProps {
   initialSettings?: Partial<SlideshowSettings>;
   onClose?: () => void;
   onImageChange?: (image: Image, index: number) => void;
+  deviceToken?: string;
+  displayResolution?: { width: number; height: number } | null;
 }
 
 const defaultSettings: SlideshowSettings = {
@@ -29,7 +34,9 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   playlist,
   initialSettings = {},
   onClose,
-  onImageChange
+  onImageChange,
+  deviceToken,
+  displayResolution
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [settings, setSettings] = useState<SlideshowSettings>({ ...defaultSettings, ...initialSettings });
@@ -48,6 +55,10 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const [imageOpacity, setImageOpacity] = useState(1);
   const [nextImageOpacity, setNextImageOpacity] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [imagesLoaded, setImagesLoaded] = useState<Set<number>>(new Set());
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [nextImageReady, setNextImageReady] = useState(false);
+  const [waitingForLoad, setWaitingForLoad] = useState(false);
   
   // Landscape stacking state
   const [topImageOpacity, setTopImageOpacity] = useState(0);
@@ -154,22 +165,75 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const [preloadedImages, setPreloadedImages] = useState<Set<string>>(new Set());
 
   // Optimized image preloading for Pi
-  const preloadImage = useCallback((imageUrl: string) => {
-    if (preloadedImages.has(imageUrl)) return;
+  const preloadImage = useCallback((image: Image, markAsLoaded = false) => {
+    if (!image) return;
     
+    // Generate the smart URL for this image
+    const imageUrl = getSmartImageUrlFromImage(image, deviceToken);
+    
+    if (preloadedImages.has(imageUrl)) {
+      if (markAsLoaded) setImagesLoaded(prev => new Set([...prev, image.id]));
+      return;
+    }
+    
+    displayLogger.debug(`🖼️ Preloading image: ${image.original_filename}`);
     const img = new Image();
     img.onload = () => {
+      displayLogger.debug(`✅ Preloaded: ${image.original_filename}`);
       setPreloadedImages(prev => new Set([...prev, imageUrl]));
+      if (markAsLoaded) setImagesLoaded(prev => new Set([...prev, image.id]));
+    };
+    img.onerror = () => {
+      displayLogger.error(`❌ Failed to preload: ${image.original_filename}`);
     };
     img.src = imageUrl;
-  }, [preloadedImages]);
+  }, [preloadedImages, deviceToken]);
 
-  // Preload next few images (accounting for potential split-screen advancement)
+  // Preload initial images when slideshow starts
   useEffect(() => {
+    if (images.length === 0 || !isInitialLoad) return;
+    
+    displayLogger.debug('🎬 Initial load: Preloading first batch of images');
+    
+    // Preload first 20 images aggressively
+    const initialImages = images.slice(0, Math.min(20, images.length));
+    initialImages.forEach(img => preloadImage(img, true));
+    
+    // Mark initial load as complete once first image is loaded
+    const checkInterval = setInterval(() => {
+      if (imagesLoaded.size > 0) {
+        setIsInitialLoad(false);
+        displayLogger.debug('🎬 Initial preload phase complete');
+        clearInterval(checkInterval);
+      }
+    }, 100);
+    
+    // Also set a max timeout to prevent indefinite loading
+    const timeout = setTimeout(() => {
+      setIsInitialLoad(false);
+      displayLogger.debug('🎬 Initial preload timeout reached');
+      clearInterval(checkInterval);
+    }, 5000);
+    
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(checkInterval);
+    };
+  }, [images, isInitialLoad, preloadImage, imagesLoaded.size]);
+
+  // Aggressively preload upcoming images as slideshow progresses
+  useEffect(() => {
+    if (images.length === 0 || isInitialLoad) return;
+    
     // Preload more images since we might advance by 2 for split-screen
-    const nextImages = images.slice(currentIndex + 1, currentIndex + 6);
-    nextImages.forEach(img => preloadImage(img.url));
-  }, [currentIndex, images, preloadImage]);
+    // Preload next 10 images for smooth transitions
+    const nextImages = images.slice(currentIndex + 1, currentIndex + 11);
+    nextImages.forEach(img => preloadImage(img));
+    
+    // Also preload images before current (for manual navigation)
+    const prevImages = images.slice(Math.max(0, currentIndex - 3), currentIndex);
+    prevImages.forEach(img => preloadImage(img));
+  }, [currentIndex, images, isInitialLoad, preloadImage]);
 
   const nextImage = images[(currentIndex + 1) % images.length];
 
@@ -188,10 +252,22 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
     
     displayLogger.debug('🎬 OPTIMIZED: Transitioning from split-screen:', isShowingSplitScreen);
     
+    // Start transition logging
+    transitionLogger.startTransition(currentIndex);
+    
     // Use requestAnimationFrame for smoother transitions on Pi
     const startTransition = () => {
       // Reset movement position to center during transition
       setMovementObjectPosition('center');
+      
+      // Log fade out start
+      transitionLogger.logEvent({
+        timestamp: Date.now(),
+        eventType: 'fade_out_start',
+        currentIndex,
+        currentImageId: currentImg?.id,
+        additionalData: { isShowingSplitScreen }
+      });
       
       if (isShowingSplitScreen) {
         // Fade out both split-screen images
@@ -206,32 +282,123 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
         displayLogger.debug('🎬 OPTIMIZED: Fading out single image');
       }
       
-      // After fade out completes, change image and fade in
+      // After fade out completes, change image and WAIT for load
       setTimeout(() => {
+        transitionLogger.logEvent({
+          timestamp: Date.now(),
+          eventType: 'fade_out_complete',
+          currentIndex
+        });
+        
         // Advance by 2 if we were showing split-screen, otherwise advance by 1
         const advanceBy = isShowingSplitScreen ? 2 : 1;
         const nextIndex = (currentIndex + advanceBy) % images.length;
+        
+        transitionLogger.logEvent({
+          timestamp: Date.now(),
+          eventType: 'index_change',
+          currentIndex,
+          nextIndex
+        });
+        
+        // Mark that we're waiting for the new image to load
+        setWaitingForLoad(true);
+        setNextImageReady(false);
         setCurrentIndex(nextIndex);
         
         // Ensure new image starts centered for movement
         setMovementObjectPosition('center');
         
-        displayLogger.debug(`🎬 OPTIMIZED: Advanced by ${advanceBy}, now at index ${nextIndex}`);
+        displayLogger.debug(`🎬 OPTIMIZED: Advanced by ${advanceBy}, now at index ${nextIndex}, waiting for image load...`);
+        
+        transitionLogger.logEvent({
+          timestamp: Date.now(),
+          eventType: 'src_change',
+          currentIndex: nextIndex,
+          currentImageId: images[nextIndex]?.id,
+          currentImageUrl: getSmartImageUrlFromImage(images[nextIndex], deviceToken),
+          isPreloaded: imagesLoaded.has(images[nextIndex]?.id)
+        });
         
         // Notify parent of image change
         if (onImageChange) {
           onImageChange(images[nextIndex], nextIndex);
         }
         
-        // End transition
-        setTimeout(() => {
-          setIsTransitioning(false);
-        }, 50);
+        // Set a timeout in case image never loads (fallback)
+        const loadTimeout = setTimeout(() => {
+          if (waitingForLoad) {
+            displayLogger.warning('⚠️ Image load timeout - forcing fade in');
+            transitionLogger.logEvent({
+              timestamp: Date.now(),
+              eventType: 'image_load_error',
+              currentIndex: nextIndex,
+              error: 'Load timeout after 2000ms'
+            });
+            setWaitingForLoad(false);
+            setIsTransitioning(false);
+            transitionLogger.completeTransition(false);
+          }
+        }, 2000);
+        
+        // Store timeout ref for cleanup
+        transitionTimeoutRef.current = loadTimeout;
       }, 300); // Shorter transition for better Pi performance
     };
     
     requestAnimationFrame(startTransition);
-  }, [currentIndex, images, isTransitioning, onImageChange]);
+  }, [currentIndex, images, isTransitioning, onImageChange, deviceToken, imagesLoaded, waitingForLoad]);
+
+  // Watch for image load and fade in when ready
+  useEffect(() => {
+    if (!waitingForLoad || !nextImageReady) return;
+    
+    const currentImg = images[currentIndex];
+    const nextImg = images[currentIndex + 1];
+    const isCurrentLandscape = currentImg && currentImg.width && currentImg.height && currentImg.width > currentImg.height;
+    const isNextLandscape = nextImg && nextImg.width && nextImg.height && nextImg.width > nextImg.height;
+    const shouldShowSplit = isCurrentLandscape && isNextLandscape;
+    
+    displayLogger.debug('🎬 OPTIMIZED: Image loaded, starting fade in');
+    
+    transitionLogger.logEvent({
+      timestamp: Date.now(),
+      eventType: 'fade_in_start',
+      currentIndex,
+      currentImageId: currentImg?.id
+    });
+    
+    // Clear the timeout since image loaded successfully
+    if (transitionTimeoutRef.current) {
+      clearTimeout(transitionTimeoutRef.current);
+      transitionTimeoutRef.current = null;
+    }
+    
+    // Fade in the new image
+    if (shouldShowSplit) {
+      setTopImageOpacity(1);
+      setBottomImageOpacity(1);
+      setTopImageTransform('translateX(0%)');
+      setBottomImageTransform('translateX(0%)');
+    } else {
+      setImageOpacity(1);
+    }
+    
+    // Mark transition complete after fade in
+    setTimeout(() => {
+      setWaitingForLoad(false);
+      setIsTransitioning(false);
+      
+      transitionLogger.logEvent({
+        timestamp: Date.now(),
+        eventType: 'fade_in_complete',
+        currentIndex
+      });
+      
+      transitionLogger.completeTransition(true);
+    }, 300);
+    
+  }, [waitingForLoad, nextImageReady, currentIndex, images]);
 
   // Auto-advance slideshow
   useEffect(() => {
@@ -267,6 +434,24 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
     setShowControls(false);
   }, []);
 
+  // Export logs handler
+  const handleExportLogs = useCallback(() => {
+    try {
+      const logs = transitionLogger.exportTransitions();
+      navigator.clipboard.writeText(logs).then(() => {
+        displayLogger.info('✅ Transition logs copied to clipboard');
+        displayDeviceLogger.info('Transition logs exported', { logCount: transitionLogger.getTransitionHistory().length });
+      }).catch((err) => {
+        displayLogger.error('❌ Failed to copy logs:', err);
+        // Fallback: show logs in console
+        console.log('Transition Logs:', logs);
+        displayDeviceLogger.error('Failed to copy logs to clipboard', { error: err.message });
+      });
+    } catch (err) {
+      displayLogger.error('❌ Failed to export logs:', err);
+    }
+  }, []);
+
   // Keyboard handlers
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -294,12 +479,17 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
             performTransition();
           }
           break;
+        case 'e':
+        case 'E':
+          e.preventDefault();
+          handleExportLogs();
+          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [onClose, isPlaying, currentIndex, images, isTransitioning, performTransition, onImageChange]);
+  }, [onClose, isPlaying, currentIndex, images, isTransitioning, performTransition, onImageChange, handleExportLogs]);
 
   // Cleanup
   useEffect(() => {
@@ -344,6 +534,17 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
         perspective: '1000px'
       }}
     >
+      {/* Initial Loading Screen */}
+      {isInitialLoad && images.length > 0 && (
+        <div className="absolute inset-0 bg-black z-50 flex items-center justify-center">
+          <div className="text-center text-white">
+            <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-xl font-medium">Loading slideshow...</p>
+            <p className="text-sm text-gray-400 mt-2">Preparing {images.length} images</p>
+          </div>
+        </div>
+      )}
+      
       {/* Main Image Container with GPU acceleration */}
       <div 
         className="relative w-full h-full flex items-center justify-center"
@@ -358,7 +559,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
             {/* Top half - current landscape image */}
             <div className="relative w-full h-1/2">
               <img
-                src={currentImage.url}
+                src={getSmartImageUrlFromImage(currentImage, deviceToken)}
                 alt={currentImage.original_filename}
                 className="w-full h-full object-cover"
                 style={{ 
@@ -370,8 +571,39 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                   // Optimized transition for Pi
                   transition: 'opacity 300ms ease-out, transform 300ms ease-out'
                 }}
-                onLoad={() => {}}
-                onError={() => {}}
+                onLoad={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  displayLogger.debug('✅ Top image loaded');
+                  
+                  // Log actual image dimensions
+                  displayDeviceLogger.logImageDimensions(
+                    currentImage.id,
+                    getSmartImageUrlFromImage(currentImage, deviceToken),
+                    img.naturalWidth,
+                    img.naturalHeight,
+                    img.clientWidth,
+                    img.clientHeight
+                  );
+                  
+                  transitionLogger.logEvent({
+                    timestamp: Date.now(),
+                    eventType: 'image_load_complete',
+                    currentIndex,
+                    currentImageId: currentImage.id,
+                    loadTime: img.complete ? 0 : undefined
+                  });
+                  
+                  setImagesLoaded(prev => new Set([...prev, currentImage.id]));
+                  
+                  // If we're waiting for this image, mark it as ready
+                  if (waitingForLoad) {
+                    setNextImageReady(true);
+                  }
+                }}
+                onError={() => {
+                  displayLogger.error('❌ Top image failed to load');
+                }}
+                loading="eager"
               />
             </div>
             
@@ -381,7 +613,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
             {/* Bottom half - next landscape image */}
             <div className="relative w-full h-1/2">
               <img
-                src={nextImageData.url}
+                src={getSmartImageUrlFromImage(nextImageData, deviceToken)}
                 alt={nextImageData.original_filename}
                 className="w-full h-full object-cover"
                 style={{ 
@@ -393,53 +625,227 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                   // Optimized transition for Pi
                   transition: 'opacity 300ms ease-out, transform 300ms ease-out'
                 }}
-                onLoad={() => {}}
-                onError={() => {}}
+                onLoad={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  displayLogger.debug('✅ Bottom image loaded');
+                  
+                  // Log actual image dimensions
+                  displayDeviceLogger.logImageDimensions(
+                    nextImageData.id,
+                    getSmartImageUrlFromImage(nextImageData, deviceToken),
+                    img.naturalWidth,
+                    img.naturalHeight,
+                    img.clientWidth,
+                    img.clientHeight
+                  );
+                  
+                  transitionLogger.logEvent({
+                    timestamp: Date.now(),
+                    eventType: 'image_load_complete',
+                    currentIndex,
+                    currentImageId: nextImageData.id,
+                    loadTime: img.complete ? 0 : undefined
+                  });
+                  
+                  setImagesLoaded(prev => new Set([...prev, nextImageData.id]));
+                  
+                  // If we're waiting for this image, mark it as ready
+                  if (waitingForLoad) {
+                    setNextImageReady(true);
+                  }
+                }}
+                onError={() => {
+                  displayLogger.error('❌ Bottom image failed to load');
+                }}
+                loading="eager"
               />
             </div>
           </div>
         ) : (
           // Single image display for portrait images or single landscape images
-          <img
-            src={currentImage.url}
-            alt={currentImage.original_filename}
-            className="w-full h-full object-cover"
-            style={{ 
-              opacity: imageOpacity,
-              // Hardware acceleration
-              transform: 'translateZ(0)',
-              backfaceVisibility: 'hidden',
-              willChange: 'opacity',
-              // Use object-position for movement instead of transform
-              objectPosition: shouldShowMovement && isCurrentImageLandscape ? movementObjectPosition : 'center',
-              // Smooth transition for opacity and object-position
-              transition: shouldShowMovement && isCurrentImageLandscape ? 
-                'opacity 300ms ease-out, object-position 30s ease-in-out' : 'opacity 300ms ease-out'
-            }}
-            onLoad={() => {}}
-            onError={() => {}}
-          />
+          <>
+            <img
+              src={getSmartImageUrlFromImage(currentImage, deviceToken)}
+              alt={currentImage.original_filename}
+              className="w-full h-full object-cover"
+              style={{ 
+                opacity: imageOpacity,
+                // Hardware acceleration
+                transform: 'translateZ(0)',
+                backfaceVisibility: 'hidden',
+                willChange: 'opacity',
+                // Use object-position for movement instead of transform
+                objectPosition: shouldShowMovement && isCurrentImageLandscape ? movementObjectPosition : 'center',
+                // Smooth transition for opacity and object-position
+                transition: shouldShowMovement && isCurrentImageLandscape ? 
+                  'opacity 300ms ease-out, object-position 30s ease-in-out' : 'opacity 300ms ease-out'
+              }}
+              onLoad={(e) => {
+                const img = e.target as HTMLImageElement;
+                displayLogger.debug('✅ Main image loaded');
+                
+                // Log actual image dimensions for troubleshooting
+                displayDeviceLogger.logImageDimensions(
+                  currentImage.id,
+                  getSmartImageUrlFromImage(currentImage, deviceToken),
+                  img.naturalWidth,
+                  img.naturalHeight,
+                  img.clientWidth,
+                  img.clientHeight
+                );
+                
+                transitionLogger.logEvent({
+                  timestamp: Date.now(),
+                  eventType: 'image_load_complete',
+                  currentIndex,
+                  currentImageId: currentImage.id,
+                  loadTime: img.complete ? 0 : undefined
+                });
+                
+                setImagesLoaded(prev => new Set([...prev, currentImage.id]));
+                
+                // If we're waiting for this image, mark it as ready
+                if (waitingForLoad) {
+                  setNextImageReady(true);
+                }
+              }}
+              onError={() => {
+                displayLogger.error('❌ Main image failed to load');
+              }}
+              loading="eager"
+            />
+            {/* Loading indicator for current image */}
+            {!imagesLoaded.has(currentImage.id) && imageOpacity > 0 && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+                <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Image Info Overlay */}
-      {settings.showInfo && (
-        <div className="absolute bottom-4 left-4 bg-black bg-opacity-75 text-white p-4 rounded-lg max-w-md">
-          <div>
-            <h3 className="font-semibold text-lg mb-2">{currentImage.original_filename}</h3>
-            {currentImage.width && currentImage.height && (
-              <p className="text-xs text-gray-400 mb-2">
+      {/* Export Logs Button - Bottom Left */}
+      {showControls && (
+        <div className="absolute bottom-4 left-4">
+          <button
+            onClick={handleExportLogs}
+            className="bg-blue-600 bg-opacity-90 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+            title="Export transition logs to clipboard (or press E)"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Export Logs (E)
+          </button>
+        </div>
+      )}
+
+      {/* Image Info Overlay - Bottom Right */}
+      {settings.showInfo && !shouldShowSplitScreen && (
+        <div className="absolute bottom-4 right-4 bg-gray-800 bg-opacity-90 text-white px-3 py-2 rounded-lg">
+          <div className="space-y-1">
+            <p className="text-sm font-medium leading-tight">{currentImage.original_filename}</p>
+            {displayResolution ? (
+              <p className="text-xs text-gray-300">
+                {displayResolution.width} × {displayResolution.height}
+              </p>
+            ) : currentImage.width && currentImage.height ? (
+              <p className="text-xs text-gray-300">
                 {currentImage.width} × {currentImage.height}
               </p>
-            )}
-            {playlist && (
-              <p className="text-sm text-gray-300 mb-2">Playlist: {playlist.name}</p>
-            )}
-            <p className="text-sm text-gray-300">
-              {currentIndex + 1} of {images.length}
-            </p>
+            ) : null}
+            {(() => {
+              // EXIF DateTime format is "YYYY:MM:DD HH:MM:SS" - need to parse properly
+              const dateStr = currentImage.exif?.DateTimeOriginal || currentImage.exif?.DateTime;
+              if (!dateStr) {
+                return <p className="text-xs text-gray-400">No date</p>;
+              }
+              try {
+                // EXIF DateTime uses colons instead of hyphens
+                const parsed = dateStr.includes(':') && dateStr.match(/^\d{4}:\d{2}:\d{2}/)
+                  ? new Date(dateStr.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3'))
+                  : new Date(dateStr);
+                if (isNaN(parsed.getTime())) {
+                  return <p className="text-xs text-gray-400">No date</p>;
+                }
+                return <p className="text-xs text-gray-300">{parsed.toLocaleDateString()}</p>;
+              } catch (e) {
+                return <p className="text-xs text-gray-400">No date</p>;
+              }
+            })()}
           </div>
         </div>
+      )}
+
+      {/* Image Info Overlays - Split Screen (Top Left for top image, Bottom Right for bottom image) */}
+      {settings.showInfo && shouldShowSplitScreen && nextImageData && (
+        <>
+          {/* Top Image Info */}
+          <div className="absolute top-4 left-4 bg-gray-800 bg-opacity-90 text-white px-3 py-2 rounded-lg" style={{ marginTop: '56px' }}>
+            <div className="space-y-1">
+              <p className="text-sm font-medium leading-tight">{currentImage?.original_filename}</p>
+              {displayResolution ? (
+                <p className="text-xs text-gray-300">
+                  {displayResolution.width} × {displayResolution.height}
+                </p>
+              ) : currentImage?.width && currentImage?.height ? (
+                <p className="text-xs text-gray-300">
+                  {currentImage.width} × {currentImage.height}
+                </p>
+              ) : null}
+              {(() => {
+                const dateStr = currentImage?.exif?.DateTimeOriginal || currentImage?.exif?.DateTime;
+                if (!dateStr) {
+                  return <p className="text-xs text-gray-400">No date</p>;
+                }
+                try {
+                  const parsed = dateStr.includes(':') && dateStr.match(/^\d{4}:\d{2}:\d{2}/)
+                    ? new Date(dateStr.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3'))
+                    : new Date(dateStr);
+                  if (isNaN(parsed.getTime())) {
+                    return <p className="text-xs text-gray-400">No date</p>;
+                  }
+                  return <p className="text-xs text-gray-300">{parsed.toLocaleDateString()}</p>;
+                } catch (e) {
+                  return <p className="text-xs text-gray-400">No date</p>;
+                }
+              })()}
+            </div>
+          </div>
+          
+          {/* Bottom Image Info */}
+          <div className="absolute bottom-4 right-4 bg-gray-800 bg-opacity-90 text-white px-3 py-2 rounded-lg">
+            <div className="space-y-1">
+              <p className="text-sm font-medium leading-tight">{nextImageData.original_filename}</p>
+              {displayResolution ? (
+                <p className="text-xs text-gray-300">
+                  {displayResolution.width} × {displayResolution.height}
+                </p>
+              ) : nextImageData.width && nextImageData.height ? (
+                <p className="text-xs text-gray-300">
+                  {nextImageData.width} × {nextImageData.height}
+                </p>
+              ) : null}
+              {(() => {
+                const dateStr = nextImageData.exif?.DateTimeOriginal || nextImageData.exif?.DateTime;
+                if (!dateStr) {
+                  return <p className="text-xs text-gray-400">No date</p>;
+                }
+                try {
+                  const parsed = dateStr.includes(':') && dateStr.match(/^\d{4}:\d{2}:\d{2}/)
+                    ? new Date(dateStr.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3'))
+                    : new Date(dateStr);
+                  if (isNaN(parsed.getTime())) {
+                    return <p className="text-xs text-gray-400">No date</p>;
+                  }
+                  return <p className="text-xs text-gray-300">{parsed.toLocaleDateString()}</p>;
+                } catch (e) {
+                  return <p className="text-xs text-gray-400">No date</p>;
+                }
+              })()}
+            </div>
+          </div>
+        </>
       )}
 
       {/* Controls */}

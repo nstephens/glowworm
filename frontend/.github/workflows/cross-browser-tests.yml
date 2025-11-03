@@ -1,0 +1,266 @@
+name: Cross-Browser Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 2 * * 1' # Run weekly on Mondays at 2 AM
+
+jobs:
+  cross-browser-tests:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        browser: [safari-ios-15, chrome-android-11, samsung-internet-android-12, firefox-android-11]
+        suite: [mobile, touch, performance, accessibility, visual]
+        exclude:
+          # Skip visual tests for some browsers to reduce CI time
+          - browser: safari-ios-15
+            suite: visual
+          - browser: firefox-android-11
+            suite: visual
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'frontend/package-lock.json'
+        
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+        
+    - name: Build application
+      run: |
+        cd frontend
+        npm run build
+        
+    - name: Start application
+      run: |
+        cd frontend
+        npm start &
+        sleep 30
+        
+    - name: Setup test environment
+      run: |
+        cd frontend/tests/cross-browser
+        npm ci
+        
+    - name: Run cross-browser tests
+      env:
+        BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+        BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+        TEST_BASE_URL: http://localhost:3000
+      run: |
+        cd frontend/tests/cross-browser
+        npm run test:browser ${{ matrix.browser }} -- --suite ${{ matrix.suite }}
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.browser }}-${{ matrix.suite }}
+        path: frontend/tests/cross-browser/test-results/
+        
+    - name: Upload screenshots
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: screenshots-${{ matrix.browser }}-${{ matrix.suite }}
+        path: frontend/tests/cross-browser/test-results/screenshots/
+        
+    - name: Upload videos
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: videos-${{ matrix.browser }}-${{ matrix.suite }}
+        path: frontend/tests/cross-browser/test-results/videos/
+
+  visual-regression-tests:
+    runs-on: ubuntu-latest
+    needs: cross-browser-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'frontend/package-lock.json'
+        
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+        
+    - name: Build application
+      run: |
+        cd frontend
+        npm run build
+        
+    - name: Start application
+      run: |
+        cd frontend
+        npm start &
+        sleep 30
+        
+    - name: Setup test environment
+      run: |
+        cd frontend/tests/cross-browser
+        npm ci
+        
+    - name: Run visual regression tests
+      env:
+        BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+        BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+        TEST_BASE_URL: http://localhost:3000
+      run: |
+        cd frontend/tests/cross-browser
+        npm run test:visual
+        
+    - name: Upload visual test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: visual-test-results
+        path: frontend/tests/cross-browser/test-results/
+
+  performance-tests:
+    runs-on: ubuntu-latest
+    needs: cross-browser-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'frontend/package-lock.json'
+        
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+        
+    - name: Build application
+      run: |
+        cd frontend
+        npm run build
+        
+    - name: Start application
+      run: |
+        cd frontend
+        npm start &
+        sleep 30
+        
+    - name: Setup test environment
+      run: |
+        cd frontend/tests/cross-browser
+        npm ci
+        
+    - name: Run performance tests
+      env:
+        BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USERNAME }}
+        BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+        TEST_BASE_URL: http://localhost:3000
+      run: |
+        cd frontend/tests/cross-browser
+        npm run test:performance
+        
+    - name: Upload performance test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-test-results
+        path: frontend/tests/cross-browser/test-results/
+
+  test-report:
+    runs-on: ubuntu-latest
+    needs: [cross-browser-tests, visual-regression-tests, performance-tests]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install Allure
+      run: |
+        npm install -g allure-commandline
+        
+    - name: Generate test report
+      run: |
+        # Combine all test results
+        mkdir -p combined-results
+        find . -name "test-results-*" -type d -exec cp -r {}/allure-results/* combined-results/ \; 2>/dev/null || true
+        
+        # Generate Allure report
+        allure generate combined-results --output allure-report --clean
+        
+    - name: Upload test report
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-report
+        path: allure-report/
+        
+    - name: Comment PR with test results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Read test results
+          const results = [];
+          const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            run_id: context.runId
+          });
+          
+          for (const artifact of artifacts.data.artifacts) {
+            if (artifact.name.includes('test-results')) {
+              results.push(`- ${artifact.name}`);
+            }
+          }
+          
+          const comment = `## 🧪 Cross-Browser Test Results
+          
+          Test artifacts generated:
+          ${results.join('\n')}
+          
+          View the full test report in the artifacts section.`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+
+
+

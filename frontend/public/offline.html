@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - Glowworm</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .offline-container {
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .offline-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.8;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        .offline-message {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .retry-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 0.5rem;
+        }
+
+        .retry-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .retry-button:active {
+            transform: translateY(0);
+        }
+
+        .features {
+            margin-top: 2rem;
+            text-align: left;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            opacity: 0.8;
+        }
+
+        .feature-icon {
+            margin-right: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .network-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .network-status.online {
+            background: rgba(34, 197, 94, 0.8);
+        }
+
+        .network-status.offline {
+            background: rgba(239, 68, 68, 0.8);
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .subtitle {
+                font-size: 1rem;
+            }
+            
+            .offline-message {
+                padding: 1.5rem;
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="network-status" id="networkStatus"></div>
+    
+    <div class="offline-container">
+        <div class="offline-icon">📱</div>
+        <h1>You're Offline</h1>
+        <p class="subtitle">
+            Don't worry! You can still access your cached content and some features will work offline.
+        </p>
+        
+        <div class="offline-message">
+            <h2 style="margin-bottom: 1rem;">What you can do:</h2>
+            <div class="features">
+                <div class="feature">
+                    <span class="feature-icon">📸</span>
+                    <span>View previously loaded images</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">📁</span>
+                    <span>Browse cached albums and playlists</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">⚙️</span>
+                    <span>Access settings and preferences</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">💾</span>
+                    <span>View cached dashboard data</span>
+                </div>
+            </div>
+        </div>
+        
+        <button class="retry-button" onclick="retryConnection()">
+            Try Again
+        </button>
+        
+        <button class="retry-button" onclick="goHome()">
+            Go Home
+        </button>
+    </div>
+
+    <script>
+        // Network status detection
+        function updateNetworkStatus() {
+            const statusEl = document.getElementById('networkStatus');
+            if (navigator.onLine) {
+                statusEl.textContent = 'Online';
+                statusEl.className = 'network-status online';
+                statusEl.style.display = 'block';
+                
+                // Auto-reload after 2 seconds when back online
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                statusEl.textContent = 'Offline';
+                statusEl.className = 'network-status offline';
+                statusEl.style.display = 'block';
+            }
+        }
+
+        // Retry connection
+        function retryConnection() {
+            if (navigator.onLine) {
+                window.location.reload();
+            } else {
+                // Show a message that we're still offline
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = 'Still Offline';
+                button.classList.add('pulse');
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.classList.remove('pulse');
+                }, 2000);
+            }
+        }
+
+        // Go to home page
+        function goHome() {
+            window.location.href = '/';
+        }
+
+        // Set up network listeners
+        window.addEventListener('online', updateNetworkStatus);
+        window.addEventListener('offline', updateNetworkStatus);
+        
+        // Initial status check
+        updateNetworkStatus();
+
+        // Check for service worker updates
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'CACHE_UPDATED') {
+                    console.log('Cache updated, new content available');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+
+
+
+

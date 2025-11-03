@@ -206,7 +206,7 @@ const DisplayRegistration: React.FC = () => {
         <div className="text-center text-white">
           <div className="flex items-center justify-center space-x-3 mb-6">
             <img 
-              src="/glowworm_icon.png" 
+              src="/glowworm-logo.svg" 
               alt="Glowworm Logo" 
               className="w-12 h-12 object-contain"
             />
@@ -236,7 +236,7 @@ const DisplayRegistration: React.FC = () => {
             <div className="mb-6">
               <div className="flex items-center justify-center space-x-3 mb-4">
                 <img 
-                  src="/glowworm_icon.png" 
+                  src="/glowworm-logo.svg" 
                   alt="Glowworm Logo" 
                   className="w-10 h-10 object-contain"
                 />

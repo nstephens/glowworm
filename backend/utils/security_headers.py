@@ -19,7 +19,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "script-src 'self' 'unsafe-inline' https://accounts.google.com; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
-            "img-src 'self' data: https:; "
+            "img-src 'self' data: https: blob:; "
             "connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com; "
             "frame-src https://accounts.google.com; "
             "object-src 'none'; "

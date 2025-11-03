@@ -35,6 +35,33 @@ export const useAuth = () => {
 
   useEffect(() => {
     checkAuthStatus();
+    
+    // Listen for visibility changes (phone unlock, tab switch, etc.)
+    // This helps catch cases where cookies might not be immediately available
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Small delay to allow cookies to be available
+        setTimeout(() => {
+          checkAuthStatus(true); // Force fresh check
+        }, 500);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Also listen for focus events (iOS web app specific)
+    const handleFocus = () => {
+      setTimeout(() => {
+        checkAuthStatus(true);
+      }, 500);
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const checkAuthStatus = async (forceFresh = false) => {
@@ -83,8 +110,42 @@ export const useAuth = () => {
 
       setIsAuthenticated(isAuth);
       setCurrentUser(user);
-    } catch (error) {
+    } catch (error: any) {
       console.warn('Auth check failed:', error);
+      
+      // If we get a 401, try refreshing the session before giving up
+      if (error.response?.status === 401 || error.status === 401) {
+        try {
+          console.log('🔄 Attempting session refresh...');
+          const refreshResponse = await apiService.refreshSession();
+          if (refreshResponse.success && refreshResponse.data) {
+            console.log('✅ Session refreshed successfully');
+            // Update cache with refreshed state
+            authCache = {
+              isAuthenticated: true,
+              user: refreshResponse.data,
+              timestamp: Date.now()
+            };
+            setIsAuthenticated(true);
+            setCurrentUser(refreshResponse.data);
+            setIsLoading(false);
+            
+            // Save optimistic auth state
+            try {
+              localStorage.setItem('glowworm_last_auth', JSON.stringify({
+                isAuthenticated: true,
+                timestamp: Date.now()
+              }));
+            } catch (e) {
+              console.warn('Failed to save auth state:', e);
+            }
+            return;
+          }
+        } catch (refreshError) {
+          console.warn('Session refresh failed:', refreshError);
+          // Fall through to normal error handling
+        }
+      }
       
       // Update cache with failed state
       authCache = {

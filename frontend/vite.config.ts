@@ -15,20 +15,15 @@ export default defineConfig({
     allowedHosts: true, // Disable host check for reverse proxy support
     strictPort: false,
     hmr: {
-      clientPort: 3003, // For reverse proxy compatibility
+      clientPort: 3005, // For reverse proxy compatibility
     },
     // Proxy API requests to backend - allows frontend to be single entry point
     proxy: {
       '/api': {
-        target: process.env.VITE_BACKEND_URL || 'http://localhost:8001',
+        target: process.env.VITE_BACKEND_URL || 'http://glowworm-backend-dev:8001',
         changeOrigin: true,
         secure: false,
-      },
-      '/ws': {
-        target: process.env.VITE_BACKEND_URL || 'http://localhost:8001',
-        changeOrigin: true,
-        secure: false,
-        ws: true,
+        ws: true, // Enable WebSocket proxying for /api/ws/* endpoints
       },
     },
   },

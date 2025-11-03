@@ -23,6 +23,8 @@ from api.smart_preload import router as smart_preload_router
 from api.settings import router as settings_router
 from api.users import router as users_router
 from api.migration import router as migration_router
+from api.logs import router as logs_router
+from api.websocket import router as websocket_api_router
 from websocket.endpoints import router as websocket_router
 from websocket.manager import connection_manager
 from models.database import create_tables
@@ -38,6 +40,13 @@ async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
     logger.info("Starting GlowWorm API...")
+    
+    # Setup file logging
+    try:
+        from utils.file_logger import setup_file_logging
+        setup_file_logging()
+    except Exception as e:
+        logger.error(f"Failed to setup file logging: {e}")
     
     # Initialize database if configured
     if is_configured():
@@ -128,6 +137,8 @@ app.include_router(smart_preload_router)
 app.include_router(settings_router)
 app.include_router(users_router)
 app.include_router(migration_router)
+app.include_router(logs_router)
+app.include_router(websocket_api_router)
 app.include_router(websocket_router)
 
 # Global OPTIONS handler for unmatched routes only (after routers)

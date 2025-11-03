@@ -5,13 +5,19 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { ArrowLeft, Plus, Edit, Trash2, Play, Settings, Clock, Star, Zap } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Play, Settings, Clock, Star, Zap, RefreshCw, Loader2 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { ConfirmationModal } from '../components/ConfirmationModal';
+import { VariantGenerationModal } from '../components/VariantGenerationModal';
+import { MobilePlaylistGrid } from '../components/playlists/MobilePlaylistGrid';
+import { MobilePlaylistCreateModal } from '../components/playlists/MobilePlaylistCreateModal';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { cn } from '../lib/utils';
 import type { Playlist } from '../types';
 
 export const Playlists: React.FC = () => {
   const navigate = useNavigate();
+  const { isMobile } = useResponsiveLayout();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +26,13 @@ export const Playlists: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [playlistThumbnails, setPlaylistThumbnails] = useState<Record<number, string>>({});
+  const [generatingVariants, setGeneratingVariants] = useState(false);
+  const [generatingAllVariants, setGeneratingAllVariants] = useState(false);
+  const [showVariantModal, setShowVariantModal] = useState(false);
+  const [variantGenerationError, setVariantGenerationError] = useState<string | null>(null);
+  const [variantPlaylistName, setVariantPlaylistName] = useState<string | undefined>(undefined);
+  const [totalVariantsGenerated, setTotalVariantsGenerated] = useState<number | undefined>(undefined);
 
   // Load playlists on component mount
   useEffect(() => {
@@ -31,11 +44,14 @@ export const Playlists: React.FC = () => {
       setLoading(true);
       setError(null);
       const response = await apiService.getPlaylists();
-      console.log('📋 Loaded playlists:', response.playlists);
-      response.playlists?.forEach(playlist => {
+      console.log('📋 Loaded playlists:', response.data);
+      response.data?.forEach(playlist => {
         console.log(`📋 Playlist "${playlist.name}": display_mode = ${playlist.display_mode}`);
       });
-      setPlaylists(response.playlists || []);
+      setPlaylists(response.data || []);
+      
+      // Load thumbnails for playlists with images
+      loadPlaylistThumbnails(response.data || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load playlists');
       console.error('Failed to load playlists:', err);
@@ -44,15 +60,59 @@ export const Playlists: React.FC = () => {
     }
   };
 
+  const loadPlaylistThumbnails = async (playlists: Playlist[]) => {
+    const thumbnails: Record<number, string> = {};
+    
+    for (const playlist of playlists) {
+      if (playlist.image_count > 0) {
+        try {
+          const imagesResponse = await apiService.getPlaylistImages(playlist.id);
+          if (imagesResponse.data && imagesResponse.data.length > 0) {
+            const firstImage = imagesResponse.data[0];
+            // Use the thumbnail URL from the image object
+            thumbnails[playlist.id] = firstImage.thumbnail_url || `/api/images/${firstImage.id}/file?size=medium`;
+          }
+        } catch (error) {
+          console.warn(`Failed to load thumbnail for playlist ${playlist.id}:`, error);
+        }
+      }
+    }
+    
+    setPlaylistThumbnails(thumbnails);
+  };
+
   const handleCreatePlaylist = async () => {
     if (!newPlaylistName.trim()) return;
     
     try {
       setIsCreating(true);
       const response = await apiService.createPlaylist(newPlaylistName.trim());
-      setPlaylists(prev => [...prev, response.playlist]);
+      setPlaylists(prev => [...prev, response.data]);
       setNewPlaylistName('');
       setShowCreateModal(false);
+      
+      // Load thumbnail for the new playlist (will be empty initially)
+      loadPlaylistThumbnails([response.data]);
+    } catch (err: any) {
+      alert('Failed to create playlist: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleCreatePlaylistMobile = async (data: any) => {
+    try {
+      setIsCreating(true);
+      const response = await apiService.createPlaylist(data.name, {
+        display_time_seconds: data.display_time_seconds,
+        display_mode: data.display_mode,
+        is_default: data.is_default,
+      });
+      setPlaylists(prev => [...prev, response.data]);
+      setShowCreateModal(false);
+      
+      // Load thumbnail for the new playlist (will be empty initially)
+      loadPlaylistThumbnails([response.data]);
     } catch (err: any) {
       alert('Failed to create playlist: ' + (err.message || 'Unknown error'));
     } finally {
@@ -88,6 +148,57 @@ export const Playlists: React.FC = () => {
     navigate('/admin');
   };
 
+  const handleGenerateVariants = async (playlistId: number) => {
+    const playlist = playlists.find(p => p.id === playlistId);
+    
+    try {
+      setGeneratingVariants(true);
+      setShowVariantModal(true);
+      setVariantGenerationError(null);
+      setVariantPlaylistName(playlist?.name);
+      setTotalVariantsGenerated(undefined);
+      setError(null);
+      
+      const response = await apiService.generatePlaylistVariants(playlistId);
+      console.log('✅ Generated variants:', response);
+      
+      // Response is already the data (apiService returns response.data)
+      setTotalVariantsGenerated((response as any).count || 0);
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate variants');
+      setVariantGenerationError(err.message || 'Failed to generate variants. Please try again.');
+      console.error('Failed to generate variants:', err);
+    } finally {
+      setGeneratingVariants(false);
+    }
+  };
+
+  const handleGenerateAllVariants = async () => {
+    try {
+      setGeneratingAllVariants(true);
+      setShowVariantModal(true);
+      setVariantGenerationError(null);
+      setVariantPlaylistName('all playlists');
+      setTotalVariantsGenerated(undefined);
+      setError(null);
+      
+      const response = await apiService.generateAllPlaylistVariants();
+      console.log('✅ Generated all variants:', response);
+      
+      // Response is already the data (apiService returns response.data)
+      // The results object contains total counts
+      const results = (response as any).results || {};
+      const totalVariants = results.variants_created || 0;
+      setTotalVariantsGenerated(totalVariants);
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate all variants');
+      setVariantGenerationError(err.message || 'Failed to generate variants. Please try again.');
+      console.error('Failed to generate all variants:', err);
+    } finally {
+      setGeneratingAllVariants(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -115,153 +226,196 @@ export const Playlists: React.FC = () => {
     <div className="space-y-8">
       {/* Action Bar */}
       <div className="animate-fade-in-up">
-        <div className="flex items-center justify-end gap-3 mb-6">
+        {/* Badge on separate line for mobile */}
+        <div className={cn("mb-4", isMobile && "mb-3")}>
           <Badge variant="secondary" className="px-3 py-1">
             <Play className="w-4 h-4 mr-2" />
             {playlists.length} playlists
           </Badge>
+        </div>
+        
+        {/* Buttons row */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button 
+            variant="outline"
+            onClick={handleGenerateAllVariants}
+            disabled={generatingAllVariants || playlists.length === 0}
+            title="Generate resolution variants for all playlists"
+            className={cn("flex-1", !isMobile && "flex-none")}
+          >
+            {generatingAllVariants ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            {isMobile ? 'All Variants' : 'Generate All Variants'}
+          </Button>
           <Button 
             className="shadow-lg"
             onClick={() => setShowCreateModal(true)}
           >
             <Plus className="w-4 h-4 mr-2" />
-            Create Playlist
+            Create
           </Button>
         </div>
       </div>
 
       {/* Playlists Grid */}
-      {playlists.length === 0 ? (
-        <Card className="animate-fade-in-up border-0 shadow-lg bg-card/50 backdrop-blur-sm">
-          <CardContent className="text-center py-12">
-            <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Play className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <CardTitle className="mb-2">No Playlists Yet</CardTitle>
-            <CardDescription className="mb-6">Create your first playlist to get started</CardDescription>
-            <Button
-              onClick={() => setShowCreateModal(true)}
-              className="shadow-lg"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Playlist
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4 animate-fade-in-up">
-          {playlists.map((playlist) => (
-            <div
-              key={playlist.id}
-              className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
-              onClick={() => navigate(`/admin/playlists/${playlist.id}`)}
-            >
-              <div className="flex items-center space-x-4">
-                {/* Thumbnail placeholder */}
-                <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <Play className="w-8 h-8 text-gray-400" />
-                </div>
-                
-                {/* Playlist Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-lg font-semibold text-gray-900 truncate">{playlist.name}</h3>
-                    {playlist.is_default && (
-                      <Badge variant="secondary" className="text-xs">
-                        <Star className="w-3 h-3 mr-1" />
-                        Default
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-500 mb-2">
-                    {playlist.image_count} images • {playlist.slug}
-                  </p>
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    {playlist.display_mode && playlist.display_mode !== 'default' && (
-                      <Badge variant="outline" className="text-xs">
-                        {playlist.display_mode === 'auto_sort' ? 'Auto Sort' :
-                         playlist.display_mode === 'movement' ? 'Movement' :
-                         playlist.display_mode}
-                      </Badge>
-                    )}
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {playlist.display_time_seconds || 30}s
-                    </span>
-                  </div>
-                </div>
-                
-                {/* Actions */}
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSetDefault(playlist);
-                    }}
-                    disabled={playlist.is_default}
-                  >
-                    <Star className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPlaylistToDelete(playlist);
-                      setShowDeleteModal(true);
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
-                </div>
+      {(() => {
+        console.log('🔍 Playlists render check:', { isMobile, playlistCount: playlists.length });
+        return isMobile ? (
+          <MobilePlaylistGrid
+            playlists={playlists}
+            playlistThumbnails={playlistThumbnails}
+            loading={loading}
+            error={error}
+            onPlaylistClick={(playlist) => navigate(`/admin/playlists/${playlist.slug}`)}
+            onPlaylistPlay={(playlist) => navigate(`/admin/playlists/${playlist.slug}`)}
+            onPlaylistEdit={(playlist) => navigate(`/admin/playlists/${playlist.slug}`)}
+            onPlaylistDelete={(playlist) => {
+              setPlaylistToDelete(playlist);
+              setShowDeleteModal(true);
+            }}
+            onPlaylistSettings={(playlist) => navigate(`/admin/playlists/${playlist.slug}`)}
+            onPlaylistPreview={(playlist) => navigate(`/admin/playlists/${playlist.slug}`)}
+            onGenerateVariants={handleGenerateVariants}
+            onCreatePlaylist={() => setShowCreateModal(true)}
+            isGeneratingVariants={generatingVariants}
+            hapticFeedback={true}
+          />
+        ) : (
+          playlists.length === 0 ? (
+          <Card className="animate-fade-in-up border-0 shadow-lg bg-card/50 backdrop-blur-sm">
+            <CardContent className="text-center py-12">
+              <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Play className="w-8 h-8 text-muted-foreground" />
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Create Playlist Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4">
-            <CardHeader>
-              <CardTitle>Create New Playlist</CardTitle>
-              <CardDescription>Enter a name for your new playlist</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="playlist-name">Playlist Name</Label>
-                <Input
-                  id="playlist-name"
-                  value={newPlaylistName}
-                  onChange={(e) => setNewPlaylistName(e.target.value)}
-                  placeholder="Enter playlist name"
-                  className="w-full"
-                />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setNewPlaylistName('');
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleCreatePlaylist}
-                  disabled={!newPlaylistName.trim() || isCreating}
-                >
-                  {isCreating ? 'Creating...' : 'Create Playlist'}
-                </Button>
-              </div>
+              <CardTitle className="mb-2">No Playlists Yet</CardTitle>
+              <CardDescription className="mb-6">Create your first playlist to get started</CardDescription>
+              <Button
+                onClick={() => setShowCreateModal(true)}
+                className="shadow-lg"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Playlist
+              </Button>
             </CardContent>
           </Card>
-        </div>
-      )}
+        ) : (
+          <div className="space-y-4 animate-fade-in-up">
+            {playlists.map((playlist) => (
+              <div
+                key={playlist.id}
+                className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
+                onClick={() => navigate(`/admin/playlists/${playlist.slug}`)}
+              >
+                <div className="flex items-center space-x-4">
+                  {/* Thumbnail */}
+                  <div className="flex-shrink-0 w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                    {playlistThumbnails[playlist.id] ? (
+                      <img
+                        src={playlistThumbnails[playlist.id]}
+                        alt={`${playlist.name} thumbnail`}
+                        className="w-full h-full object-cover rounded-lg"
+                        onError={(e) => {
+                          // Fallback to play icon if image fails to load
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <div className={`w-full h-full flex items-center justify-center ${playlistThumbnails[playlist.id] ? 'hidden' : ''}`}>
+                      <Play className="w-8 h-8 text-gray-400" />
+                    </div>
+                  </div>
+                  
+                  {/* Playlist Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-lg font-semibold text-gray-900 truncate">{playlist.name}</h3>
+                      {playlist.is_default && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Star className="w-3 h-3 mr-1" />
+                          Default
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 mb-2">
+                      {playlist.image_count} images • {playlist.slug}
+                    </p>
+                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                      {playlist.display_mode && playlist.display_mode !== 'default' && (
+                        <Badge variant="outline" className="text-xs">
+                          {playlist.display_mode === 'auto_sort' ? 'Auto Sort' :
+                           playlist.display_mode === 'movement' ? 'Movement' :
+                           playlist.display_mode}
+                        </Badge>
+                      )}
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {playlist.display_time_seconds || 30}s
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Actions */}
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleGenerateVariants(playlist.id);
+                      }}
+                      disabled={generatingVariants}
+                      title="Generate resolution variants"
+                    >
+                      {generatingVariants ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSetDefault(playlist);
+                      }}
+                      disabled={playlist.is_default}
+                      title="Set as default"
+                    >
+                      <Star className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPlaylistToDelete(playlist);
+                        setShowDeleteModal(true);
+                      }}
+                      title="Delete playlist"
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+        );
+      })()}
+
+      {/* Create Playlist Modal */}
+      <MobilePlaylistCreateModal
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
+        onCreatePlaylist={handleCreatePlaylistMobile}
+        loading={isCreating}
+      />
 
       {/* Delete Confirmation Modal */}
       <ConfirmationModal
@@ -276,6 +430,21 @@ export const Playlists: React.FC = () => {
         confirmText="Delete Playlist"
         cancelText="Cancel"
         variant="danger"
+      />
+
+      {/* Variant Generation Modal */}
+      <VariantGenerationModal
+        isOpen={showVariantModal}
+        isGenerating={generatingVariants || generatingAllVariants}
+        playlistName={variantPlaylistName}
+        variantCount={totalVariantsGenerated}
+        error={variantGenerationError}
+        onClose={() => {
+          setShowVariantModal(false);
+          setVariantGenerationError(null);
+          setVariantPlaylistName(undefined);
+          setTotalVariantsGenerated(undefined);
+        }}
       />
     </div>
   );

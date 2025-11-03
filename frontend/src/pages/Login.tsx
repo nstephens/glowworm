@@ -7,6 +7,7 @@ import { Label } from '../components/ui/label';
 import { Camera, Sparkles } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { userLogger } from '../services/userLogger';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -70,6 +71,10 @@ const Login: React.FC = () => {
       
       if (response.success) {
         console.log('🔐 Login successful, waiting for cookies to set...');
+        
+        // Log successful login
+        userLogger.logLogin(credentials.username);
+        
         // Longer delay to ensure session cookie is properly set
         await new Promise(resolve => setTimeout(resolve, 1000));
         
@@ -84,6 +89,7 @@ const Login: React.FC = () => {
         navigate('/admin');
       } else {
         setError(response.message || 'Login failed');
+        userLogger.logError(`Failed login attempt for user: ${credentials.username}`);
       }
     } catch (err: any) {
       console.error('🔐 Login error:', err);
@@ -174,6 +180,17 @@ const Login: React.FC = () => {
                 {loading ? 'Signing In...' : 'Sign In'}
               </Button>
             </form>
+
+            <div className="border-t pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate('/display')}
+                className="w-full h-11"
+              >
+                Display View
+              </Button>
+            </div>
 
             <p className="text-center text-sm text-muted-foreground">
               Need help? Contact your system administrator

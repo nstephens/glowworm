@@ -1,9 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, User, Menu, X, Settings, LogOut, Camera } from 'lucide-react';
+import { User, Menu, Settings, LogOut, Camera, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -14,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { apiService } from '@/services/api';
+import { AboutModal } from '@/components/AboutModal';
 
 interface TopBarProps {
   onMenuToggle: () => void;
@@ -27,10 +26,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   className 
 }) => {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const [showAboutModal, setShowAboutModal] = useState(false);
 
   // Load user data
   useEffect(() => {
@@ -46,17 +43,15 @@ export const TopBar: React.FC<TopBarProps> = ({
     loadUserData();
   }, []);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      // TODO: Implement global search
-      console.log('Searching for:', searchQuery);
-      navigate(`/admin/search?q=${encodeURIComponent(searchQuery)}`);
-    }
-  };
 
   const handleLogout = async () => {
     try {
+      // Log logout before actual logout (while user is still authenticated)
+      const { userLogger } = await import('@/services/userLogger');
+      if (user?.name) {
+        userLogger.logLogout(user.name);
+      }
+      
       await apiService.logout();
       navigate('/login');
     } catch (error) {
@@ -65,19 +60,13 @@ export const TopBar: React.FC<TopBarProps> = ({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      setSearchQuery('');
-      searchRef.current?.blur();
-    }
-  };
 
   return (
     <header className={cn(
       "sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
       className
     )}>
-      <div className="flex h-16 items-center px-4 sm:px-6 lg:px-8">
+      <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left section - Logo and Menu toggle */}
         <div className="flex items-center gap-4">
           {/* Mobile menu button */}
@@ -103,53 +92,18 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
         </div>
 
-        {/* Center section - Search */}
-        <div className="flex-1 max-w-md mx-4">
-          <form onSubmit={handleSearch} className="relative">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                ref={searchRef}
-                type="text"
-                placeholder="Search images, albums, tags..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => setIsSearchFocused(false)}
-                onKeyDown={handleKeyDown}
-                className={cn(
-                  "pl-9 pr-4 h-10 transition-all duration-200",
-                  isSearchFocused && "ring-2 ring-primary ring-offset-2"
-                )}
-              />
-              {searchQuery && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                  onClick={() => setSearchQuery('')}
-                  aria-label="Clear search"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          </form>
-        </div>
-
         {/* Right section - User menu */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center">
           {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="relative h-10 w-10 rounded-full"
+                className="relative h-12 w-12 rounded-full p-0 mobile-button"
                 aria-label="User menu"
               >
-                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-                  <User className="h-4 w-4 text-primary-foreground" />
+                <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary-foreground" />
                 </div>
               </Button>
             </DropdownMenuTrigger>
@@ -169,6 +123,10 @@ export const TopBar: React.FC<TopBarProps> = ({
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowAboutModal(true)}>
+                <Info className="mr-2 h-4 w-4" />
+                <span>About</span>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
@@ -178,6 +136,12 @@ export const TopBar: React.FC<TopBarProps> = ({
           </DropdownMenu>
         </div>
       </div>
+      
+      {/* About Modal */}
+      <AboutModal 
+        isOpen={showAboutModal} 
+        onClose={() => setShowAboutModal(false)} 
+      />
     </header>
   );
 };

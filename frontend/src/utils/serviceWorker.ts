@@ -1,312 +1,276 @@
-// Service Worker Registration and Management
-// Provides utilities for registering, updating, and managing the service worker
+/**
+ * Service Worker registration and management utilities
+ */
 
 interface ServiceWorkerConfig {
   onUpdate?: (registration: ServiceWorkerRegistration) => void;
   onSuccess?: (registration: ServiceWorkerRegistration) => void;
-  onOfflineReady?: () => void;
-  onError?: (error: Error) => void;
-}
-
-interface ServiceWorkerState {
-  isSupported: boolean;
-  isRegistered: boolean;
-  isUpdated: boolean;
-  isOfflineReady: boolean;
-  registration: ServiceWorkerRegistration | null;
+  onOffline?: () => void;
+  onOnline?: () => void;
 }
 
 class ServiceWorkerManager {
-  private config: ServiceWorkerConfig;
-  private state: ServiceWorkerState = {
-    isSupported: false,
-    isRegistered: false,
-    isUpdated: false,
-    isOfflineReady: false,
-    registration: null,
-  };
+  private registration: ServiceWorkerRegistration | null = null;
+  private config: ServiceWorkerConfig = {};
 
   constructor(config: ServiceWorkerConfig = {}) {
     this.config = config;
-    this.checkSupport();
   }
 
-  private checkSupport(): void {
-    this.state.isSupported = 'serviceWorker' in navigator;
-  }
-
+  /**
+   * Register the service worker
+   */
   async register(): Promise<ServiceWorkerRegistration | null> {
-    if (!this.state.isSupported) {
-      console.warn('Service Worker: Not supported in this browser');
+    // Only register in supported browsers and in production
+    const isSupported = 'serviceWorker' in navigator;
+    const isProd = typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.PROD;
+    if (!isSupported || !isProd) {
+      // Quietly no-op in unsupported environments or during development
       return null;
     }
 
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js', {
+      const registration = await navigator.serviceWorker.register('/service-worker.js', {
         scope: '/',
       });
 
-      this.state.registration = registration;
-      this.state.isRegistered = true;
-
-      console.log('Service Worker: Registered successfully', registration);
-
-      // Handle registration success
-      this.config.onSuccess?.(registration);
+      this.registration = registration;
 
       // Handle updates
       registration.addEventListener('updatefound', () => {
         const newWorker = registration.installing;
         if (newWorker) {
           newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed') {
-              if (navigator.serviceWorker.controller) {
-                // New content is available
-                this.state.isUpdated = true;
-                this.config.onUpdate?.(registration);
-              } else {
-                // Content is cached for offline use
-                this.state.isOfflineReady = true;
-                this.config.onOfflineReady?.();
-              }
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New content is available
+              this.config.onUpdate?.(registration);
             }
           });
         }
       });
 
-      // Handle controller change
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        window.location.reload();
-      });
+      // Handle successful registration
+      if (registration.active) {
+        this.config.onSuccess?.(registration);
+      }
 
+      // Set up network status listeners
+      this.setupNetworkListeners();
+
+      console.log('Service Worker registered successfully');
       return registration;
+
     } catch (error) {
-      console.error('Service Worker: Registration failed', error);
-      this.config.onError?.(error as Error);
+      console.error('Service Worker registration failed:', error);
       return null;
     }
   }
 
+  /**
+   * Unregister the service worker
+   */
   async unregister(): Promise<boolean> {
-    if (!this.state.registration) {
+    if (!this.registration) {
       return false;
     }
 
     try {
-      const result = await this.state.registration.unregister();
-      this.state.isRegistered = false;
-      this.state.registration = null;
-      console.log('Service Worker: Unregistered', result);
+      const result = await this.registration.unregister();
+      this.registration = null;
+      console.log('Service Worker unregistered');
       return result;
     } catch (error) {
-      console.error('Service Worker: Unregistration failed', error);
+      console.error('Service Worker unregistration failed:', error);
       return false;
     }
   }
 
-  async update(): Promise<void> {
-    if (!this.state.registration) {
+  /**
+   * Check for updates
+   */
+  async checkForUpdates(): Promise<void> {
+    if (!this.registration) {
       return;
     }
 
     try {
-      await this.state.registration.update();
-      console.log('Service Worker: Update requested');
+      await this.registration.update();
     } catch (error) {
-      console.error('Service Worker: Update failed', error);
+      console.error('Failed to check for updates:', error);
     }
   }
 
-  async skipWaiting(): Promise<void> {
-    if (!this.state.registration || !this.state.registration.waiting) {
+  /**
+   * Skip waiting and reload
+   */
+  async skipWaitingAndReload(): Promise<void> {
+    if (!this.registration || !this.registration.waiting) {
+      return;
+    }
+
+    // Tell the waiting service worker to skip waiting
+    this.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+
+    // Reload the page
+    window.location.reload();
+  }
+
+  /**
+   * Get cache information
+   */
+  async getCacheInfo(): Promise<{ name: string; size: number }[]> {
+    if (!('caches' in window)) {
+      return [];
+    }
+
+    const cacheNames = await caches.keys();
+    const cacheInfo = await Promise.all(
+      cacheNames.map(async (name) => {
+        const cache = await caches.open(name);
+        const keys = await cache.keys();
+        return {
+          name,
+          size: keys.length,
+        };
+      })
+    );
+
+    return cacheInfo;
+  }
+
+  /**
+   * Clear all caches
+   */
+  async clearAllCaches(): Promise<void> {
+    if (!('caches' in window)) {
+      return;
+    }
+
+    const cacheNames = await caches.keys();
+    await Promise.all(
+      cacheNames.map(name => caches.delete(name))
+    );
+
+    console.log('All caches cleared');
+  }
+
+  /**
+   * Clear specific cache
+   */
+  async clearCache(cacheName: string): Promise<boolean> {
+    if (!('caches' in window)) {
+      return false;
+    }
+
+    try {
+      const result = await caches.delete(cacheName);
+      console.log(`Cache ${cacheName} cleared:`, result);
+      return result;
+    } catch (error) {
+      console.error(`Failed to clear cache ${cacheName}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Precache specific URLs
+   */
+  async precache(urls: string[]): Promise<void> {
+    if (!this.registration || !this.registration.active) {
       return;
     }
 
     try {
-      this.state.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      console.log('Service Worker: Skip waiting requested');
+      // Send message to service worker to precache URLs
+      this.registration.active.postMessage({
+        type: 'PRECACHE',
+        urls,
+      });
     } catch (error) {
-      console.error('Service Worker: Skip waiting failed', error);
+      console.error('Failed to precache URLs:', error);
     }
   }
 
-  async clearCache(): Promise<void> {
-    if (!this.state.isSupported) {
-      return;
-    }
-
-    try {
-      const cacheNames = await caches.keys();
-      await Promise.all(
-        cacheNames
-          .filter(name => name.startsWith('glowworm-'))
-          .map(name => caches.delete(name))
-      );
-      console.log('Service Worker: Cache cleared');
-    } catch (error) {
-      console.error('Service Worker: Cache clear failed', error);
-    }
-  }
-
-  async getCacheSize(): Promise<number> {
-    if (!this.state.isSupported) {
-      return 0;
-    }
-
-    try {
-      const cacheNames = await caches.keys();
-      let totalSize = 0;
-
-      for (const cacheName of cacheNames) {
-        if (cacheName.startsWith('glowworm-')) {
-          const cache = await caches.open(cacheName);
-          const keys = await cache.keys();
-          
-          for (const key of keys) {
-            const response = await cache.match(key);
-            if (response) {
-              const blob = await response.blob();
-              totalSize += blob.size;
-            }
-          }
-        }
-      }
-
-      return totalSize;
-    } catch (error) {
-      console.error('Service Worker: Cache size calculation failed', error);
-      return 0;
-    }
-  }
-
-  getState(): ServiceWorkerState {
-    return { ...this.state };
-  }
-
-  isOnline(): boolean {
-    return navigator.onLine;
-  }
-
-  addOnlineListener(callback: () => void): void {
-    window.addEventListener('online', callback);
-  }
-
-  addOfflineListener(callback: () => void): void {
-    window.addEventListener('offline', callback);
-  }
-
-  removeOnlineListener(callback: () => void): void {
-    window.removeEventListener('online', callback);
-  }
-
-  removeOfflineListener(callback: () => void): void {
-    window.removeEventListener('offline', callback);
-  }
-}
-
-// Create global instance
-let swManager: ServiceWorkerManager | null = null;
-
-export function initializeServiceWorker(config: ServiceWorkerConfig = {}): ServiceWorkerManager {
-  if (!swManager) {
-    swManager = new ServiceWorkerManager(config);
-  }
-  return swManager;
-}
-
-export function getServiceWorkerManager(): ServiceWorkerManager | null {
-  return swManager;
-}
-
-// Utility functions
-export async function registerServiceWorker(config: ServiceWorkerConfig = {}): Promise<ServiceWorkerRegistration | null> {
-  const manager = initializeServiceWorker(config);
-  return await manager.register();
-}
-
-export async function unregisterServiceWorker(): Promise<boolean> {
-  const manager = getServiceWorkerManager();
-  if (!manager) return false;
-  return await manager.unregister();
-}
-
-export async function updateServiceWorker(): Promise<void> {
-  const manager = getServiceWorkerManager();
-  if (!manager) return;
-  await manager.update();
-}
-
-export async function skipWaitingServiceWorker(): Promise<void> {
-  const manager = getServiceWorkerManager();
-  if (!manager) return;
-  await manager.skipWaiting();
-}
-
-export async function clearServiceWorkerCache(): Promise<void> {
-  const manager = getServiceWorkerManager();
-  if (!manager) return;
-  await manager.clearCache();
-}
-
-export async function getServiceWorkerCacheSize(): Promise<number> {
-  const manager = getServiceWorkerManager();
-  if (!manager) return 0;
-  return await manager.getCacheSize();
-}
-
-export function isServiceWorkerSupported(): boolean {
-  return 'serviceWorker' in navigator;
-}
-
-export function isOnline(): boolean {
-  return navigator.onLine;
-}
-
-// React hook for service worker
-export function useServiceWorker(config: ServiceWorkerConfig = {}) {
-  const [state, setState] = React.useState<ServiceWorkerState>({
-    isSupported: false,
-    isRegistered: false,
-    isUpdated: false,
-    isOfflineReady: false,
-    registration: null,
-  });
-
-  React.useEffect(() => {
-    const manager = initializeServiceWorker({
-      ...config,
-      onUpdate: (registration) => {
-        setState(prev => ({ ...prev, isUpdated: true, registration }));
-        config.onUpdate?.(registration);
-      },
-      onSuccess: (registration) => {
-        setState(prev => ({ ...prev, isRegistered: true, registration }));
-        config.onSuccess?.(registration);
-      },
-      onOfflineReady: () => {
-        setState(prev => ({ ...prev, isOfflineReady: true }));
-        config.onOfflineReady?.();
-      },
-      onError: (error) => {
-        console.error('Service Worker Error:', error);
-        config.onError?.(error);
-      },
+  /**
+   * Set up network status listeners
+   */
+  private setupNetworkListeners(): void {
+    window.addEventListener('online', () => {
+      console.log('Network: Online');
+      this.config.onOnline?.();
     });
 
-    manager.register().then(() => {
-      setState(manager.getState());
+    window.addEventListener('offline', () => {
+      console.log('Network: Offline');
+      this.config.onOffline?.();
     });
+  }
 
-    return () => {
-      // Cleanup if needed
-    };
-  }, []);
+  /**
+   * Get registration status
+   */
+  getRegistration(): ServiceWorkerRegistration | null {
+    return this.registration;
+  }
 
-  return {
-    ...state,
-    update: () => getServiceWorkerManager()?.update(),
-    skipWaiting: () => getServiceWorkerManager()?.skipWaiting(),
-    clearCache: () => getServiceWorkerManager()?.clearCache(),
-    getCacheSize: () => getServiceWorkerManager()?.getCacheSize() || Promise.resolve(0),
-  };
+  /**
+   * Check if service worker is supported
+   */
+  static isSupported(): boolean {
+    return 'serviceWorker' in navigator;
+  }
+
+  /**
+   * Check if the app is running in a service worker context
+   */
+  static isServiceWorkerContext(): boolean {
+    return typeof self !== 'undefined' && 'ServiceWorkerGlobalScope' in self;
+  }
 }
+
+// Create default instance
+const serviceWorkerManager = new ServiceWorkerManager();
+
+// Default configuration
+const defaultConfig: ServiceWorkerConfig = {
+  onUpdate: (registration) => {
+    console.log('New content available, please refresh');
+    // You could show a notification to the user here
+  },
+  onSuccess: (registration) => {
+    console.log('Service Worker is ready');
+  },
+  onOffline: () => {
+    console.log('App is offline');
+    // You could show an offline indicator here
+  },
+  onOnline: () => {
+    console.log('App is online');
+    // You could hide the offline indicator here
+  },
+};
+
+// Register service worker with default config
+export const registerServiceWorker = async (config: ServiceWorkerConfig = {}): Promise<ServiceWorkerRegistration | null> => {
+  const mergedConfig = { ...defaultConfig, ...config };
+  serviceWorkerManager['config'] = mergedConfig;
+  return await serviceWorkerManager.register();
+};
+
+// Export the manager instance and utilities
+export {
+  ServiceWorkerManager,
+  serviceWorkerManager,
+  defaultConfig,
+};
+
+// Export individual functions for convenience
+export const unregisterServiceWorker = () => serviceWorkerManager.unregister();
+export const checkForUpdates = () => serviceWorkerManager.checkForUpdates();
+export const skipWaitingAndReload = () => serviceWorkerManager.skipWaitingAndReload();
+export const getCacheInfo = () => serviceWorkerManager.getCacheInfo();
+export const clearAllCaches = () => serviceWorkerManager.clearAllCaches();
+export const clearCache = (cacheName: string) => serviceWorkerManager.clearCache(cacheName);
+export const precache = (urls: string[]) => serviceWorkerManager.precache(urls);
+
+export default serviceWorkerManager;

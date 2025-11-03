@@ -50,20 +50,37 @@ class ConfigService:
     def get_setting(self, key: str, default: Any = None) -> Any:
         """Get a setting value from database first, then file, then default"""
         # Try database first
-        db_config = self._get_database_config_service()
-        if db_config:
+        # Check if setup is complete before attempting database access
+        from config.settings import is_configured
+        if not is_configured():
+            logger.debug("Skipping database config - setup not complete")
+            # Fall back to bootstrap settings
             try:
-                value = db_config.get_setting(key)
-                if value is not None:
-                    return value
-            except Exception as e:
-                logger.debug(f"Could not get setting '{key}' from database: {e}")
-                # If we created our own session and it failed, we need to rollback and close it
-                if not self.db:
-                    try:
-                        db_config.db.rollback()
-                    except:
-                        pass
+                return getattr(bootstrap_settings, key, default)
+            except AttributeError:
+                return default
+        
+        # Create a fresh session for this query
+        db = None
+        try:
+            from models.database import SessionLocal, ensure_database_initialized
+            ensure_database_initialized()
+            
+            db = SessionLocal()
+            db_config = DatabaseConfigService(db)
+            value = db_config.get_setting(key)
+            if value is not None:
+                return value
+        except Exception as e:
+            logger.debug(f"Could not get setting '{key}' from database: {e}")
+            if db:
+                try:
+                    db.rollback()
+                except:
+                    pass
+        finally:
+            if db:
+                db.close()
         
         # Fall back to bootstrap settings
         try:
@@ -157,7 +174,12 @@ class ConfigService:
     
     @property
     def target_display_sizes(self) -> list:
-        return self.get_setting('target_display_sizes', ['1080x1920', '2k-portrait', '4k-portrait'])
+        # Don't use a default - empty list is valid (means no sizes configured)
+        value = self.get_setting('target_display_sizes', None)
+        if value is None:
+            # Only use default if setting doesn't exist at all
+            return ['1080x1920', '2k-portrait', '4k-portrait']
+        return value if isinstance(value, list) else []
 
 
 # Global configuration service instance

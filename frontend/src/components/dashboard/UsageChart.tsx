@@ -6,6 +6,7 @@ import {
   PointElement,
   LineElement,
   BarElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend,
@@ -21,6 +22,7 @@ ChartJS.register(
   PointElement,
   LineElement,
   BarElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend,
@@ -144,13 +146,13 @@ export const UsageChart: React.FC<UsageChartProps> = ({
   const renderChart = () => {
     switch (type) {
       case 'line':
-        return <Line options={options} data={data} />;
+        return <Line options={options} data={data} redraw />;
       case 'bar':
-        return <Bar options={options} data={data} />;
+        return <Bar options={options} data={data} redraw />;
       case 'doughnut':
-        return <Doughnut options={options} data={data} />;
+        return <Doughnut options={options} data={data} redraw />;
       default:
-        return <Line options={options} data={data} />;
+        return <Line options={options} data={data} redraw />;
     }
   };
 

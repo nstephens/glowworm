@@ -10,6 +10,7 @@ from models.display_device import DisplayDevice, DeviceStatus
 from utils.middleware import get_current_user
 from services.playlist_service import PlaylistService
 from services.display_device_service import DisplayDeviceService
+from services.playlist_variant_service import PlaylistVariantService
 from utils.csrf import csrf_protection
 from utils.cookies import CookieManager
 from websocket.manager import connection_manager
@@ -26,6 +27,7 @@ class PlaylistUpdateRequest(BaseModel):
     is_default: Optional[bool] = None
     display_time_seconds: Optional[int] = None
     display_mode: Optional[str] = None
+    show_image_info: Optional[bool] = None
 
 class PlaylistReorderRequest(BaseModel):
     image_ids: List[int]
@@ -247,7 +249,8 @@ async def update_playlist(
             name=update_data.name, 
             is_default=update_data.is_default, 
             display_time_seconds=update_data.display_time_seconds,
-            display_mode=update_data.display_mode
+            display_mode=update_data.display_mode,
+            show_image_info=update_data.show_image_info
         )
         
         # Send WebSocket notification to all connected devices
@@ -535,5 +538,221 @@ async def get_playlist_statistics(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve playlist statistics"
+        )
+
+# Playlist Variant Endpoints
+
+@router.post("/{playlist_id}/generate-variants")
+async def generate_playlist_variants(
+    playlist_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate resolution-specific variants for a playlist"""
+    try:
+        # Check if playlist exists
+        playlist = db.query(Playlist).filter(Playlist.id == playlist_id).first()
+        if not playlist:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Playlist not found"
+            )
+        
+        # Get configured display sizes for diagnostics
+        from services.image_storage_service import image_storage_service
+        configured_sizes = image_storage_service._load_display_sizes()
+        logger.info(f"🎯 Variant generation request for '{playlist.name}'")
+        logger.info(f"📐 Configured display sizes from database: {configured_sizes}")
+        
+        # Generate variants
+        variant_service = PlaylistVariantService(db)
+        variants = variant_service.generate_variants_for_playlist(playlist_id)
+        
+        # Get generation errors if any
+        generation_errors = getattr(variant_service, '_last_generation_errors', [])
+        
+        # Enhanced response with diagnostic info
+        return {
+            "success": True,
+            "message": f"Generated {len(variants)} variants for playlist {playlist.name}",
+            "playlist_id": playlist_id,
+            "playlist_name": playlist.name,
+            "variants": [variant.to_dict() for variant in variants],
+            "count": len(variants),
+            "diagnostic": {
+                "configured_display_sizes": [f"{w}x{h}" for w, h in configured_sizes],
+                "configured_count": len(configured_sizes),
+                "variants_generated": len(variants),
+                "errors": generation_errors
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Generate playlist variants error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate playlist variants: {str(e)}"
+        )
+
+@router.post("/generate-all-variants")
+async def generate_all_playlist_variants(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate variants for all playlists"""
+    try:
+        variant_service = PlaylistVariantService(db)
+        results = variant_service.regenerate_all_variants()
+        
+        return {
+            "message": "Playlist variant generation completed",
+            "results": results
+        }
+        
+    except Exception as e:
+        logger.error(f"Generate all playlist variants error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate playlist variants"
+        )
+
+@router.get("/{playlist_id}/variants")
+async def get_playlist_variants(
+    playlist_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all variants for a playlist"""
+    try:
+        from models.playlist_variant import PlaylistVariant
+        
+        # Check if playlist exists
+        playlist = db.query(Playlist).filter(Playlist.id == playlist_id).first()
+        if not playlist:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Playlist not found"
+            )
+        
+        # Get variants
+        variants = db.query(PlaylistVariant).filter(PlaylistVariant.playlist_id == playlist_id).all()
+        
+        return {
+            "message": f"Retrieved {len(variants)} variants for playlist {playlist.name}",
+            "playlist_id": playlist_id,
+            "variants": [variant.to_dict() for variant in variants],
+            "count": len(variants)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get playlist variants error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve playlist variants"
+        )
+
+@router.get("/{playlist_id}/smart")
+async def get_playlist_smart(
+    playlist_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get playlist optimized for device resolution (public endpoint for display devices)"""
+    try:
+        from models.playlist_variant import PlaylistVariant
+        
+        # Get device token from cookie
+        cookie_manager = CookieManager()
+        device_token = cookie_manager.get_display_device_cookie(request)
+        
+        if not device_token:
+            raise HTTPException(status_code=401, detail="Display device not authenticated")
+        
+        # Verify device exists and is authorized
+        device_service = DisplayDeviceService(db)
+        device = device_service.get_device_by_token(device_token)
+        
+        if not device:
+            raise HTTPException(status_code=404, detail="Display device not found")
+        
+        if device.status != DeviceStatus.AUTHORIZED:
+            raise HTTPException(status_code=403, detail="Display device not authorized")
+        
+        # Get device resolution
+        device_width = device.screen_width or 1920
+        device_height = device.screen_height or 1080
+        device_pixel_ratio = float(device.device_pixel_ratio or "1.0")
+        
+        # Get all available variants for this playlist
+        all_variants = db.query(PlaylistVariant).filter(PlaylistVariant.playlist_id == playlist_id).all()
+        available_variants_list = [
+            {
+                "id": v.id,
+                "type": v.variant_type.value,
+                "target": f"{v.target_width}x{v.target_height}",
+                "image_count": v.image_count
+            } for v in all_variants
+        ]
+        
+        # Log variant selection process
+        logger.info(f"Smart playlist request for playlist {playlist_id}, device: {device_token[:8]}...")
+        logger.info(f"Device resolution: {device_width}x{device_height} (DPR: {device_pixel_ratio})")
+        logger.info(f"Available variants: {len(all_variants)}")
+        for v in all_variants:
+            logger.info(f"  - {v.variant_type.value}: {v.target_width}x{v.target_height} ({v.image_count} images)")
+        
+        # Get best variant for this device
+        variant_service = PlaylistVariantService(db)
+        best_variant = variant_service.get_best_variant_for_device(
+            playlist_id, device_width, device_height, device_pixel_ratio
+        )
+        
+        if not best_variant:
+            # Fallback to original playlist
+            playlist = db.query(Playlist).filter(Playlist.id == playlist_id).first()
+            if not playlist:
+                raise HTTPException(status_code=404, detail="Playlist not found")
+            
+            logger.warning(f"No variant found for {device_width}x{device_height}, using original")
+            
+            return {
+                "message": "Using original playlist (no variants available)",
+                "playlist": playlist.to_dict(),
+                "variant_type": "original",
+                "device_resolution": f"{device_width}x{device_height}",
+                "effective_resolution": f"{int(device_width * device_pixel_ratio)}x{int(device_height * device_pixel_ratio)}",
+                "available_variants": available_variants_list
+            }
+        
+        # Get playlist details
+        playlist = db.query(Playlist).filter(Playlist.id == playlist_id).first()
+        
+        # Create optimized playlist response
+        optimized_playlist = playlist.to_dict()
+        optimized_playlist["sequence"] = best_variant.optimized_sequence
+        optimized_playlist["image_count"] = best_variant.image_count
+        
+        logger.info(f"Selected variant: {best_variant.variant_type.value} ({best_variant.target_width}x{best_variant.target_height})")
+        
+        return {
+            "message": f"Using {best_variant.variant_type.value} variant for device",
+            "playlist": optimized_playlist,
+            "variant": best_variant.to_dict(),
+            "device_resolution": f"{device_width}x{device_height}",
+            "effective_resolution": f"{int(device_width * device_pixel_ratio)}x{int(device_height * device_pixel_ratio)}",
+            "available_variants": available_variants_list
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get smart playlist error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve optimized playlist"
         )
 

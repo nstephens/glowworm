@@ -19,11 +19,13 @@ class Playlist(Base):
     sequence = Column(JSON, nullable=True)  # Array of image IDs in display order
     display_time_seconds = Column(Integer, nullable=True)  # Time to display each image in seconds
     display_mode = Column(Enum(DisplayMode), default=DisplayMode.DEFAULT, nullable=True)  # Display mode for the playlist
+    show_image_info = Column(Boolean, default=False, nullable=True)  # Show image info overlay on display
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=True)
     
     # Relationships
     images = relationship("Image", back_populates="playlist", cascade="all, delete-orphan")
+    variants = relationship("PlaylistVariant", back_populates="playlist", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Playlist(id={self.id}, name='{self.name}', slug='{self.slug}')>"
@@ -56,6 +58,7 @@ class Playlist(Base):
                 "sequence": self.sequence,
                 "display_time_seconds": self.display_time_seconds,
                 "display_mode": display_mode_value,
+                "show_image_info": self.show_image_info or False,
                 "created_at": self.created_at.isoformat() if self.created_at else None,
                 "updated_at": self.updated_at.isoformat() if self.updated_at else None,
                 "image_count": len(self.images) if self.images else 0
@@ -73,6 +76,7 @@ class Playlist(Base):
                 "sequence": self.sequence or [],
                 "display_time_seconds": self.display_time_seconds or self._get_default_display_time(),
                 "display_mode": DisplayMode.DEFAULT.value,
+                "show_image_info": getattr(self, 'show_image_info', False) or False,
                 "created_at": None,
                 "updated_at": None,
                 "image_count": 0

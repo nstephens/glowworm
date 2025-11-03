@@ -21,6 +21,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { formatDistanceToNow, format } from 'date-fns';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 export interface ActivityItem {
   id: string;
@@ -162,7 +163,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   }
 
   return (
-    <div className={cn("space-y-4", className)} ref={timelineRef}>
+    <div className={cn("space-y-4 overflow-hidden", className)} ref={timelineRef}>
       <AnimatePresence>
         {visibleActivities.map((activity, index) => (
           <motion.div
@@ -191,19 +192,19 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
             </div>
 
             {/* Activity content */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <h4 className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">
                     {activity.title}
                   </h4>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                     {activity.description}
                   </p>
                   
                   {/* Metadata */}
                   {showMetadata && activity.metadata && (
-                    <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground flex-wrap">
                       {activity.metadata.fileType && (
                         <div className="flex items-center gap-1">
                           {getFileTypeIcon(activity.metadata.fileType)}
@@ -214,7 +215,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                         <span>{activity.metadata.fileSize}</span>
                       )}
                       {activity.metadata.albumName && (
-                        <span>in {activity.metadata.albumName}</span>
+                        <span className="truncate">in {activity.metadata.albumName}</span>
                       )}
                     </div>
                   )}
@@ -240,9 +241,9 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                 </div>
                 
                 {/* Timestamp */}
-                <div className="flex flex-col items-end text-xs text-muted-foreground ml-4">
-                  <span>{formatDistanceToNow(activity.timestamp, { addSuffix: true })}</span>
-                  <span className="text-xs opacity-75">
+                <div className="flex flex-col items-end text-xs text-muted-foreground flex-shrink-0">
+                  <span className="text-right whitespace-nowrap">{formatDistanceToNow(activity.timestamp, { addSuffix: true })}</span>
+                  <span className="text-xs opacity-75 text-right whitespace-nowrap">
                     {format(activity.timestamp, 'MMM d, HH:mm')}
                   </span>
                 </div>
@@ -283,19 +284,20 @@ export const ActivityTimelineCard: React.FC<ActivityTimelineCardProps> = ({
   className,
 }) => {
   return (
-    <div className={cn("p-6 rounded-lg border bg-card text-card-foreground shadow-sm", className)}>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold">{title}</h2>
+    <Card className={cn("w-full", className)}>
+      <CardHeader className="flex-row items-center justify-between">
+        <CardTitle>{title}</CardTitle>
         <Settings className="h-4 w-4 text-muted-foreground" />
-      </div>
-      
-      <ActivityTimeline
-        activities={activities}
-        showUser={showUser}
-        showMetadata={showMetadata}
-        maxItems={maxItems}
-        loading={loading}
-      />
-    </div>
+      </CardHeader>
+      <CardContent>
+        <ActivityTimeline
+          activities={activities}
+          showUser={showUser}
+          showMetadata={showMetadata}
+          maxItems={maxItems}
+          loading={loading}
+        />
+      </CardContent>
+    </Card>
   );
 };

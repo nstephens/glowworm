@@ -55,5 +55,26 @@ export const getBestImageUrl = (image: any, size: string = 'medium'): string => 
   return getImageUrl(image.id, size);
 };
 
+/**
+ * Get smart image URL for display devices with resolution matching
+ * @param imageId - The image ID
+ * @param deviceToken - The device token for resolution matching
+ * @returns The smart image URL
+ */
+export const getSmartImageUrl = (imageId: number, deviceToken?: string): string => {
+  const baseUrl = urlResolver.getApiUrl(`/images/${imageId}/smart`);
+  return deviceToken ? `${baseUrl}?device_token=${deviceToken}` : baseUrl;
+};
+
+/**
+ * Get smart image URL from an image object for display devices
+ * @param image - The image object
+ * @param deviceToken - The device token for resolution matching
+ * @returns The smart image URL
+ */
+export const getSmartImageUrlFromImage = (image: any, deviceToken?: string): string => {
+  return getSmartImageUrl(image.id, deviceToken);
+};
+
 
 

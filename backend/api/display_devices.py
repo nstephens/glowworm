@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
+from datetime import datetime
 import logging
 
 from models.database import get_db
 from models.display_device import DisplayDevice, DeviceStatus
+from models.device_log import DeviceLog, LogLevel
 from models.user import User
 from services.display_device_service import DisplayDeviceService
 from utils.middleware import require_admin, get_current_user
@@ -239,6 +241,66 @@ async def update_device(
         logger.error(f"Update device failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to update device")
 
+@router.get("/debug-cookies")
+async def debug_cookies(request: Request):
+    """Debug endpoint to check cookie handling"""
+    return {
+        "all_cookies": dict(request.cookies),
+        "glowworm_display_cookie": cookie_manager.get_display_device_cookie(request),
+        "query_token": request.query_params.get('device_token'),
+        "header_token": request.headers.get('X-Device-Token')
+    }
+
+@router.post("/update-resolution")
+async def update_device_resolution(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    """Update device resolution information (no auth required for display devices)"""
+    try:
+        # Get device token from query parameters, headers, or cookie
+        device_token = (request.query_params.get('device_token') or 
+                       request.headers.get('X-Device-Token') or
+                       cookie_manager.get_display_device_cookie(request))
+        
+        logger.info(f"Update resolution request - query: {request.query_params.get('device_token')}, header: {request.headers.get('X-Device-Token')}, cookie: {cookie_manager.get_display_device_cookie(request)}")
+        logger.info(f"All cookies: {list(request.cookies.keys())}")
+        
+        if not device_token:
+            raise HTTPException(status_code=400, detail="Device token required")
+        
+        # Get resolution data from request body
+        body = await request.json()
+        screen_width = body.get('screen_width')
+        screen_height = body.get('screen_height')
+        device_pixel_ratio = body.get('device_pixel_ratio', '1.0')
+        
+        if not screen_width or not screen_height:
+            raise HTTPException(status_code=400, detail="Screen width and height required")
+        
+        # Update device resolution
+        service = DisplayDeviceService(db)
+        device = service.update_device_resolution(
+            device_token=device_token,
+            screen_width=screen_width,
+            screen_height=screen_height,
+            device_pixel_ratio=device_pixel_ratio
+        )
+        
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found")
+        
+        logger.info(f"Updated resolution for device {device_token[:8]}...: {screen_width}x{screen_height} (DPR: {device_pixel_ratio})")
+        
+        return {"message": "Device resolution updated successfully", "device": DeviceResponse.from_device(device)}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update device resolution failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update device resolution")
+
 @router.delete("/admin/devices/{device_id}")
 async def delete_device(
     device_id: int,
@@ -386,3 +448,120 @@ async def reset_device(
     except Exception as e:
         logger.error(f"Reset device failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to reset device")
+
+# Device logging endpoints
+class DeviceLogRequest(BaseModel):
+    log_level: str  # "debug", "info", "warning", "error", "critical"
+    message: str
+    context: Optional[dict] = None
+
+class DeviceLogResponse(BaseModel):
+    id: int
+    device_id: int
+    device_name: Optional[str]
+    device_token: str
+    log_level: str
+    message: str
+    context: Optional[dict]
+    created_at: str
+
+    @classmethod
+    def from_log(cls, log: DeviceLog) -> "DeviceLogResponse":
+        return cls(**log.to_dict())
+
+@router.post("/logs")
+async def submit_device_log(
+    request: Request,
+    log_data: DeviceLogRequest,
+    db: Session = Depends(get_db)
+):
+    """Submit a log entry from a display device (no auth required)"""
+    try:
+        # Get device token from cookie, query param, or header
+        device_token = (request.query_params.get('device_token') or 
+                       request.headers.get('X-Device-Token') or
+                       cookie_manager.get_display_device_cookie(request))
+        
+        if not device_token:
+            raise HTTPException(status_code=400, detail="Device token required")
+        
+        # Get device
+        service = DisplayDeviceService(db)
+        device = service.get_device_by_token(device_token)
+        
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found")
+        
+        # Validate log level (accept lowercase from frontend, convert to uppercase for DB)
+        try:
+            log_level_enum = LogLevel(log_data.log_level.upper())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid log level: {log_data.log_level}")
+        
+        # Create log entry
+        device_log = DeviceLog(
+            device_id=device.id,
+            log_level=log_level_enum,
+            message=log_data.message,
+            context=log_data.context
+        )
+        
+        db.add(device_log)
+        db.commit()
+        db.refresh(device_log)
+        
+        logger.info(f"Log received from device {device_token[:8]}... [{log_level_enum.value.upper()}]: {log_data.message[:50]}")
+        
+        return {"success": True, "message": "Log submitted successfully", "log_id": device_log.id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Submit device log failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to submit log")
+
+@router.get("/admin/logs", response_model=List[DeviceLogResponse])
+async def get_device_logs(
+    device_id: Optional[int] = Query(None, description="Filter by device ID"),
+    device_name: Optional[str] = Query(None, description="Filter by device name (partial match)"),
+    log_level: Optional[str] = Query(None, description="Filter by log level (debug, info, warning, error, critical)"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of logs to return"),
+    offset: int = Query(0, ge=0, description="Number of logs to skip"),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Get device logs with optional filtering (admin only)"""
+    try:
+        # Start with base query
+        query = db.query(DeviceLog).join(DisplayDevice)
+        
+        # Apply filters
+        if device_id:
+            query = query.filter(DeviceLog.device_id == device_id)
+        
+        if device_name:
+            query = query.filter(DisplayDevice.device_name.like(f"%{device_name}%"))
+        
+        if log_level:
+            try:
+                log_level_enum = LogLevel(log_level.upper())
+                query = query.filter(DeviceLog.log_level == log_level_enum)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid log level: {log_level}")
+        
+        # Order by most recent first
+        query = query.order_by(DeviceLog.created_at.desc())
+        
+        # Apply pagination
+        query = query.offset(offset).limit(limit)
+        
+        # Execute query
+        logs = query.all()
+        
+        return [DeviceLogResponse.from_log(log) for log in logs]
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get device logs failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get device logs")

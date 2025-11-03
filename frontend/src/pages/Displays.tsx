@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { ArrowLeft, X, RotateCcw, Monitor, Wifi, WifiOff, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, X, RotateCcw, Monitor, Wifi, WifiOff, CheckCircle, Clock, AlertTriangle, FileText } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { apiService } from '../services/api';
 import { urlResolver } from '../services/urlResolver';
 import { displayLogger } from '../utils/logger';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import DisplaysMobile from './DisplaysMobile';
 import type { Playlist } from '../types';
 
 interface DisplayDevice {
@@ -26,6 +28,7 @@ interface DisplayDevice {
 
 const Displays: React.FC = () => {
   const navigate = useNavigate();
+  const { isMobile } = useResponsiveLayout();
   const [devices, setDevices] = useState<DisplayDevice[]>([]);
   const [activeDevices, setActiveDevices] = useState<DisplayDevice[]>([]);
   const [pendingDevices, setPendingDevices] = useState<DisplayDevice[]>([]);
@@ -57,6 +60,8 @@ const Displays: React.FC = () => {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null);
 
+  // Do NOT early-return before hooks to avoid hook order mismatches when switching layouts.
+
   // Fetch all devices
   const fetchDevices = async () => {
     try {
@@ -86,7 +91,7 @@ const Displays: React.FC = () => {
   const fetchPlaylists = async () => {
     try {
       const response = await apiService.getPlaylists();
-      setPlaylists(response.playlists || []);
+      setPlaylists(response.data || []);
     } catch (err) {
       displayLogger.error('Failed to fetch playlists:', err);
     }
@@ -121,6 +126,26 @@ const Displays: React.FC = () => {
       });
 
       if (response.ok) {
+        // Try to assign the default playlist if one exists
+        try {
+          const defaultPlaylistResponse = await apiService.getDefaultPlaylist();
+          if (defaultPlaylistResponse.success && defaultPlaylistResponse.data) {
+            await fetch(urlResolver.getApiUrl(`/display-devices/admin/devices/${deviceToAuthorize.id}/playlist`), {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                playlist_id: defaultPlaylistResponse.data.id,
+              }),
+            });
+          }
+        } catch (playlistErr) {
+          // If no default playlist exists or assignment fails, continue without error
+          displayLogger.info('No default playlist found or failed to assign default playlist');
+        }
+        
         await fetchDevices(); // Refresh the list
         setShowAuthorizeModal(false);
         setDeviceToAuthorize(null);
@@ -300,7 +325,7 @@ const Displays: React.FC = () => {
 
   const handleRefreshBrowser = async (device: DisplayDevice) => {
     try {
-      const response = await fetch(`${urlResolver.getServerBaseUrl()}/ws/device/${device.device_token}/command?command=refresh_browser`, {
+      const response = await fetch(urlResolver.getApiUrl(`/ws/device/${device.device_token}/command?command=refresh_browser`), {
         method: 'POST',
         credentials: 'include',
       });
@@ -415,8 +440,26 @@ const Displays: React.FC = () => {
     navigate('/admin');
   };
 
+  // Use mobile-optimized view on mobile
+  if (isMobile) {
+    return <DisplaysMobile />;
+  }
+
   return (
-    <div className="p-8">
+    <div className="space-y-8">
+
+      {/* Header with View Logs Button */}
+      <div className="flex items-center justify-between mb-6">
+        <div></div>
+        <Button
+          onClick={() => navigate('/admin/displays/logs')}
+          className="flex items-center gap-2"
+          variant="outline"
+        >
+          <FileText className="w-4 h-4" />
+          View Logs
+        </Button>
+      </div>
 
       {/* Tabs */}
       <div className="mb-6">
@@ -479,63 +522,72 @@ const Displays: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
             {currentDevices.map((device) => (
-              <div key={device.id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-3">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {device.device_name || `Device ${device.id}`}
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                          Token: {device.device_token.substring(0, 12)}...
-                        </p>
-                        {device.device_identifier && (
-                          <p className="text-sm text-gray-500">
-                            ID: {device.device_identifier}
-                          </p>
+              <div key={device.id} className="bg-white border border-gray-200 rounded-lg shadow-sm">
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-4 mb-4">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                            {device.device_name || `Device ${device.id}`}
+                          </h3>
+                          <div className="space-y-1">
+                            <p className="text-sm text-gray-500">
+                              Token: {device.device_token.substring(0, 12)}...
+                            </p>
+                            {device.device_identifier && (
+                              <p className="text-sm text-gray-500">
+                                ID: {device.device_identifier}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <span className={getStatusBadge(device.status)}>
+                          {device.status}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+                        <div>
+                          <p className="font-medium text-gray-700 mb-1">Created</p>
+                          <p className="text-gray-600">{formatDate(device.created_at)}</p>
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-700 mb-1">Last Seen</p>
+                          <p className="text-gray-600">{formatDate(device.last_seen)}</p>
+                        </div>
+                        {device.authorized_at && (
+                          <div>
+                            <p className="font-medium text-gray-700 mb-1">Authorized</p>
+                            <p className="text-gray-600">{formatDate(device.authorized_at)}</p>
+                          </div>
                         )}
                       </div>
-                      <span className={getStatusBadge(device.status)}>
-                        {device.status}
-                      </span>
+                      
+                      {device.status === 'authorized' && (
+                        <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                          <p className="text-sm text-gray-600">
+                            <span className="font-medium">Playlist:</span> {device.playlist_name || 'None assigned'}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                      <div>
-                        <p className="font-medium">Created</p>
-                        <p>{formatDate(device.created_at)}</p>
-                      </div>
-                      <div>
-                        <p className="font-medium">Last Seen</p>
-                        <p>{formatDate(device.last_seen)}</p>
-                      </div>
-                    </div>
-                    {device.authorized_at && (
-                      <div className="mt-2 text-sm text-gray-600">
-                        <p className="font-medium">Authorized: {formatDate(device.authorized_at)}</p>
-                      </div>
-                    )}
-                    {device.status === 'authorized' && (
-                      <div className="mt-2 text-sm text-gray-600">
-                        <p><span className="font-medium">Playlist:</span> {device.playlist_name || 'None assigned'}</p>
-                      </div>
-                    )}
                   </div>
                   
-                  <div className="flex flex-wrap gap-2 mt-4">
+                  <div className="flex flex-wrap gap-3">
                     {device.status === 'pending' && (
                       <>
                         <button
                           onClick={() => openAuthorizeModal(device)}
-                          className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                          className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors"
                         >
                           Authorize
                         </button>
                         <button
                           onClick={() => openRejectModal(device)}
-                          className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                          className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
                         >
                           Reject
                         </button>
@@ -546,19 +598,19 @@ const Displays: React.FC = () => {
                       <>
                         <button
                           onClick={() => openPlaylistModal(device)}
-                          className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700"
+                          className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700 transition-colors"
                         >
                           {device.playlist_name ? 'Change Playlist' : 'Select Playlist'}
                         </button>
                         <button
                           onClick={() => handleRefreshBrowser(device)}
-                          className="bg-orange-600 text-white px-3 py-1 rounded text-sm hover:bg-orange-700"
+                          className="bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-orange-700 transition-colors"
                         >
                           Refresh Browser
                         </button>
                         <button
                           onClick={() => openUpdateModal(device)}
-                          className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
                         >
                           Edit
                         </button>
@@ -567,7 +619,7 @@ const Displays: React.FC = () => {
                             setDeviceToReset(device);
                             setShowResetModal(true);
                           }}
-                          className="bg-orange-600 text-white px-3 py-1 rounded text-sm hover:bg-orange-700"
+                          className="bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-orange-700 transition-colors"
                           title="Reset Device (forces re-registration)"
                         >
                           <RotateCcw className="w-4 h-4 inline mr-1" />
@@ -580,13 +632,13 @@ const Displays: React.FC = () => {
                       <>
                         <button
                           onClick={() => openUpdateModal(device)}
-                          className="bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700"
+                          className="bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-700 transition-colors"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => openDeleteModal(device)}
-                          className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                          className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
                         >
                           Delete
                         </button>

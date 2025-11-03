@@ -13,6 +13,9 @@ import { ConfirmationModal } from '../components/ConfirmationModal';
 import AlertContainer from '../components/AlertContainer';
 import { useAlert } from '../hooks/useAlert';
 import { apiService } from '../services/api';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { MobileUploadFlow } from '../components/upload/MobileUploadFlow';
+import { cn } from '../lib/utils';
 import type { Image, Album } from '../types';
 
 
@@ -27,6 +30,7 @@ interface ImagesProps {
 export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, showUploadModal: propShowUploadModal, setShowUploadModal: propSetShowUploadModal }) => {
   const navigate = useNavigate();
   const { alerts, removeAlert, success, error: showError, warning, info } = useAlert();
+  const { isMobile } = useResponsiveLayout();
   const [images, setImages] = useState<Image[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
@@ -56,6 +60,20 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
       onDataChange(images, albums);
     }
   }, [images, albums, onDataChange]);
+
+  // Prevent body scroll when upload modal is open
+  useEffect(() => {
+    if (showUploadModal) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [showUploadModal]);
 
   const loadData = async () => {
     try {
@@ -101,7 +119,7 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
     }
   };
 
-  const handleCreateAlbum = async (name: string) => {
+  const handleCreateAlbum = async (name: string, description?: string) => {
     try {
       const response = await apiService.createAlbum(name);
       setAlbums(prev => [...prev, response.data]);
@@ -306,16 +324,16 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
             Create Album
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 mb-6 md:mb-8">
           <Card className="gallery-item border-0 shadow-lg bg-card/50 backdrop-blur-sm cursor-pointer" onClick={() => setSelectedAlbum(null)}>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-accent to-secondary rounded-lg flex items-center justify-center">
-                  <FolderOpen className="w-6 h-6 text-white" />
+            <CardContent className="p-2 md:p-4">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-12 md:h-12 bg-gradient-to-br from-accent to-secondary rounded-lg flex items-center justify-center">
+                  <FolderOpen className="w-4 h-4 md:w-6 md:h-6 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold">All Images</h3>
-                  <p className="text-sm text-muted-foreground">{images.length} images</p>
+                  <h3 className="font-semibold text-sm md:text-base">All Images</h3>
+                  <p className="text-xs md:text-sm text-muted-foreground">{images.length} images</p>
                 </div>
               </div>
             </CardContent>
@@ -326,14 +344,14 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
               className="gallery-item border-0 shadow-lg bg-card/50 backdrop-blur-sm cursor-pointer"
               onClick={() => setSelectedAlbum(album)}
             >
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
-                    <FolderOpen className="w-6 h-6 text-white" />
+              <CardContent className="p-2 md:p-4">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <div className="w-8 h-8 md:w-12 md:h-12 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center">
+                    <FolderOpen className="w-4 h-4 md:w-6 md:h-6 text-white" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold">{album.name}</h3>
-                    <p className="text-sm text-muted-foreground">{images.filter(img => img.album_id === album.id).length} images</p>
+                    <h3 className="font-semibold text-sm md:text-base">{album.name}</h3>
+                    <p className="text-xs md:text-sm text-muted-foreground">{images.filter(img => img.album_id === album.id).length} images</p>
                   </div>
                 </div>
               </CardContent>
@@ -365,27 +383,62 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
       </div>
 
 
-      {/* Upload Modal */}
+      {/* Upload Modal - Full-screen on mobile, modal on desktop */}
       {showUploadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto mx-4 border-0 shadow-2xl">
-            <CardHeader>
+        <div 
+          className={cn(
+            "fixed inset-0 z-50",
+            isMobile 
+              ? "bg-background" 
+              : "bg-black bg-opacity-50 flex items-center justify-center mobile-modal"
+          )}
+          onClick={(e) => {
+            // Prevent dismissing on backdrop click for mobile
+            if (!isMobile && e.target === e.currentTarget) {
+              setShowUploadModal(false);
+            }
+          }}
+        >
+          <Card className={cn(
+            "w-full overflow-hidden border-0 shadow-2xl flex flex-col",
+            isMobile 
+              ? "h-full rounded-none" 
+              : "max-w-4xl max-h-[90vh] mx-4 mobile-modal-content"
+          )}>
+            <CardHeader className={cn(
+              "flex-shrink-0",
+              isMobile && "p-4 border-b"
+            )}>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-xl">Upload Images</CardTitle>
-                  <CardDescription>Add new photos to your library</CardDescription>
+                  <CardTitle className={cn(
+                    isMobile ? "text-2xl" : "text-xl"
+                  )}>Upload Images</CardTitle>
+                  {!isMobile && (
+                    <CardDescription>Add new photos to your library</CardDescription>
+                  )}
                 </div>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size={isMobile ? "lg" : "sm"}
                   onClick={() => setShowUploadModal(false)}
-                  className="h-8 w-8 p-0"
+                  className={cn(
+                    isMobile 
+                      ? "h-12 w-12" 
+                      : "h-8 w-8 p-0"
+                  )}
                 >
-                  <Plus className="w-4 h-4 rotate-45" />
+                  <Plus className={cn(
+                    isMobile ? "w-6 h-6" : "w-4 h-4",
+                    "rotate-45"
+                  )} />
                 </Button>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className={cn(
+              "flex-1 overflow-y-auto mobile-scroll",
+              isMobile && "p-4"
+            )}>
               <ImageUpload
                 onUploadComplete={(newImages) => {
                   handleUploadComplete(newImages);
@@ -485,6 +538,19 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
 
       {/* Alerts */}
       <AlertContainer alerts={alerts} onRemove={removeAlert} />
+
+      {/* Mobile Upload Flow */}
+      {isMobile && (
+        <MobileUploadFlow
+          onUploadComplete={handleUploadComplete}
+          albums={albums}
+          onCreateAlbum={handleCreateAlbum}
+          showAlbumSelection={true}
+          buttonPosition="bottom-right"
+          buttonSize="md"
+          hapticFeedback={true}
+        />
+      )}
     </div>
   );
 };

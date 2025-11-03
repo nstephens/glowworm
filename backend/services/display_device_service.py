@@ -70,6 +70,19 @@ class DisplayDeviceService:
             self.db.refresh(device)
         return device
     
+    def update_device_resolution(self, device_token: str, screen_width: int, screen_height: int, device_pixel_ratio: str = "1.0") -> Optional[DisplayDevice]:
+        """Update device resolution information"""
+        device = self.get_device_by_token(device_token)
+        if device:
+            device.screen_width = screen_width
+            device.screen_height = screen_height
+            device.device_pixel_ratio = device_pixel_ratio
+            device.last_seen = datetime.utcnow()
+            self.db.commit()
+            self.db.refresh(device)
+            logger.info(f"Updated device {device_token[:8]}... resolution: {screen_width}x{screen_height} (DPR: {device_pixel_ratio})")
+        return device
+    
     def get_pending_devices(self) -> List[DisplayDevice]:
         """Get all devices waiting for authorization"""
         return self.db.query(DisplayDevice).filter(

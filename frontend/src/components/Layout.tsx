@@ -45,7 +45,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex h-16 items-center justify-center border-b border-gray-200">
             <div className="flex items-center space-x-3">
               <img 
-                src="/glowworm_icon.png" 
+                src="/glowworm-icon.svg" 
                 alt="Glowworm Logo" 
                 className="w-8 h-8 object-contain"
               />

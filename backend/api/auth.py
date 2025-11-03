@@ -103,7 +103,8 @@ async def login(
             response=response,
             session_token=session.session_token,
             refresh_token=session.refresh_token,
-            csrf_token=csrf_token
+            csrf_token=csrf_token,
+            request=request
         )
         
         logger.info(f"User {user.username} logged in successfully")
@@ -324,6 +325,62 @@ async def logout_all_sessions(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to logout all sessions"
+        )
+
+@router.post("/refresh")
+async def refresh_session(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db)
+):
+    """Refresh session using refresh token"""
+    try:
+        _, refresh_token, _ = cookie_manager.get_auth_cookies(request)
+        
+        if not refresh_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="No refresh token available"
+            )
+        
+        auth_service = AuthService(db)
+        result = auth_service.refresh_session(refresh_token)
+        
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired refresh token"
+            )
+        
+        session, user = result
+        
+        # Generate new CSRF token
+        csrf_token = cookie_manager.generate_csrf_token()
+        
+        # Update cookies with new session
+        cookie_manager.set_auth_cookies(
+            response=response,
+            session_token=session.session_token,
+            refresh_token=session.refresh_token,
+            csrf_token=csrf_token,
+            request=request
+        )
+        
+        logger.info(f"Session refreshed for user: {user.username}")
+        
+        return {
+            "success": True,
+            "message": "Session refreshed successfully",
+            "user": UserResponse(**user.to_dict())
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Session refresh failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Session refresh failed"
         )
 
 @router.get("/status")

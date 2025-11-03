@@ -502,7 +502,7 @@ const SetupWizard: React.FC = () => {
           <div className="text-center mb-8">
             <div className="flex items-center justify-center space-x-3 mb-4">
               <img 
-                src="/glowworm_icon.png" 
+                src="/glowworm-logo.svg" 
                 alt="Glowworm Logo" 
                 className="w-12 h-12 object-contain"
               />

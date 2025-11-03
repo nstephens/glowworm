@@ -142,7 +142,7 @@ class AuthService:
         logger.info(f"Created session for user: {user.username}, device_type: {device_type}")
         return session
     
-    def get_session_by_token(self, session_token: str) -> Optional[UserSession]:
+    def get_session_by_token(self, session_token: str, extend_on_access: bool = True) -> Optional[UserSession]:
         """Get active session by token"""
         logger.debug(f"Querying database for active session: {session_token[:8]}...")
         
@@ -161,8 +161,17 @@ class AuthService:
         
         logger.debug(f"Found valid session for user: {session.user.username}")
         
-        # Update last used timestamp
+        # Update last used timestamp and extend session if close to expiring
         session.last_used = datetime.utcnow()
+        
+        # Extend session expiration if it's within 7 days of expiring (auto-refresh)
+        if extend_on_access:
+            days_until_expiry = (session.expires_at - datetime.utcnow()).days
+            if days_until_expiry < 7:
+                # Extend by another 30 days
+                session.extend_session(days=30)
+                logger.debug(f"Extended session expiration for user: {session.user.username}")
+        
         self.db.commit()
         
         return session
@@ -186,13 +195,21 @@ class AuthService:
             UserSession.is_active == True
         ).first()
         
-        if not session or session.is_expired():
+        if not session:
+            logger.debug(f"No session found for refresh token")
             return None
         
-        # Extend session
-        session.extend_session()
+        # Check if session is expired (allow refresh even if close to expiry)
+        if session.is_expired():
+            logger.warning(f"Refresh token session is expired")
+            return None
+        
+        # Extend session by 30 days and update last used
+        session.extend_session(days=30)
+        session.last_used = datetime.utcnow()
         self.db.commit()
         
+        logger.info(f"Refreshed session for user: {session.user.username}")
         return session, session.user
     
     def logout_session(self, session_token: str) -> bool:

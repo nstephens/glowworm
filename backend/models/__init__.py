@@ -5,7 +5,10 @@ from .session import UserSession
 from .image import Image
 from .album import Album
 from .playlist import Playlist, DisplayMode
+from .playlist_variant import PlaylistVariant, PlaylistVariantType
 from .display_device import DisplayDevice, DeviceStatus
+from .device_log import DeviceLog, LogLevel
+from .user_log import UserLog, UserLogLevel, UserLogAction
 from .system_settings import SystemSettings, SettingType
 
 __all__ = [
@@ -22,8 +25,15 @@ __all__ = [
     "Album", 
     "Playlist",
     "DisplayMode",
+    "PlaylistVariant",
+    "PlaylistVariantType",
     "DisplayDevice",
     "DeviceStatus",
+    "DeviceLog",
+    "LogLevel",
+    "UserLog",
+    "UserLogLevel",
+    "UserLogAction",
     "SystemSettings",
     "SettingType"
 ]
