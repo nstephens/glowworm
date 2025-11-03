@@ -25,6 +25,8 @@ export interface KenBurnsPlusState {
   objectPosition: string;
   /** Current rotation in degrees */
   rotation: number;
+  /** Current opacity (0.0 to 1.0) */
+  opacity: number;
   /** Whether animation is active */
   isAnimating: boolean;
 }
@@ -82,8 +84,8 @@ const generateKenBurnsConfig = (
     };
   }
 
-  // Vary duration slightly (25-35 seconds)
-  const duration = (displayInterval * 0.83 + Math.random() * displayInterval * 0.33) * 1000;
+  // Slower movement: 35-45 seconds (was 25-35)
+  const duration = (displayInterval * 1.17 + Math.random() * displayInterval * 0.33) * 1000;
 
   return {
     zoomDirection,
@@ -120,6 +122,7 @@ export const KenBurnsPlus: React.FC<KenBurnsPlusProps> = ({
     scale: config.zoomDirection === 'in' ? 1.15 : 1.3,  // Start more zoomed in to hide borders
     objectPosition: config.zoomDirection === 'in' ? 'center' : `${config.panTarget.x}% ${config.panTarget.y}%`,
     rotation: config.zoomDirection === 'in' ? -config.rotation : config.rotation,
+    opacity: 0.0,  // Start invisible for fade-in
     isAnimating: false
   });
 
@@ -131,6 +134,7 @@ export const KenBurnsPlus: React.FC<KenBurnsPlusProps> = ({
         scale: config.zoomDirection === 'in' ? 1.15 : 1.3,  // Start more zoomed in
         objectPosition: config.zoomDirection === 'in' ? 'center' : `${config.panTarget.x}% ${config.panTarget.y}%`,
         rotation: config.zoomDirection === 'in' ? -config.rotation : config.rotation,
+        opacity: 0.0,  // Fade out
         isAnimating: false
       });
       return;
@@ -142,6 +146,7 @@ export const KenBurnsPlus: React.FC<KenBurnsPlusProps> = ({
         scale: config.zoomDirection === 'in' ? 1.3 : 1.15,  // End more zoomed in
         objectPosition: config.zoomDirection === 'in' ? `${config.panTarget.x}% ${config.panTarget.y}%` : 'center',
         rotation: config.zoomDirection === 'in' ? config.rotation : -config.rotation,
+        opacity: 1.0,  // Fade in
         isAnimating: true
       });
     }, 50);
@@ -152,14 +157,17 @@ export const KenBurnsPlus: React.FC<KenBurnsPlusProps> = ({
   const transformStyle = state.isAnimating ? {
     transform: `scale(${state.scale}) rotate(${state.rotation}deg)`,
     objectPosition: state.objectPosition,
-    transition: `transform ${config.duration}ms cubic-bezier(0.25, 0.1, 0.25, 1.0), object-position ${config.duration}ms cubic-bezier(0.25, 0.1, 0.25, 1.0)`,
-    willChange: 'transform, object-position',
+    opacity: state.opacity,
+    transition: `transform ${config.duration}ms cubic-bezier(0.25, 0.1, 0.25, 1.0), object-position ${config.duration}ms cubic-bezier(0.25, 0.1, 0.25, 1.0), opacity 800ms ease-in-out`,
+    willChange: 'transform, object-position, opacity',
     backfaceVisibility: 'hidden' as const,
     transformStyle: 'preserve-3d' as const
   } : {
     transform: `scale(${state.scale}) rotate(${state.rotation}deg)`,
     objectPosition: state.objectPosition,
-    willChange: 'transform, object-position',
+    opacity: state.opacity,
+    transition: 'opacity 800ms ease-in-out',
+    willChange: 'transform, object-position, opacity',
     backfaceVisibility: 'hidden' as const,
     transformStyle: 'preserve-3d' as const
   };
@@ -171,7 +179,8 @@ export const KenBurnsPlus: React.FC<KenBurnsPlusProps> = ({
         position: 'relative',
         width: '100%',
         height: '100%',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        backgroundColor: '#000'  // Black background for fade effect
       }}
     >
       {React.Children.map(children, child => {

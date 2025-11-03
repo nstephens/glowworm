@@ -53,7 +53,7 @@ export const DreamyReveal: React.FC<DreamyRevealProps> = ({
 }) => {
   const [state, setState] = useState<DreamyRevealState>({
     blur: 30,
-    opacity: 0.5,
+    opacity: 0.0,  // Start from 0 for fade-in effect
     scale: includeScale ? 1.05 : 1.0,
     isRevealing: false
   });
@@ -62,10 +62,10 @@ export const DreamyReveal: React.FC<DreamyRevealProps> = ({
 
   useEffect(() => {
     if (!isRevealing) {
-      // Reset to blurred initial state
+      // Reset to blurred initial state with fade from black
       setState({
         blur: 30,
-        opacity: 0.5,
+        opacity: 0.0,  // Fade in from black
         scale: includeScale ? 1.05 : 1.0,
         isRevealing: false
       });
@@ -120,7 +120,8 @@ export const DreamyReveal: React.FC<DreamyRevealProps> = ({
         position: 'relative',
         width: '100%',
         height: '100%',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        backgroundColor: '#000'  // Black background for fade effect
       }}
     >
       {React.Children.map(children, child => {
