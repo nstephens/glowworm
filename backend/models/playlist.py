@@ -32,7 +32,7 @@ class Playlist(Base):
     is_default = Column(Boolean, default=False, nullable=True)
     sequence = Column(JSON, nullable=True)  # Array of image IDs in display order
     display_time_seconds = Column(Integer, nullable=True)  # Time to display each image in seconds
-    display_mode = Column(Enum(DisplayMode), default=DisplayMode.DEFAULT, nullable=True)  # Display mode for the playlist
+    display_mode = Column(Enum(DisplayMode, values_callable=lambda x: [e.value for e in x]), default=DisplayMode.DEFAULT, nullable=True)  # Display mode for the playlist
     show_image_info = Column(Boolean, default=False, nullable=True)  # Show image info overlay on display
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=True)
