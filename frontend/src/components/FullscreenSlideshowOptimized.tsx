@@ -1096,6 +1096,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
               </CinematicBars>
             ) : shouldShowDreamyReveal ? (
               <DreamyReveal
+                key={`dreamy-${currentImage.id}`}
                 isRevealing={isDreamyRevealing}
                 duration={1500}
                 includeScale={true}
@@ -1106,13 +1107,10 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                   alt={currentImage.original_filename}
                   className="w-full h-full object-cover"
                   style={{ 
-                    opacity: imageOpacity,
+                    // Don't control opacity here - DreamyReveal handles it
                     // Hardware acceleration
                     transform: 'translateZ(0)',
-                    backfaceVisibility: 'hidden',
-                    willChange: 'opacity',
-                    // Smooth transition for opacity
-                    transition: 'opacity 300ms ease-out'
+                    backfaceVisibility: 'hidden'
                   }}
                   onLoad={(e) => {
                     const img = e.target as HTMLImageElement;
