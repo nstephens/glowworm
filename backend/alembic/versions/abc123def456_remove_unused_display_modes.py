@@ -17,6 +17,13 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # First, update any playlists using removed modes to 'default'
+    op.execute("""
+        UPDATE playlists 
+        SET display_mode = 'default' 
+        WHERE display_mode IN ('parallax_depth', 'color_harmony', 'cinematic_bars', 'magic_dust', 'liquid_blend')
+    """)
+    
     # Update the displaymode enum to remove unused modes
     # Keep only: default, auto_sort, movement, ken_burns_plus, soft_glow, 
     # ambient_pulse, dreamy_reveal, stacked_reveal

@@ -47,6 +47,10 @@ class DeviceResponse(BaseModel):
     last_seen: str
     created_at: str
     updated_at: str
+    screen_width: Optional[int]
+    screen_height: Optional[int]
+    device_pixel_ratio: Optional[str]
+    orientation: str
 
     @classmethod
     def from_device(cls, device: DisplayDevice) -> "DeviceResponse":
