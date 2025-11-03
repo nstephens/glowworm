@@ -6,6 +6,7 @@ import { getSmartImageUrlFromImage } from '../utils/imageUrls';
 import { transitionLogger } from '../services/transitionLogger';
 import { KenBurnsPlus } from './effects/KenBurnsPlus';
 import { SoftGlow } from './effects/SoftGlow';
+import { AmbientPulse } from './effects/AmbientPulse';
 
 interface SlideshowSettings {
   interval: number;
@@ -86,6 +87,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const shouldShowMovement = playlist?.display_mode === 'movement' && isCurrentImageLandscape;
   const shouldShowKenBurns = playlist?.display_mode === 'ken_burns_plus';
   const shouldShowSoftGlow = playlist?.display_mode === 'soft_glow';
+  const shouldShowAmbientPulse = playlist?.display_mode === 'ambient_pulse';
   const imageAspectRatio = currentImage && currentImage.width && currentImage.height ? currentImage.width / currentImage.height : 1;
   const displayAspectRatio = window.innerWidth / window.innerHeight;
   const isImageSignificantlyWider = imageAspectRatio > displayAspectRatio * 1.2; // 20% wider than display (less restrictive)
@@ -684,7 +686,59 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
         ) : (
           // Single image display for portrait images or single landscape images
           <>
-            {shouldShowKenBurns ? (
+            {shouldShowAmbientPulse ? (
+              <AmbientPulse
+                displayInterval={settings.interval}
+                isActive={true}
+                className="w-full h-full"
+              >
+                <img
+                  src={getSmartImageUrlFromImage(currentImage, deviceToken)}
+                  alt={currentImage.original_filename}
+                  className="w-full h-full object-cover"
+                  style={{ 
+                    opacity: imageOpacity,
+                    // Hardware acceleration
+                    transform: 'translateZ(0)',
+                    backfaceVisibility: 'hidden',
+                    willChange: 'opacity',
+                    // Smooth transition for opacity
+                    transition: 'opacity 300ms ease-out'
+                  }}
+                  onLoad={(e) => {
+                    const img = e.target as HTMLImageElement;
+                    displayLogger.debug('✅ Main image loaded (Ambient Pulse)');
+                    
+                    displayDeviceLogger.logImageDimensions(
+                      currentImage.id,
+                      getSmartImageUrlFromImage(currentImage, deviceToken),
+                      img.naturalWidth,
+                      img.naturalHeight,
+                      img.clientWidth,
+                      img.clientHeight
+                    );
+                    
+                    transitionLogger.logEvent({
+                      timestamp: Date.now(),
+                      eventType: 'image_load_complete',
+                      currentIndex,
+                      currentImageId: currentImage.id,
+                      loadTime: img.complete ? 0 : undefined
+                    });
+                    
+                    setImagesLoaded(prev => new Set([...prev, currentImage.id]));
+                    
+                    if (waitingForLoad) {
+                      setNextImageReady(true);
+                    }
+                  }}
+                  onError={() => {
+                    displayLogger.error('❌ Main image failed to load (Ambient Pulse)');
+                  }}
+                  loading="eager"
+                />
+              </AmbientPulse>
+            ) : shouldShowKenBurns ? (
               <KenBurnsPlus
                 image={currentImage}
                 isActive={imageOpacity > 0.5}
