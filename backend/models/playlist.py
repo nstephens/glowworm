@@ -24,6 +24,7 @@ class Playlist(Base):
     slug = Column(String(64), nullable=False, unique=True, index=True)
     is_default = Column(Boolean, default=False, nullable=True)
     sequence = Column(JSON, nullable=True)  # Array of image IDs in display order
+    computed_sequence = Column(JSON, nullable=True)  # Computed pairing structure: [{"type": "single"|"pair", "images": [id1, id2]}]
     display_time_seconds = Column(Integer, nullable=True)  # Time to display each image in seconds
     display_mode = Column(Enum(DisplayMode, values_callable=lambda x: [e.value for e in x]), default=DisplayMode.DEFAULT, nullable=True)  # Display mode for the playlist
     show_image_info = Column(Boolean, default=False, nullable=True)  # Show image info overlay on display
@@ -63,6 +64,7 @@ class Playlist(Base):
                 "slug": self.slug,
                 "is_default": self.is_default,
                 "sequence": self.sequence,
+                "computed_sequence": self.computed_sequence,
                 "display_time_seconds": self.display_time_seconds,
                 "display_mode": display_mode_value,
                 "show_image_info": self.show_image_info or False,

@@ -37,6 +37,7 @@ class DisplayDevice(Base):
     screen_width = Column(Integer, nullable=True)
     screen_height = Column(Integer, nullable=True)
     device_pixel_ratio = Column(String(10), nullable=True)  # e.g., "2.0", "1.5"
+    orientation = Column(String(20), nullable=False, server_default='portrait')  # 'portrait' or 'landscape'
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -71,4 +72,5 @@ class DisplayDevice(Base):
             "screen_width": self.screen_width,
             "screen_height": self.screen_height,
             "device_pixel_ratio": self.device_pixel_ratio,
+            "orientation": self.orientation,
         }
