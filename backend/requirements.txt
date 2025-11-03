@@ -23,6 +23,7 @@ email-validator==2.1.0
 # Image processing
 Pillow==10.1.0
 python-magic==0.4.27
+colorthief==0.2.1
 
 # WebSocket support
 websockets==12.0

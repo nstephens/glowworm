@@ -16,6 +16,7 @@ class Image(Base):
     mime_type = Column(String(64), nullable=True)
     file_hash = Column(String(64), nullable=True, index=True)  # MD5 hash for duplicate detection
     exif = Column(JSON, nullable=True)
+    dominant_colors = Column(JSON, nullable=True)  # Array of hex color strings ["#FF5733", "#33FF57", "#3357FF"]
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     playlist_id = Column(Integer, ForeignKey("playlists.id"), nullable=True, index=True)
     
@@ -50,6 +51,7 @@ class Image(Base):
             "mime_type": self.mime_type,
             "file_hash": self.file_hash,
             "exif": self.exif,
+            "dominant_colors": self.dominant_colors,
             "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
             "playlist_id": self.playlist_id,
             "url": f"/api/images/{self.id}/file",

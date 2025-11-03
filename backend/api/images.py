@@ -1067,3 +1067,78 @@ async def debug_image_info(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get debug info"
         )
+
+
+@router.post("/process-colors")
+async def process_all_image_colors(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """
+    Batch process dominant colors for all images that don't have them yet.
+    Runs asynchronously in background.
+    """
+    try:
+        from services.color_extractor import color_extractor_service
+        from services.image_storage_service import image_storage_service
+        
+        # Find images without dominant colors
+        images_to_process = db.query(Image).filter(
+            Image.dominant_colors == None
+        ).all()
+        
+        logger.info(f"Found {len(images_to_process)} images to process for color extraction")
+        
+        # Add background task for each image
+        def extract_and_save_colors(image_id: int):
+            """Background task to extract and save colors for an image"""
+            try:
+                # Get fresh session for background task
+                from models import SessionLocal
+                bg_db = SessionLocal()
+                
+                try:
+                    image = bg_db.query(Image).filter(Image.id == image_id).first()
+                    if not image:
+                        logger.warning(f"Image {image_id} not found during color extraction")
+                        return
+                    
+                    # Get full file path
+                    file_path = image_storage_service.get_image_path(image.filename)
+                    if not file_path:
+                        logger.warning(f"File path not found for image {image_id}")
+                        return
+                    
+                    # Extract colors
+                    colors = color_extractor_service.extract_colors(file_path, color_count=3, quality=10)
+                    
+                    if colors:
+                        # Save to database
+                        image.dominant_colors = colors
+                        bg_db.commit()
+                        logger.info(f"Saved colors for image {image_id}: {colors}")
+                    else:
+                        logger.warning(f"Failed to extract colors for image {image_id}")
+                        
+                finally:
+                    bg_db.close()
+                    
+            except Exception as e:
+                logger.error(f"Error in background color extraction for image {image_id}: {e}")
+        
+        # Queue all tasks
+        for image in images_to_process:
+            background_tasks.add_task(extract_and_save_colors, image.id)
+        
+        return {
+            "message": f"Processing colors for {len(images_to_process)} images in background",
+            "images_to_process": len(images_to_process)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error starting color processing: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to start color processing"
+        )
