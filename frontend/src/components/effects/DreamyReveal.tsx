@@ -62,15 +62,25 @@ export const DreamyReveal: React.FC<DreamyRevealProps> = ({
 
   useEffect(() => {
     if (!isRevealing) {
-      // Reset to blurred initial state with fade from black
-      setState({
-        blur: 30,
-        opacity: 0.0,  // Fade in from black
-        scale: includeScale ? 1.05 : 1.0,
+      // Fade out to black smoothly (keep image clear, no blur)
+      setState(prev => ({
+        ...prev,
+        opacity: 0.0,  // Fade out smoothly
         isRevealing: false
-      });
-      revealStartedRef.current = false;
-      return;
+      }));
+      
+      // After fade-out completes, reset to initial blurred state for next reveal
+      const resetTimer = setTimeout(() => {
+        setState({
+          blur: 30,
+          opacity: 0.0,
+          scale: includeScale ? 1.05 : 1.0,
+          isRevealing: false
+        });
+        revealStartedRef.current = false;
+      }, 800);  // Match fade-out duration
+      
+      return () => clearTimeout(resetTimer);
     }
 
     if (revealStartedRef.current) {
