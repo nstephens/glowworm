@@ -25,6 +25,8 @@ import { playlistLogger } from '../utils/logger';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { cn } from '../lib/utils';
 import type { Playlist, Image, Album, DisplayDevice, DisplayMode } from '../types';
+import { DISPLAY_MODE_CONFIGS, getDisplayModeConfig, getDisplayModesByTier, PERFORMANCE_TIER_LABELS, PerformanceTier } from '../types/displayModes';
+import { getDeviceCapabilities } from '../utils/deviceCapabilities';
 
 // Draggable Image Item Component
 const DraggableImageItem: React.FC<{
@@ -130,13 +132,16 @@ const PlaylistDetail: React.FC = () => {
   const [hasChanges, setHasChanges] = useState(false);
   const wsRef = useRef<AdminWebSocketClient | null>(null);
 
-  // Display mode options
-  const displayModeOptions = [
-    { value: 'default', label: 'Default', description: 'Standard playlist behavior' },
-    { value: 'auto_sort', label: 'Auto Sort', description: 'Automatically sort by date, rating, or other criteria' },
-    { value: 'movement', label: 'Movement', description: 'Focus on images with movement or action' },
-    { value: 'random', label: 'Random', description: 'Randomize the order each time' }
-  ];
+  // Get device capabilities for recommendations
+  const deviceCapabilities = getDeviceCapabilities();
+  
+  // Display mode options grouped by performance tier
+  const tier1Modes = getDisplayModesByTier(PerformanceTier.TIER_1);
+  const tier2Modes = getDisplayModesByTier(PerformanceTier.TIER_2);
+  const tier3Modes = getDisplayModesByTier(PerformanceTier.TIER_3);
+  
+  // Get current mode config
+  const currentModeConfig = getDisplayModeConfig(editDisplayMode);
 
   // Load playlist data
   useEffect(() => {
@@ -513,15 +518,53 @@ const PlaylistDetail: React.FC = () => {
                         isMobile ? "px-4 py-3 text-base" : "px-3 py-2 text-sm"
                       )}
                     >
-                      {displayModeOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
+                      <optgroup label={PERFORMANCE_TIER_LABELS[PerformanceTier.TIER_1].label}>
+                        {tier1Modes.map((config) => (
+                          <option key={config.mode} value={config.mode}>
+                            {config.displayName}
+                          </option>
+                        ))}
+                      </optgroup>
+                      
+                      <optgroup label={PERFORMANCE_TIER_LABELS[PerformanceTier.TIER_2].label}>
+                        {tier2Modes.map((config) => (
+                          <option key={config.mode} value={config.mode}>
+                            {config.displayName}
+                          </option>
+                        ))}
+                      </optgroup>
+                      
+                      <optgroup label={PERFORMANCE_TIER_LABELS[PerformanceTier.TIER_3].label}>
+                        {tier3Modes.map((config) => (
+                          <option key={config.mode} value={config.mode}>
+                            {config.displayName}
+                          </option>
+                        ))}
+                      </optgroup>
                     </select>
+                    
+                    {/* Mode description */}
                     <p className={cn("text-gray-500", isMobile ? "text-sm" : "text-xs")}>
-                      {displayModeOptions.find(opt => opt.value === editDisplayMode)?.description}
+                      {currentModeConfig.description}
                     </p>
+                    
+                    {/* Performance warning for Tier 3 modes */}
+                    {currentModeConfig.tier >= PerformanceTier.TIER_3 && (
+                      <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                        <p className="text-sm text-yellow-800">
+                          ⚡ {currentModeConfig.warningMessage || 'This mode requires high-performance hardware.'}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Tier recommendation */}
+                    {currentModeConfig.tier > deviceCapabilities.tier && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <p className="text-sm text-blue-800">
+                          💡 Your device is optimized for {PERFORMANCE_TIER_LABELS[deviceCapabilities.tier].label}. This mode may not run smoothly.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Display Time */}
@@ -606,7 +649,7 @@ const PlaylistDetail: React.FC = () => {
                         "inline-flex items-center rounded-full font-medium bg-blue-100 text-blue-800",
                         isMobile ? "px-2 py-1 text-xs" : "px-2 py-1 text-xs"
                       )}>
-                        {displayModeOptions.find(opt => opt.value === playlist.display_mode)?.label}
+                        {getDisplayModeConfig(playlist.display_mode).displayName}
                       </span>
                     )}
                   </div>
@@ -630,10 +673,10 @@ const PlaylistDetail: React.FC = () => {
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <span className="font-medium">Display Mode:</span>
                     <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
-                      {displayModeOptions.find(opt => opt.value === (playlist.display_mode || 'default'))?.label || 'Default'}
+                      {getDisplayModeConfig(playlist.display_mode || 'default').displayName}
                     </span>
                     <span className="text-gray-500">
-                      - {displayModeOptions.find(opt => opt.value === (playlist.display_mode || 'default'))?.description}
+                      - {getDisplayModeConfig(playlist.display_mode || 'default').description}
                     </span>
                   </div>
                 )}
