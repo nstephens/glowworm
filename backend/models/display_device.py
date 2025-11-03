@@ -7,10 +7,10 @@ import string
 import enum
 
 class DeviceStatus(str, enum.Enum):
-    PENDING = "pending"
-    AUTHORIZED = "authorized"
-    REJECTED = "rejected"
-    OFFLINE = "offline"
+    PENDING = "PENDING"
+    AUTHORIZED = "AUTHORIZED"
+    REJECTED = "REJECTED"
+    OFFLINE = "OFFLINE"
 
 class DisplayDevice(Base):
     __tablename__ = "display_devices"
