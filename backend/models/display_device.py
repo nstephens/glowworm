@@ -61,7 +61,7 @@ class DisplayDevice(Base):
             "device_token": self.device_token,
             "device_name": self.device_name,
             "device_identifier": self.device_identifier,
-            "status": self.status.value,
+            "status": self.status.value.lower(),  # Convert to lowercase for frontend compatibility
             "playlist_id": self.playlist_id,
             "playlist_name": self.playlist.name if self.playlist else None,
             "authorized_at": self.authorized_at.isoformat() if self.authorized_at else None,

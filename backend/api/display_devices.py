@@ -82,7 +82,7 @@ async def register_device(
         return DeviceRegistrationResponse(
             device_id=device.id,
             device_token=device.device_token,
-            status=device.status.value,
+            status=device.status.value.lower(),
             message="Device registered successfully. Waiting for authorization."
         )
         
@@ -113,7 +113,7 @@ async def get_device_status(
         service.update_device_last_seen(device_token)
         
         # For authorized devices, ensure the cookie is properly set to maintain authentication
-        if device.status.value == 'authorized':
+        if device.status.value == 'AUTHORIZED':
             cookie_manager.set_display_device_cookie(response, device.device_token)
         
         return DeviceResponse.from_device(device)
