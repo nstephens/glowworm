@@ -10,6 +10,7 @@ import { AmbientPulse } from './effects/AmbientPulse';
 import { DreamyReveal } from './effects/DreamyReveal';
 import { StackedReveal } from './effects/StackedReveal';
 import { CinematicBars } from './effects/CinematicBars';
+import { ParallaxDepth } from './effects/ParallaxDepth';
 
 interface SlideshowSettings {
   interval: number;
@@ -88,6 +89,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const isNextImageLandscape = nextImageData && nextImageData.width && nextImageData.height && nextImageData.width > nextImageData.height;
   const shouldShowSplitScreen = (playlist?.display_mode === 'auto_sort' || playlist?.display_mode === 'default') && isCurrentImageLandscape && isNextImageLandscape;
   const shouldShowStackedReveal = playlist?.display_mode === 'stacked_reveal' && isCurrentImageLandscape && isNextImageLandscape;
+  const shouldShowParallaxDepth = playlist?.display_mode === 'parallax_depth';
   const shouldShowMovement = playlist?.display_mode === 'movement' && isCurrentImageLandscape;
   const shouldShowKenBurns = playlist?.display_mode === 'ken_burns_plus';
   const shouldShowSoftGlow = playlist?.display_mode === 'soft_glow';
@@ -581,12 +583,65 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
           backfaceVisibility: 'hidden'
         }}
       >
-        {shouldShowSplitScreen || shouldShowStackedReveal ? (
+        {shouldShowSplitScreen || shouldShowStackedReveal || (shouldShowParallaxDepth && isCurrentImageLandscape && isNextImageLandscape) ? (
           // Split-screen display for landscape images
           <div className="w-full h-full flex flex-col">
             {/* Top half - current landscape image */}
             <div className="relative w-full h-1/2">
-              {shouldShowStackedReveal ? (
+              {shouldShowParallaxDepth ? (
+                <ParallaxDepth
+                  layer="top"
+                  image={currentImage}
+                  isActive={topImageOpacity > 0.5}
+                  duration={settings.interval}
+                  className="w-full h-full"
+                >
+                  <img
+                    src={getSmartImageUrlFromImage(currentImage, deviceToken)}
+                    alt={currentImage.original_filename}
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      opacity: topImageOpacity,
+                      // Hardware acceleration
+                      backfaceVisibility: 'hidden',
+                      willChange: 'opacity, transform',
+                      // Base transition (ParallaxDepth handles transform)
+                      transition: 'opacity 300ms ease-out'
+                    }}
+                    onLoad={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      displayLogger.debug('✅ Top image loaded (Parallax Depth)');
+                      
+                      displayDeviceLogger.logImageDimensions(
+                        currentImage.id,
+                        getSmartImageUrlFromImage(currentImage, deviceToken),
+                        img.naturalWidth,
+                        img.naturalHeight,
+                        img.clientWidth,
+                        img.clientHeight
+                      );
+                      
+                      transitionLogger.logEvent({
+                        timestamp: Date.now(),
+                        eventType: 'image_load_complete',
+                        currentIndex,
+                        currentImageId: currentImage.id,
+                        loadTime: img.complete ? 0 : undefined
+                      });
+                      
+                      setImagesLoaded(prev => new Set([...prev, currentImage.id]));
+                      
+                      if (waitingForLoad) {
+                        setNextImageReady(true);
+                      }
+                    }}
+                    onError={() => {
+                      displayLogger.error('❌ Top image failed to load (Parallax Depth)');
+                    }}
+                    loading="eager"
+                  />
+                </ParallaxDepth>
+              ) : shouldShowStackedReveal ? (
                 <StackedReveal
                   layer="top"
                   image={currentImage}
@@ -694,7 +749,61 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
             
             {/* Bottom half - next landscape image */}
             <div className="relative w-full h-1/2">
-              {shouldShowStackedReveal ? (
+              {shouldShowParallaxDepth ? (
+                <ParallaxDepth
+                  layer="bottom"
+                  image={nextImageData}
+                  isActive={bottomImageOpacity > 0.5}
+                  duration={settings.interval}
+                  parallaxFactor={0.6}
+                  className="w-full h-full"
+                >
+                  <img
+                    src={getSmartImageUrlFromImage(nextImageData, deviceToken)}
+                    alt={nextImageData.original_filename}
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      opacity: bottomImageOpacity,
+                      // Hardware acceleration
+                      backfaceVisibility: 'hidden',
+                      willChange: 'opacity, transform',
+                      // Base transition (ParallaxDepth handles transform)
+                      transition: 'opacity 300ms ease-out'
+                    }}
+                    onLoad={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      displayLogger.debug('✅ Bottom image loaded (Parallax Depth)');
+                      
+                      displayDeviceLogger.logImageDimensions(
+                        nextImageData.id,
+                        getSmartImageUrlFromImage(nextImageData, deviceToken),
+                        img.naturalWidth,
+                        img.naturalHeight,
+                        img.clientWidth,
+                        img.clientHeight
+                      );
+                      
+                      transitionLogger.logEvent({
+                        timestamp: Date.now(),
+                        eventType: 'image_load_complete',
+                        currentIndex,
+                        currentImageId: nextImageData.id,
+                        loadTime: img.complete ? 0 : undefined
+                      });
+                      
+                      setImagesLoaded(prev => new Set([...prev, nextImageData.id]));
+                      
+                      if (waitingForLoad) {
+                        setNextImageReady(true);
+                      }
+                    }}
+                    onError={() => {
+                      displayLogger.error('❌ Bottom image failed to load (Parallax Depth)');
+                    }}
+                    loading="eager"
+                  />
+                </ParallaxDepth>
+              ) : shouldShowStackedReveal ? (
                 <StackedReveal
                   layer="bottom"
                   image={nextImageData}
@@ -801,7 +910,61 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
         ) : (
           // Single image display for portrait images or single landscape images
           <>
-            {shouldShowCinematicBars ? (
+            {shouldShowParallaxDepth && !isCurrentImageLandscape ? (
+              <ParallaxDepth
+                layer="single"
+                image={currentImage}
+                isActive={imageOpacity > 0.5}
+                duration={settings.interval}
+                className="w-full h-full"
+              >
+                <img
+                  src={getSmartImageUrlFromImage(currentImage, deviceToken)}
+                  alt={currentImage.original_filename}
+                  className="w-full h-full object-cover"
+                  style={{ 
+                    opacity: imageOpacity,
+                    // Hardware acceleration
+                    transform: 'translateZ(0)',
+                    backfaceVisibility: 'hidden',
+                    willChange: 'opacity, transform',
+                    // Smooth transition for opacity
+                    transition: 'opacity 300ms ease-out'
+                  }}
+                  onLoad={(e) => {
+                    const img = e.target as HTMLImageElement;
+                    displayLogger.debug('✅ Main image loaded (Parallax Depth Portrait)');
+                    
+                    displayDeviceLogger.logImageDimensions(
+                      currentImage.id,
+                      getSmartImageUrlFromImage(currentImage, deviceToken),
+                      img.naturalWidth,
+                      img.naturalHeight,
+                      img.clientWidth,
+                      img.clientHeight
+                    );
+                    
+                    transitionLogger.logEvent({
+                      timestamp: Date.now(),
+                      eventType: 'image_load_complete',
+                      currentIndex,
+                      currentImageId: currentImage.id,
+                      loadTime: img.complete ? 0 : undefined
+                    });
+                    
+                    setImagesLoaded(prev => new Set([...prev, currentImage.id]));
+                    
+                    if (waitingForLoad) {
+                      setNextImageReady(true);
+                    }
+                  }}
+                  onError={() => {
+                    displayLogger.error('❌ Main image failed to load (Parallax Depth Portrait)');
+                  }}
+                  loading="eager"
+                />
+              </ParallaxDepth>
+            ) : shouldShowCinematicBars ? (
               <CinematicBars
                 displayInterval={settings.interval}
                 isActive={true}
