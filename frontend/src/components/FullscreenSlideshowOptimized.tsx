@@ -72,6 +72,9 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const [imageBrightness, setImageBrightness] = useState(1.0);
   const [nextImageBrightness, setNextImageBrightness] = useState(1.3);
   
+  // Dreamy Reveal state - tracks when a new image should be revealed
+  const [isDreamyRevealing, setIsDreamyRevealing] = useState(false);
+  
   // Landscape stacking state
   const [topImageOpacity, setTopImageOpacity] = useState(0);
   const [bottomImageOpacity, setBottomImageOpacity] = useState(0);
@@ -177,6 +180,15 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
     }
   }, [currentIndex, shouldShowMovement, isCurrentImageLandscape, settings.interval, imageAspectRatio, displayAspectRatio]);
 
+  // Trigger Dreamy Reveal on initial load and when first image appears
+  useEffect(() => {
+    if (shouldShowDreamyReveal && images.length > 0) {
+      // Trigger reveal for the first image
+      setTimeout(() => {
+        setIsDreamyRevealing(true);
+      }, 100);
+    }
+  }, [shouldShowDreamyReveal, images.length]);
   
   const slideshowRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -303,6 +315,10 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
         if (shouldShowSoftGlow) {
           setImageBrightness(0.7);
         }
+        // Dreamy Reveal: Reset state for next reveal
+        if (shouldShowDreamyReveal) {
+          setIsDreamyRevealing(false);
+        }
         displayLogger.debug('🎬 OPTIMIZED: Fading out single image');
       }
       
@@ -413,6 +429,13 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
         setTimeout(() => {
           setImageBrightness(1.0);
         }, 900);
+      }
+      // Dreamy Reveal: Trigger reveal animation
+      if (shouldShowDreamyReveal) {
+        // Small delay to ensure component is ready
+        setTimeout(() => {
+          setIsDreamyRevealing(true);
+        }, 50);
       }
     }
     
@@ -1073,7 +1096,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
               </CinematicBars>
             ) : shouldShowDreamyReveal ? (
               <DreamyReveal
-                isRevealing={imageOpacity > 0.5}
+                isRevealing={isDreamyRevealing}
                 duration={1500}
                 includeScale={true}
                 className="w-full h-full"

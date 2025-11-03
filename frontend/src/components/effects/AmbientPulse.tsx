@@ -60,10 +60,10 @@ export const AmbientPulse: React.FC<AmbientPulseProps> = ({
             {`
               @keyframes vignette-breathing {
                 0%, 100% {
-                  box-shadow: inset 0 0 120px 60px rgba(0, 0, 0, 0.3);
+                  box-shadow: inset 0 0 150px 80px rgba(0, 0, 0, 0.5);
                 }
                 50% {
-                  box-shadow: inset 0 0 50px 30px rgba(0, 0, 0, 0.15);
+                  box-shadow: inset 0 0 80px 40px rgba(0, 0, 0, 0.25);
                 }
               }
             `}

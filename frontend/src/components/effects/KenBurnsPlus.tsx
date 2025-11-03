@@ -57,8 +57,8 @@ const generateKenBurnsConfig = (
   // Random zoom direction
   const zoomDirection: 'in' | 'out' = Math.random() > 0.5 ? 'in' : 'out';
 
-  // Random rotation (-2 to +2 degrees)
-  const rotation = (Math.random() * 4) - 2;
+  // Subtle rotation (-1 to +1 degrees) - reduced for less distraction
+  const rotation = (Math.random() * 2) - 1;
 
   // Calculate safe pan boundaries
   // For zoom in: start at center, pan to a corner
@@ -117,7 +117,7 @@ export const KenBurnsPlus: React.FC<KenBurnsPlusProps> = ({
   );
 
   const [state, setState] = useState<KenBurnsPlusState>({
-    scale: config.zoomDirection === 'in' ? 1.0 : 1.15,
+    scale: config.zoomDirection === 'in' ? 1.15 : 1.3,  // Start more zoomed in to hide borders
     objectPosition: config.zoomDirection === 'in' ? 'center' : `${config.panTarget.x}% ${config.panTarget.y}%`,
     rotation: config.zoomDirection === 'in' ? -config.rotation : config.rotation,
     isAnimating: false
@@ -128,7 +128,7 @@ export const KenBurnsPlus: React.FC<KenBurnsPlusProps> = ({
     if (!isActive) {
       // Reset to initial state when not active
       setState({
-        scale: config.zoomDirection === 'in' ? 1.0 : 1.15,
+        scale: config.zoomDirection === 'in' ? 1.15 : 1.3,  // Start more zoomed in
         objectPosition: config.zoomDirection === 'in' ? 'center' : `${config.panTarget.x}% ${config.panTarget.y}%`,
         rotation: config.zoomDirection === 'in' ? -config.rotation : config.rotation,
         isAnimating: false
@@ -139,7 +139,7 @@ export const KenBurnsPlus: React.FC<KenBurnsPlusProps> = ({
     // Small delay to ensure initial state is rendered before animation starts
     const startDelay = setTimeout(() => {
       setState({
-        scale: config.zoomDirection === 'in' ? 1.15 : 1.0,
+        scale: config.zoomDirection === 'in' ? 1.3 : 1.15,  // End more zoomed in
         objectPosition: config.zoomDirection === 'in' ? `${config.panTarget.x}% ${config.panTarget.y}%` : 'center',
         rotation: config.zoomDirection === 'in' ? config.rotation : -config.rotation,
         isAnimating: true
