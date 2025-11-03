@@ -8,6 +8,20 @@ class DisplayMode(enum.Enum):
     DEFAULT = "default"
     AUTO_SORT = "auto_sort"
     MOVEMENT = "movement"
+    # Phase 1: Tier 1 modes (Raspberry Pi Safe - 30fps)
+    KEN_BURNS_PLUS = "ken_burns_plus"
+    SOFT_GLOW = "soft_glow"
+    AMBIENT_PULSE = "ambient_pulse"
+    # Phase 2: Tier 2 modes (Moderate Performance - 24-30fps)
+    DREAMY_REVEAL = "dreamy_reveal"
+    STACKED_REVEAL = "stacked_reveal"
+    PARALLAX_DEPTH = "parallax_depth"
+    # Phase 3: Tier 2 modes (Moderate Performance - 24-30fps)
+    COLOR_HARMONY = "color_harmony"
+    CINEMATIC_BARS = "cinematic_bars"
+    # Phase 4: Tier 3 modes (High Performance Required - 15-24fps)
+    MAGIC_DUST = "magic_dust"
+    LIQUID_BLEND = "liquid_blend"
 
 class Playlist(Base):
     __tablename__ = "playlists"

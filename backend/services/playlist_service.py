@@ -122,14 +122,16 @@ class PlaylistService:
             if display_mode is not None:
                 from models.playlist import DisplayMode
                 try:
-                    # Convert string to enum
-                    if display_mode == 'default':
-                        playlist.display_mode = DisplayMode.DEFAULT
-                    elif display_mode == 'auto_sort':
-                        playlist.display_mode = DisplayMode.AUTO_SORT
-                    elif display_mode == 'movement':
-                        playlist.display_mode = DisplayMode.MOVEMENT
-                    else:
+                    # Convert string to enum by finding matching value
+                    # This supports all display modes dynamically
+                    mode_found = False
+                    for mode in DisplayMode:
+                        if mode.value == display_mode:
+                            playlist.display_mode = mode
+                            mode_found = True
+                            break
+                    
+                    if not mode_found:
                         logger.warning(f"Invalid display_mode value: {display_mode}, using DEFAULT")
                         playlist.display_mode = DisplayMode.DEFAULT
                 except Exception as e:
