@@ -9,12 +9,12 @@ import enum
 
 class PlaylistVariantType(str, enum.Enum):
     """Types of playlist variants based on resolution"""
-    ORIGINAL = "original"  # Original resolution, no filtering
-    PORTRAIT_2K = "2k_portrait"  # 1080x1920
-    PORTRAIT_4K = "4k_portrait"  # 2160x3840
-    LANDSCAPE_2K = "2k_landscape"  # 1920x1080
-    LANDSCAPE_4K = "4k_landscape"  # 3840x2160
-    CUSTOM = "custom"  # Custom resolution
+    ORIGINAL = "ORIGINAL"  # Original resolution, no filtering
+    PORTRAIT_2K = "PORTRAIT_2K"  # 1080x1920
+    PORTRAIT_4K = "PORTRAIT_4K"  # 2160x3840
+    LANDSCAPE_2K = "LANDSCAPE_2K"  # 1920x1080
+    LANDSCAPE_4K = "LANDSCAPE_4K"  # 3840x2160
+    CUSTOM = "CUSTOM"  # Custom resolution
 
     @classmethod
     def get_variant_type_for_resolution(cls, width: int, height: int):
@@ -66,7 +66,7 @@ class PlaylistVariant(Base):
         return {
             "id": self.id,
             "playlist_id": self.playlist_id,
-            "variant_type": self.variant_type.value,
+            "variant_type": self.variant_type.value.lower().replace('_', '_'),  # Keep format as-is for now (PORTRAIT_2K -> portrait_2k)
             "target_width": self.target_width,
             "target_height": self.target_height,
             "optimized_sequence": self.optimized_sequence or [],
