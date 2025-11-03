@@ -5,6 +5,7 @@ import { displayDeviceLogger } from '../services/displayDeviceLogger';
 import { getSmartImageUrlFromImage } from '../utils/imageUrls';
 import { transitionLogger } from '../services/transitionLogger';
 import { KenBurnsPlus } from './effects/KenBurnsPlus';
+import { SoftGlow } from './effects/SoftGlow';
 
 interface SlideshowSettings {
   interval: number;
@@ -61,6 +62,10 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const [nextImageReady, setNextImageReady] = useState(false);
   const [waitingForLoad, setWaitingForLoad] = useState(false);
   
+  // Soft Glow brightness state
+  const [imageBrightness, setImageBrightness] = useState(1.0);
+  const [nextImageBrightness, setNextImageBrightness] = useState(1.3);
+  
   // Landscape stacking state
   const [topImageOpacity, setTopImageOpacity] = useState(0);
   const [bottomImageOpacity, setBottomImageOpacity] = useState(0);
@@ -80,6 +85,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const shouldShowSplitScreen = (playlist?.display_mode === 'auto_sort' || playlist?.display_mode === 'default') && isCurrentImageLandscape && isNextImageLandscape;
   const shouldShowMovement = playlist?.display_mode === 'movement' && isCurrentImageLandscape;
   const shouldShowKenBurns = playlist?.display_mode === 'ken_burns_plus';
+  const shouldShowSoftGlow = playlist?.display_mode === 'soft_glow';
   const imageAspectRatio = currentImage && currentImage.width && currentImage.height ? currentImage.width / currentImage.height : 1;
   const displayAspectRatio = window.innerWidth / window.innerHeight;
   const isImageSignificantlyWider = imageAspectRatio > displayAspectRatio * 1.2; // 20% wider than display (less restrictive)
@@ -281,6 +287,10 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
       } else {
         // Fade out single image
         setImageOpacity(0);
+        // Soft Glow: Dim outgoing image to 70% brightness
+        if (shouldShowSoftGlow) {
+          setImageBrightness(0.7);
+        }
         displayLogger.debug('🎬 OPTIMIZED: Fading out single image');
       }
       
@@ -384,6 +394,14 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
       setBottomImageTransform('translateX(0%)');
     } else {
       setImageOpacity(1);
+      // Soft Glow: Start incoming image at 130% brightness
+      if (shouldShowSoftGlow) {
+        setImageBrightness(1.3);
+        // Settle to 100% brightness after 900ms (1200ms transition - 300ms delay)
+        setTimeout(() => {
+          setImageBrightness(1.0);
+        }, 900);
+      }
     }
     
     // Mark transition complete after fade in
@@ -731,12 +749,16 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                   // Hardware acceleration
                   transform: 'translateZ(0)',
                   backfaceVisibility: 'hidden',
-                  willChange: 'opacity',
+                  willChange: shouldShowSoftGlow ? 'opacity, filter' : 'opacity',
+                  // Soft Glow: Add brightness filter
+                  filter: shouldShowSoftGlow ? `brightness(${imageBrightness})` : undefined,
                   // Use object-position for movement instead of transform
                   objectPosition: shouldShowMovement && isCurrentImageLandscape ? movementObjectPosition : 'center',
-                  // Smooth transition for opacity and object-position
-                  transition: shouldShowMovement && isCurrentImageLandscape ? 
-                    'opacity 300ms ease-out, object-position 30s ease-in-out' : 'opacity 300ms ease-out'
+                  // Smooth transition for opacity, brightness, and object-position
+                  transition: shouldShowSoftGlow ? 
+                    'opacity 800ms ease-in-out, filter 1200ms ease-in-out' : 
+                    (shouldShowMovement && isCurrentImageLandscape ? 
+                      'opacity 300ms ease-out, object-position 30s ease-in-out' : 'opacity 300ms ease-out')
                 }}
               onLoad={(e) => {
                 const img = e.target as HTMLImageElement;
