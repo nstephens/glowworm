@@ -22,7 +22,7 @@ class SystemSettings(Base):
     id = Column(Integer, primary_key=True, index=True)
     setting_key = Column(String(100), unique=True, nullable=False, index=True)
     setting_value = Column(Text, nullable=True)
-    setting_type = Column(Enum(SettingType), nullable=False, default=SettingType.STRING)
+    setting_type = Column(Enum(SettingType, values_callable=lambda x: [e.value for e in x]), nullable=False, default=SettingType.STRING)
     description = Column(Text, nullable=True)
     is_sensitive = Column(Boolean, nullable=False, default=False)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.current_timestamp())

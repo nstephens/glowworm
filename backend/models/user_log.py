@@ -30,8 +30,8 @@ class UserLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)  # Nullable for anonymous actions
-    log_level = Column(Enum(UserLogLevel), nullable=False, index=True, default=UserLogLevel.INFO)
-    action = Column(Enum(UserLogAction), nullable=False, index=True)
+    log_level = Column(Enum(UserLogLevel, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True, default=UserLogLevel.INFO)
+    action = Column(Enum(UserLogAction, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True)
     message = Column(Text, nullable=False)
     context = Column(JSON, nullable=True)  # Additional structured data
     url = Column(String(500), nullable=True)  # Page URL where action occurred

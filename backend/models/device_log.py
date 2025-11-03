@@ -18,7 +18,7 @@ class DeviceLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     device_id = Column(Integer, ForeignKey('display_devices.id'), nullable=False, index=True)
-    log_level = Column(Enum(LogLevel), nullable=False, index=True, default=LogLevel.INFO)
+    log_level = Column(Enum(LogLevel, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True, default=LogLevel.INFO)
     message = Column(Text, nullable=False)
     context = Column(JSON, nullable=True)  # Additional structured data (e.g., playlist info, errors, etc.)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)

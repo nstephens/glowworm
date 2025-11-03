@@ -21,7 +21,7 @@ class DisplayDevice(Base):
     device_identifier = Column(String(100), nullable=True)  # Custom identifier set by admin
     
     # Status and authorization
-    status = Column(Enum(DeviceStatus), default=DeviceStatus.PENDING, nullable=False)
+    status = Column(Enum(DeviceStatus, values_callable=lambda x: [e.value for e in x]), default=DeviceStatus.PENDING, nullable=False)
     authorized_by_user_id = Column(Integer, nullable=True)  # User who authorized this device
     authorized_at = Column(DateTime(timezone=True), nullable=True)
     
