@@ -461,6 +461,16 @@ async def reorder_playlist(
         db.commit()
         db.refresh(playlist)
         
+        # Auto-generate variants after sequence change
+        from services.playlist_variant_service import PlaylistVariantService
+        try:
+            variant_service = PlaylistVariantService(db)
+            variant_result = variant_service.generate_variants_for_playlist(playlist_id)
+            logger.info(f"Auto-generated {variant_result.get('count', 0)} variants after reorder")
+        except Exception as e:
+            logger.error(f"Auto variant generation failed (non-fatal): {e}")
+            # Don't fail the reorder if variant generation fails
+        
         # Send WebSocket notification
         updated_playlist = playlist_service.get_playlist_by_id(playlist_id)
         if updated_playlist:
@@ -606,6 +616,16 @@ async def randomize_playlist(
         
         db.commit()
         db.refresh(playlist)
+        
+        # Auto-generate variants after sequence change
+        from services.playlist_variant_service import PlaylistVariantService
+        try:
+            variant_service = PlaylistVariantService(db)
+            variant_result = variant_service.generate_variants_for_playlist(playlist_id)
+            logger.info(f"Auto-generated {variant_result.get('count', 0)} variants after randomize")
+        except Exception as e:
+            logger.error(f"Auto variant generation failed (non-fatal): {e}")
+            # Don't fail the randomize if variant generation fails
         
         # Send WebSocket notification
         try:

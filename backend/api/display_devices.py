@@ -275,13 +275,41 @@ async def update_device_orientation(
         db.commit()
         db.refresh(device)
         
-        # Get affected playlists (playlists assigned to this device)
+        # Get affected playlists and trigger re-computation
         affected_playlists = []
         if device.playlist_id:
             from models.playlist import Playlist
+            from models.image import Image
+            from services.image_pairing_service import image_classification_service
+            from services.playlist_variant_service import PlaylistVariantService
+            
             playlist = db.query(Playlist).filter(Playlist.id == device.playlist_id).first()
             if playlist:
                 affected_playlists.append(playlist.id)
+                
+                # Re-compute pairing sequence for new orientation
+                images = db.query(Image).filter(Image.playlist_id == playlist.id).all()
+                image_data = [{'id': img.id, 'width': img.width, 'height': img.height} for img in images]
+                
+                # Get current sequence order
+                if playlist.sequence:
+                    image_map = {img['id']: img for img in image_data}
+                    ordered_images = [image_map[img_id] for img_id in playlist.sequence if img_id in image_map]
+                else:
+                    ordered_images = image_data
+                
+                # Compute new pairing for new orientation
+                computed = image_classification_service.compute_sequence(ordered_images, orientation_data.orientation)
+                playlist.computed_sequence = computed
+                db.commit()
+                
+                # Auto-generate variants for new orientation
+                try:
+                    variant_service = PlaylistVariantService(db)
+                    variant_result = variant_service.generate_variants_for_playlist(playlist.id)
+                    logger.info(f"Auto-generated {variant_result.get('count', 0)} variants after orientation change")
+                except Exception as e:
+                    logger.error(f"Auto variant generation failed (non-fatal): {e}")
         
         logger.info(f"Device {device_id} orientation updated to {orientation_data.orientation} by {current_user.username}")
         
