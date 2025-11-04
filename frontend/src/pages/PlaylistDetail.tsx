@@ -27,6 +27,7 @@ import { cn } from '../lib/utils';
 import type { Playlist, Image, Album, DisplayDevice, DisplayMode } from '../types';
 import { DISPLAY_MODE_CONFIGS, getDisplayModeConfig, getDisplayModesByTier, PERFORMANCE_TIER_LABELS, PerformanceTier } from '../types/displayModes';
 import { getDeviceCapabilities } from '../utils/deviceCapabilities';
+import { PlaylistPairingView } from '../components/PlaylistPairingView';
 
 // Draggable Image Item Component
 const DraggableImageItem: React.FC<{
@@ -670,7 +671,7 @@ const PlaylistDetail: React.FC = () => {
                 </div>
                 {/* Display Mode Info */}
                 {!isMobile && (
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <div className="flex items-center space-x-2 text-sm text-gray-600 mb-3">
                     <span className="font-medium">Display Mode:</span>
                     <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
                       {getDisplayModeConfig(playlist.display_mode || 'default').displayName}
@@ -678,6 +679,20 @@ const PlaylistDetail: React.FC = () => {
                     <span className="text-gray-500">
                       - {getDisplayModeConfig(playlist.display_mode || 'default').description}
                     </span>
+                  </div>
+                )}
+                
+                {/* Pairing Structure Visualization */}
+                {!isMobile && playlist.computed_sequence && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">Image Pairing Structure</h3>
+                    <PlaylistPairingView
+                      computedSequence={playlist.computed_sequence}
+                      images={playlistImages}
+                      displayOrientation={playlist.computed_sequence ? 'portrait' : 'portrait'} // TODO: Get from assigned display
+                      showWarnings={true}
+                      compact={false}
+                    />
                   </div>
                 )}
               </div>
