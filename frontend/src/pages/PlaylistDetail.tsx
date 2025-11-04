@@ -44,17 +44,17 @@ const DraggableImageItem: React.FC<{
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
-    canDrag: isEditing && displayMode !== 'auto_sort', // Only allow dragging when in edit mode and auto sort is disabled
+    canDrag: isEditing, // Allow dragging when in edit mode
   });
 
   const [, drop] = useDrop({
     accept: 'IMAGE',
     hover: (item: { id: number }) => {
-      if (item.id !== image.id && isEditing && displayMode !== 'auto_sort') {
+      if (item.id !== image.id && isEditing) {
         moveImage(item.id, image.id);
       }
     },
-    canDrop: () => isEditing && displayMode !== 'auto_sort', // Only allow dropping when in edit mode and auto sort is disabled
+    canDrop: () => isEditing, // Allow dropping when in edit mode
   });
 
   return (
@@ -62,7 +62,7 @@ const DraggableImageItem: React.FC<{
       ref={(node) => drag(drop(node))}
       className={`relative group rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
         isDragging ? 'opacity-50 scale-95' : 'hover:scale-105'
-      } ${isEditing && displayMode !== 'auto_sort' ? 'cursor-move' : 'cursor-default'}`}
+      } ${isEditing ? 'cursor-move' : 'cursor-default'}`}
     >
       <img
         src={getThumbnailUrl(image.id)}
@@ -73,7 +73,7 @@ const DraggableImageItem: React.FC<{
       {/* Overlay with actions */}
       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 flex items-center justify-center">
         <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-2">
-          {isEditing && displayMode !== 'auto_sort' && (
+          {isEditing && (
             <div className="flex items-center space-x-1 text-white text-xs bg-black bg-opacity-50 px-2 py-1 rounded">
               <GripVertical className="w-3 h-3" />
               <span>Drag to reorder</span>

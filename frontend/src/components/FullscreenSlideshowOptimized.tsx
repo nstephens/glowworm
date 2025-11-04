@@ -88,7 +88,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const isCurrentImageLandscape = currentImage && currentImage.width && currentImage.height && currentImage.width > currentImage.height;
   const nextImageData = images[currentIndex + 1];
   const isNextImageLandscape = nextImageData && nextImageData.width && nextImageData.height && nextImageData.width > nextImageData.height;
-  const shouldShowSplitScreen = (playlist?.display_mode === 'auto_sort' || playlist?.display_mode === 'default') && isCurrentImageLandscape && isNextImageLandscape;
+  const shouldShowSplitScreen = playlist?.display_mode === 'default' && isCurrentImageLandscape && isNextImageLandscape;
   const shouldShowStackedReveal = playlist?.display_mode === 'stacked_reveal' && isCurrentImageLandscape && isNextImageLandscape;
   const shouldShowMovement = playlist?.display_mode === 'movement' && isCurrentImageLandscape;
   const shouldShowKenBurns = playlist?.display_mode === 'ken_burns_plus';

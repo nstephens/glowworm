@@ -6,7 +6,6 @@ import enum
 
 class DisplayMode(enum.Enum):
     DEFAULT = "default"
-    AUTO_SORT = "auto_sort"
     MOVEMENT = "movement"
     # Tier 1: Raspberry Pi Safe (30fps)
     KEN_BURNS_PLUS = "ken_burns_plus"

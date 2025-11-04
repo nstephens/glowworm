@@ -21,17 +21,17 @@ def upgrade() -> None:
     op.execute("""
         UPDATE playlists 
         SET display_mode = 'default' 
-        WHERE display_mode IN ('parallax_depth', 'color_harmony', 'cinematic_bars', 'magic_dust', 'liquid_blend')
+        WHERE display_mode IN ('auto_sort', 'parallax_depth', 'color_harmony', 'cinematic_bars', 'magic_dust', 'liquid_blend')
     """)
     
     # Update the displaymode enum to remove unused modes
-    # Keep only: default, auto_sort, movement, ken_burns_plus, soft_glow, 
+    # Keep only: default, movement, ken_burns_plus, soft_glow, 
     # ambient_pulse, dreamy_reveal, stacked_reveal
     op.alter_column(
         'playlists',
         'display_mode',
         existing_type=sa.Enum(
-            'default', 'auto_sort', 'movement', 'ken_burns_plus', 'soft_glow', 
+            'default', 'movement', 'ken_burns_plus', 'soft_glow', 
             'ambient_pulse', 'dreamy_reveal', 'stacked_reveal',
             name='displaymode'
         ),

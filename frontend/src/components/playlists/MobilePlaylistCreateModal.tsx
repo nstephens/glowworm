@@ -76,13 +76,6 @@ const DISPLAY_MODES = [
     color: 'bg-purple-500'
   },
   { 
-    value: 'auto_sort', 
-    label: 'Auto Sort', 
-    description: 'Smart sorting by metadata',
-    icon: <Settings className="w-4 h-4" />,
-    color: 'bg-green-500'
-  },
-  { 
     value: 'movement', 
     label: 'Movement', 
     description: 'Motion-based transitions',

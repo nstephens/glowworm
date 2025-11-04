@@ -8,7 +8,6 @@
 export enum DisplayMode {
   // Original modes
   DEFAULT = 'default',
-  AUTO_SORT = 'auto_sort',
   MOVEMENT = 'movement',
   
   // Tier 1: Raspberry Pi Safe (30fps)
@@ -59,15 +58,6 @@ export const DISPLAY_MODE_CONFIGS: Record<DisplayMode, DisplayModeConfig> = {
     displayName: 'Default Fade',
     description: 'Simple cross-fade transitions between images',
     emotionalTone: 'Classic',
-    tier: PerformanceTier.TIER_1,
-    supportsSplitScreen: true
-  },
-  
-  [DisplayMode.AUTO_SORT]: {
-    mode: DisplayMode.AUTO_SORT,
-    displayName: 'Auto Sort',
-    description: 'Stacks landscape images with slight offset',
-    emotionalTone: 'Organized',
     tier: PerformanceTier.TIER_1,
     supportsSplitScreen: true
   },

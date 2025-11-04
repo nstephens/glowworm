@@ -165,13 +165,11 @@ const SortablePlaylistItem: React.FC<SortablePlaylistItemProps> = ({
                   )}
                   {playlist.display_mode && playlist.display_mode !== 'default' && (
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      playlist.display_mode === 'auto_sort' ? 'bg-blue-100 text-blue-800' :
                       playlist.display_mode === 'movement' ? 'bg-purple-100 text-purple-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
                       <Settings className="w-3 h-3 mr-1" />
-                      {playlist.display_mode === 'auto_sort' ? 'Auto Sort' :
-                       playlist.display_mode === 'movement' ? 'Movement' :
+                      {playlist.display_mode === 'movement' ? 'Movement' :
                        playlist.display_mode}
                     </span>
                   )}
