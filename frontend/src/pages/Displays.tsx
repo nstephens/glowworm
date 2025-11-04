@@ -24,6 +24,10 @@ interface DisplayDevice {
   last_seen: string;
   created_at: string;
   updated_at: string;
+  screen_width?: number;
+  screen_height?: number;
+  device_pixel_ratio?: string;
+  orientation: string;
 }
 
 const Displays: React.FC = () => {
@@ -55,6 +59,9 @@ const Displays: React.FC = () => {
   const [deviceToReset, setDeviceToReset] = useState<DisplayDevice | null>(null);
   const [deviceName, setDeviceName] = useState('');
   const [deviceIdentifier, setDeviceIdentifier] = useState('');
+  const [deviceOrientation, setDeviceOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [showOrientationWarning, setShowOrientationWarning] = useState(false);
+  const [pendingOrientation, setPendingOrientation] = useState<'portrait' | 'landscape'>('portrait');
   
   // Playlist state
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -186,6 +193,7 @@ const Displays: React.FC = () => {
     if (!deviceToUpdate) return;
     
     try {
+      // Update basic device info
       const response = await fetch(`${urlResolver.getApiUrl()}/display-devices/admin/devices/${deviceToUpdate.id}`, {
         method: 'PUT',
         headers: {
@@ -198,15 +206,34 @@ const Displays: React.FC = () => {
         }),
       });
 
-      if (response.ok) {
-        await fetchDevices(); // Refresh the list
-        setShowUpdateModal(false);
-        setDeviceToUpdate(null);
-        setDeviceName('');
-        setDeviceIdentifier('');
-      } else {
+      if (!response.ok) {
         throw new Error('Failed to update device');
       }
+      
+      // Update orientation if changed
+      if (deviceOrientation !== deviceToUpdate.orientation) {
+        const orientationResponse = await fetch(`${urlResolver.getApiUrl()}/display-devices/admin/devices/${deviceToUpdate.id}/orientation`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            orientation: deviceOrientation
+          }),
+        });
+        
+        if (!orientationResponse.ok) {
+          throw new Error('Failed to update orientation');
+        }
+      }
+      
+      await fetchDevices(); // Refresh the list
+      setShowUpdateModal(false);
+      setDeviceToUpdate(null);
+      setDeviceName('');
+      setDeviceIdentifier('');
+      setDeviceOrientation('portrait');
     } catch (err) {
       displayLogger.error('Failed to update device:', err);
       setError('Failed to update device');
@@ -230,6 +257,7 @@ const Displays: React.FC = () => {
     setDeviceToUpdate(device);
     setDeviceName(device.device_name || '');
     setDeviceIdentifier(device.device_identifier || '');
+    setDeviceOrientation((device.orientation as 'portrait' | 'landscape') || 'portrait');
     setShowUpdateModal(true);
   };
 
@@ -786,6 +814,62 @@ const Displays: React.FC = () => {
                   placeholder="Enter device identifier"
                 />
               </div>
+              
+              {/* Orientation Setting */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Screen Orientation
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="orientation"
+                      value="portrait"
+                      checked={deviceOrientation === 'portrait'}
+                      onChange={(e) => {
+                        if (deviceToUpdate && e.target.value !== deviceToUpdate.orientation) {
+                          setPendingOrientation('portrait');
+                          setShowOrientationWarning(true);
+                        } else {
+                          setDeviceOrientation('portrait');
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Portrait {deviceToUpdate && deviceToUpdate.screen_height && deviceToUpdate.screen_width && deviceToUpdate.screen_height > deviceToUpdate.screen_width && '(Recommended)'}
+                    </span>
+                  </label>
+                  
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="orientation"
+                      value="landscape"
+                      checked={deviceOrientation === 'landscape'}
+                      onChange={(e) => {
+                        if (deviceToUpdate && e.target.value !== deviceToUpdate.orientation) {
+                          setPendingOrientation('landscape');
+                          setShowOrientationWarning(true);
+                        } else {
+                          setDeviceOrientation('landscape');
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Landscape {deviceToUpdate && deviceToUpdate.screen_width && deviceToUpdate.screen_height && deviceToUpdate.screen_width > deviceToUpdate.screen_height && '(Recommended)'}
+                    </span>
+                  </label>
+                </div>
+                
+                <p className="mt-2 text-xs text-gray-500">
+                  ℹ️ Auto-detected from resolution ({deviceToUpdate?.screen_width}x{deviceToUpdate?.screen_height}).
+                  Changing this will trigger playlist re-computation.
+                </p>
+              </div>
+              
               <div className="flex justify-between">
                 {/* Left side - Delete and Reject buttons for active devices */}
                 {deviceToUpdate?.status === 'authorized' && (
@@ -951,6 +1035,23 @@ const Displays: React.FC = () => {
         title="Reset Device"
         message={deviceToReset ? `Are you sure you want to reset device "${deviceToReset.device_name || deviceToReset.device_token}"? This will invalidate its authentication and force it to re-register. The device will need to generate a new registration code.` : ''}
         confirmText="Reset Device"
+        variant="warning"
+      />
+      
+      {/* Orientation Change Warning Modal */}
+      <ConfirmationModal
+        isOpen={showOrientationWarning}
+        onClose={() => {
+          setShowOrientationWarning(false);
+          setDeviceOrientation(deviceToUpdate?.orientation as 'portrait' | 'landscape' || 'portrait');
+        }}
+        onConfirm={() => {
+          setDeviceOrientation(pendingOrientation);
+          setShowOrientationWarning(false);
+        }}
+        title="Change Display Orientation"
+        message={`Changing the orientation to ${pendingOrientation} will trigger re-computation of all assigned playlists. This will optimize image pairing for the new orientation. Continue?`}
+        confirmText="Change Orientation"
         variant="warning"
       />
     </div>
