@@ -88,8 +88,28 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const isCurrentImageLandscape = currentImage && currentImage.width && currentImage.height && currentImage.width > currentImage.height;
   const nextImageData = images[currentIndex + 1];
   const isNextImageLandscape = nextImageData && nextImageData.width && nextImageData.height && nextImageData.width > nextImageData.height;
-  const shouldShowSplitScreen = playlist?.display_mode === 'default' && isCurrentImageLandscape && isNextImageLandscape;
-  const shouldShowStackedReveal = playlist?.display_mode === 'stacked_reveal' && isCurrentImageLandscape && isNextImageLandscape;
+  
+  // Check if current index is part of a pair from computed_sequence
+  const isPairedFromSequence = React.useMemo(() => {
+    if (!playlist?.computed_sequence || !currentImage || !nextImageData) return false;
+    
+    // Find which entry contains the current image
+    for (const entry of playlist.computed_sequence) {
+      if (entry.type === 'pair' && entry.images.length === 2) {
+        // Check if this pair includes current and next images
+        if (entry.images[0] === currentImage.id && entry.images[1] === nextImageData.id) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }, [playlist?.computed_sequence, currentImage?.id, nextImageData?.id]);
+  
+  // Use computed_sequence if available, otherwise fall back to orientation-based logic
+  const shouldShowSplitScreen = isPairedFromSequence || 
+    (playlist?.display_mode === 'default' && isCurrentImageLandscape && isNextImageLandscape);
+  const shouldShowStackedReveal = (isPairedFromSequence && playlist?.display_mode === 'stacked_reveal') ||
+    (playlist?.display_mode === 'stacked_reveal' && isCurrentImageLandscape && isNextImageLandscape);
   const shouldShowMovement = playlist?.display_mode === 'movement' && isCurrentImageLandscape;
   const shouldShowKenBurns = playlist?.display_mode === 'ken_burns_plus';
   const shouldShowSoftGlow = playlist?.display_mode === 'soft_glow';
