@@ -415,32 +415,65 @@ async def reorder_playlist(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Reorder images in playlist"""
+    """Reorder images in playlist and compute pairing sequence"""
     try:
         # CSRF protection
         csrf_protection.require_csrf_token(request)
         
+        from services.image_pairing_service import image_classification_service
+        from models.image import Image
+        from models.display_device import DisplayDevice
+        
         playlist_service = PlaylistService(db)
+        playlist = playlist_service.get_playlist_by_id(playlist_id)
+        
+        if not playlist:
+            raise HTTPException(status_code=404, detail="Playlist not found")
+        
+        # Reorder playlist
         success = playlist_service.reorder_playlist(playlist_id, reorder_data.image_ids)
         
-        if success:
-            # Get updated playlist data and send WebSocket notification
-            updated_playlist = playlist_service.get_playlist_by_id(playlist_id)
-            if updated_playlist:
-                try:
-                    await connection_manager.broadcast_playlist_update(updated_playlist.to_dict())
-                except Exception as e:
-                    logger.error(f"Failed to broadcast playlist update: {e}")
-            
-            return {
-                "success": True,
-                "message": "Playlist reordered successfully"
-            }
-        else:
+        if not success:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to reorder playlist"
             )
+        
+        # Get display orientation from assigned device (if any)
+        display_orientation = 'portrait'  # Default
+        if playlist.id:
+            # Find device(s) using this playlist
+            device = db.query(DisplayDevice).filter(DisplayDevice.playlist_id == playlist.id).first()
+            if device and device.orientation:
+                display_orientation = device.orientation
+        
+        # Compute pairing sequence
+        images = db.query(Image).filter(Image.playlist_id == playlist_id).all()
+        image_data = [{'id': img.id, 'width': img.width, 'height': img.height} for img in images]
+        
+        # Create ordered image data based on reorder_data
+        image_map = {img['id']: img for img in image_data}
+        ordered_images = [image_map[img_id] for img_id in reorder_data.image_ids if img_id in image_map]
+        
+        computed = image_classification_service.compute_sequence(ordered_images, display_orientation)
+        playlist.computed_sequence = computed
+        
+        db.commit()
+        db.refresh(playlist)
+        
+        # Send WebSocket notification
+        updated_playlist = playlist_service.get_playlist_by_id(playlist_id)
+        if updated_playlist:
+            try:
+                await connection_manager.broadcast_playlist_update(updated_playlist.to_dict())
+            except Exception as e:
+                logger.error(f"Failed to broadcast playlist update: {e}")
+        
+        return {
+            "success": True,
+            "message": "Playlist reordered successfully",
+            "computed_sequence": computed
+        }
         
     except HTTPException:
         raise
@@ -451,6 +484,64 @@ async def reorder_playlist(
             detail="Failed to reorder playlist"
         )
 
+@router.post("/{playlist_id}/validate-order")
+async def validate_playlist_order(
+    request: Request,
+    playlist_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Validate playlist order for optimal pairing"""
+    try:
+        # CSRF protection
+        csrf_protection.require_csrf_token(request)
+        
+        # Get request body
+        body = await request.json()
+        sequence = body.get('sequence')
+        display_orientation = body.get('display_orientation', 'portrait')
+        
+        if not sequence:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Sequence is required"
+            )
+        
+        # Get playlist and images
+        from services.image_pairing_service import image_classification_service
+        from models.image import Image
+        
+        playlist_service = PlaylistService(db)
+        playlist = playlist_service.get_playlist_by_id(playlist_id)
+        
+        if not playlist:
+            raise HTTPException(status_code=404, detail="Playlist not found")
+        
+        # Get image metadata
+        images = db.query(Image).filter(Image.playlist_id == playlist_id).all()
+        image_data = [{'id': img.id, 'width': img.width, 'height': img.height} for img in images]
+        
+        # Validate sequence
+        validation = image_classification_service.validate_sequence_consistency(
+            sequence, image_data, display_orientation
+        )
+        
+        return {
+            "is_valid": validation['is_valid'],
+            "errors": validation['errors'],
+            "optimal_sequence": validation['optimal_sequence'],
+            "optimal_computed": validation['optimal_computed']
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Validate playlist order error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to validate playlist order"
+        )
+
 @router.post("/{playlist_id}/randomize")
 async def randomize_playlist(
     request: Request,
@@ -458,32 +549,76 @@ async def randomize_playlist(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Randomize the order of images in playlist"""
+    """Randomize the order of images in playlist with smart pairing preservation"""
     try:
         # CSRF protection
         csrf_protection.require_csrf_token(request)
         
-        playlist_service = PlaylistService(db)
-        success = playlist_service.randomize_playlist(playlist_id)
+        # Get request body for display orientation
+        body = await request.json()
+        display_orientation = body.get('display_orientation', 'portrait')
+        preserve_pairing = body.get('preserve_pairing', True)
         
-        if success:
-            # Get updated playlist data and send WebSocket notification
-            updated_playlist = playlist_service.get_playlist_by_id(playlist_id)
-            if updated_playlist:
-                try:
-                    await connection_manager.broadcast_playlist_update(updated_playlist.to_dict())
-                except Exception as e:
-                    logger.error(f"Failed to broadcast playlist update: {e}")
+        from services.image_pairing_service import image_classification_service
+        from models.image import Image
+        import random
+        
+        playlist_service = PlaylistService(db)
+        playlist = playlist_service.get_playlist_by_id(playlist_id)
+        
+        if not playlist:
+            raise HTTPException(status_code=404, detail="Playlist not found")
+        
+        # Get all images for this playlist
+        images = db.query(Image).filter(Image.playlist_id == playlist_id).all()
+        
+        if preserve_pairing:
+            # Smart randomize: shuffle while preserving optimal pairing
+            image_data = [{'id': img.id, 'width': img.width, 'height': img.height} for img in images]
             
-            return {
-                "success": True,
-                "message": "Playlist randomized successfully"
-            }
+            # Separate by orientation
+            landscapes = [img for img in image_data if image_classification_service.classify_image(img['width'], img['height']) == 'landscape']
+            portraits = [img for img in image_data if image_classification_service.classify_image(img['width'], img['height']) == 'portrait']
+            
+            # Shuffle each group
+            random.shuffle(landscapes)
+            random.shuffle(portraits)
+            
+            # Combine and shuffle again for variety
+            all_shuffled = landscapes + portraits
+            random.shuffle(all_shuffled)
+            
+            # Compute optimal sequence from shuffled images
+            computed = image_classification_service.compute_sequence(all_shuffled, display_orientation)
+            new_sequence = [img_id for entry in computed for img_id in entry['images']]
+            
+            # Update playlist
+            playlist.sequence = new_sequence
+            playlist.computed_sequence = computed
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to randomize playlist"
-            )
+            # Simple randomize without pairing preservation
+            success = playlist_service.randomize_playlist(playlist_id)
+            if not success:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Failed to randomize playlist"
+                )
+        
+        db.commit()
+        db.refresh(playlist)
+        
+        # Send WebSocket notification
+        try:
+            await connection_manager.broadcast_playlist_update(playlist.to_dict())
+        except Exception as e:
+            logger.error(f"Failed to broadcast playlist update: {e}")
+        
+        return {
+            "success": True,
+            "message": "Playlist randomized successfully",
+            "new_sequence": playlist.sequence,
+            "computed_sequence": playlist.computed_sequence
+        }
         
     except HTTPException:
         raise

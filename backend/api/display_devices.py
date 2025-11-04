@@ -35,6 +35,9 @@ class DeviceUpdateRequest(BaseModel):
     device_name: Optional[str] = None
     device_identifier: Optional[str] = None
 
+class DeviceOrientationRequest(BaseModel):
+    orientation: str  # 'portrait' or 'landscape'
+
 class DeviceResponse(BaseModel):
     id: int
     device_token: str
@@ -244,6 +247,56 @@ async def update_device(
     except Exception as e:
         logger.error(f"Update device failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to update device")
+
+@router.put("/admin/devices/{device_id}/orientation")
+async def update_device_orientation(
+    device_id: int,
+    orientation_data: DeviceOrientationRequest,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Update device orientation and trigger playlist re-computation (admin only)"""
+    try:
+        # Validate orientation value
+        if orientation_data.orientation not in ['portrait', 'landscape']:
+            raise HTTPException(
+                status_code=400, 
+                detail="Orientation must be 'portrait' or 'landscape'"
+            )
+        
+        service = DisplayDeviceService(db)
+        device = service.get_device_by_id(device_id)
+        
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found")
+        
+        # Update orientation
+        device.orientation = orientation_data.orientation
+        db.commit()
+        db.refresh(device)
+        
+        # Get affected playlists (playlists assigned to this device)
+        affected_playlists = []
+        if device.playlist_id:
+            from models.playlist import Playlist
+            playlist = db.query(Playlist).filter(Playlist.id == device.playlist_id).first()
+            if playlist:
+                affected_playlists.append(playlist.id)
+        
+        logger.info(f"Device {device_id} orientation updated to {orientation_data.orientation} by {current_user.username}")
+        
+        return {
+            "success": True,
+            "message": "Orientation updated successfully",
+            "device": DeviceResponse.from_device(device),
+            "affected_playlists": affected_playlists
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update orientation failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update orientation")
 
 @router.get("/debug-cookies")
 async def debug_cookies(request: Request):
