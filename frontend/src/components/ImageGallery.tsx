@@ -162,22 +162,17 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   });
 
   const handleImageSelect = (image: Image, event: React.MouseEvent) => {
-    if (event.ctrlKey || event.metaKey) {
-      // Multi-select
-      setSelectedImages(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(image.id)) {
-          newSet.delete(image.id);
-        } else {
-          newSet.add(image.id);
-        }
-        return newSet;
-      });
-    } else {
-      // Single select
-      setSelectedImages(new Set([image.id]));
-      onImageSelect?.(image);
-    }
+    // With checkboxes, default behavior is to toggle selection (multi-select mode)
+    // This allows users to check multiple images without holding Ctrl/Cmd
+    setSelectedImages(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(image.id)) {
+        newSet.delete(image.id);
+      } else {
+        newSet.add(image.id);
+      }
+      return newSet;
+    });
   };
 
 
