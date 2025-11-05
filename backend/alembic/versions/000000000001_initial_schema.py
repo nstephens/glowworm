@@ -22,9 +22,16 @@ def upgrade():
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('username', sa.String(length=80), nullable=False),
         sa.Column('email', sa.String(length=120), nullable=True),
-        sa.Column('password_hash', sa.String(length=255), nullable=False),
+        sa.Column('hashed_password', sa.String(length=255), nullable=False),
         sa.Column('role', sa.String(length=20), nullable=True, server_default='user'),
+        sa.Column('is_active', sa.Boolean(), nullable=False, server_default='1'),
+        sa.Column('is_first_user', sa.Boolean(), nullable=False, server_default='0'),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('last_login', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('display_name', sa.String(length=100), nullable=True),
+        sa.Column('avatar_url', sa.String(length=255), nullable=True),
+        sa.Column('google_id', sa.String(length=100), nullable=True),
         sa.PrimaryKeyConstraint('id'),
         mysql_charset='utf8mb4',
         mysql_collate='utf8mb4_unicode_ci'
@@ -32,6 +39,7 @@ def upgrade():
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
     op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
     op.create_index(op.f('ix_users_username'), 'users', ['username'], unique=True)
+    op.create_index(op.f('ix_users_google_id'), 'users', ['google_id'], unique=True)
 
     # Create playlists table
     op.create_table('playlists',
