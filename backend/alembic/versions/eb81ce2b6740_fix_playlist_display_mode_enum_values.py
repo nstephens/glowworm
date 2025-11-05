@@ -28,14 +28,16 @@ def upgrade() -> None:
     
     if 'playlists' in tables:
         # Table exists, update existing data from uppercase to lowercase
+        # Also migrate legacy modes to current modes
         op.execute("UPDATE playlists SET display_mode = 'default' WHERE display_mode = 'DEFAULT'")
-        op.execute("UPDATE playlists SET display_mode = 'auto_sort' WHERE display_mode = 'AUTO_SORT'")
-        op.execute("UPDATE playlists SET display_mode = 'movement' WHERE display_mode = 'MOVEMENT'")
+        op.execute("UPDATE playlists SET display_mode = 'default' WHERE display_mode = 'AUTO_SORT'")
+        op.execute("UPDATE playlists SET display_mode = 'default' WHERE display_mode IN ('auto_sort', 'MOVEMENT', 'movement')")
         
         # Now change the column type to use the proper enum with lowercase values
+        # Movement and auto_sort removed as legacy modes
         op.alter_column('playlists', 'display_mode',
                        existing_type=mysql.VARCHAR(collation='utf8mb4_unicode_ci', length=20),
-                       type_=sa.Enum('default', 'auto_sort', 'movement', name='displaymode'),
+                       type_=sa.Enum('default', name='displaymode'),
                        existing_nullable=True,
                        existing_server_default=sa.text("'default'"))
     else:
@@ -48,12 +50,10 @@ def downgrade() -> None:
     """Downgrade schema."""
     # Revert the column type back to VARCHAR
     op.alter_column('playlists', 'display_mode',
-                   existing_type=sa.Enum('default', 'auto_sort', 'movement', name='displaymode'),
+                   existing_type=sa.Enum('default', name='displaymode'),
                    type_=mysql.VARCHAR(collation='utf8mb4_unicode_ci', length=20),
                    existing_nullable=True,
                    existing_server_default=sa.text("'default'"))
     
     # Revert data back to uppercase (if needed)
     op.execute("UPDATE playlists SET display_mode = 'DEFAULT' WHERE display_mode = 'default'")
-    op.execute("UPDATE playlists SET display_mode = 'AUTO_SORT' WHERE display_mode = 'auto_sort'")
-    op.execute("UPDATE playlists SET display_mode = 'MOVEMENT' WHERE display_mode = 'movement'")
