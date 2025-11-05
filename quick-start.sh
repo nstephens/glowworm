@@ -301,7 +301,7 @@ fi
 echo -e "${BLUE}🌐 Access the application:${NC}"
 if [ "$SERVER_IP" != "YOUR_SERVER_IP" ]; then
     echo "   📱 From this server:    http://localhost:3003"
-    echo "   📱 From other devices:  http://$SERVER_IP:3003"
+    echo "   📱 From other devices:  http://$SERVER_IP:3003"a
     echo "   🔌 Backend API:         http://$SERVER_IP:8001/api"
 else
     echo "   📱 Web Interface: http://localhost:3003 (if local)"

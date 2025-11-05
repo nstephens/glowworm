@@ -58,6 +58,11 @@ const AdminLogs: React.FC = () => {
     limit: 100
   });
   
+  // Get unique devices from display logs for filtering
+  const uniqueDevices = Array.from(new Map(
+    displayLogs.map(log => [log.device_id, { id: log.device_id, name: log.device_name, token: log.device_token }])
+  ).values());
+  
   // User logs
   const [userLogs, setUserLogs] = useState<UserLog[]>([]);
   const [userFilters, setUserFilters] = useState({
@@ -493,6 +498,26 @@ const AdminLogs: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Device</label>
+                  <select
+                    value={displayFilters.deviceId || ''}
+                    onChange={(e) => {
+                      const newDeviceId = e.target.value ? parseInt(e.target.value) : null;
+                      setDisplayFilters({ ...displayFilters, deviceId: newDeviceId });
+                      setDisplayLogs([]); // Clear stale data immediately
+                      fetchDisplayLogs({ deviceId: newDeviceId }); // Pass new value directly
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  >
+                    <option value="">All Devices</option>
+                    {uniqueDevices.map((device) => (
+                      <option key={device.id} value={device.id}>
+                        {device.name || `Device ${device.token.substring(0, 8)}...`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Log Level</label>
                   <select

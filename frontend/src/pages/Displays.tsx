@@ -487,20 +487,6 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
 
   return (
     <div className="space-y-8">
-
-      {/* Header with View Logs Button */}
-      <div className="flex items-center justify-between mb-6">
-        <div></div>
-        <Button
-          onClick={() => navigate('/admin/displays/logs')}
-          className="flex items-center gap-2"
-          variant="outline"
-        >
-          <FileText className="w-4 h-4" />
-          View Logs
-        </Button>
-      </div>
-
       {/* Tabs */}
       <div className="mb-6">
         <div className="border-b border-gray-200">

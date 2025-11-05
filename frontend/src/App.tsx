@@ -19,7 +19,6 @@ import { Images } from './pages/Images';
 import Playlists from './pages/Playlists';
 import PlaylistDetail from './pages/PlaylistDetail';
 import Displays from './pages/Displays';
-import DisplayLogs from './pages/DisplayLogs';
 import AdminLogs from './pages/AdminLogs';
 import Settings from './pages/Settings';
 import AdminLayout from './components/AdminLayout';
@@ -144,7 +143,6 @@ function AppContent() {
             <Route path="/admin/playlists" element={<ProtectedRoute><PlaylistsWithHeader /></ProtectedRoute>} />
             <Route path="/admin/playlists/:slug" element={<ProtectedRoute><AdminLayout headerContent={<PlaylistDetailHeader />}><PlaylistDetail /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/displays" element={<ProtectedRoute><DisplaysWithHeader /></ProtectedRoute>} />
-            <Route path="/admin/displays/logs" element={<ProtectedRoute><AdminLayout><DisplayLogs /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/logs" element={<AdminProtectedRoute><AdminLayout headerContent={<AdminLogsHeader />}><AdminLogs /></AdminLayout></AdminProtectedRoute>} />
             <Route path="/admin/settings" element={<AdminProtectedRoute><AdminLayout headerContent={<SettingsHeader />}><Settings /></AdminLayout></AdminProtectedRoute>} />
             <Route path="/display" element={<DisplayRegistration />} />
