@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -73,6 +74,7 @@ interface DisplaySize {
 const Settings: React.FC = () => {
   const { toast } = useToast();
   const { isMobile } = useResponsiveLayout();
+  const location = useLocation();
   const isCoarsePointer = typeof window !== 'undefined' &&
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(pointer: coarse)').matches;
@@ -111,6 +113,17 @@ const Settings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'database' | 'admin' | 'oauth' | 'displays' | 'general' | 'users' | 'utilities'>('general');
   const [resolutionSuggestions, setResolutionSuggestions] = useState<any[]>([]);
+  
+  // Handle hash navigation
+  useEffect(() => {
+    const hash = location.hash.slice(1); // Remove the # symbol
+    if (hash) {
+      const validTabs = ['general', 'users', 'database', 'admin', 'oauth', 'displays', 'utilities'];
+      if (validTabs.includes(hash)) {
+        setActiveTab(hash as any);
+      }
+    }
+  }, [location.hash]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [variantStatus, setVariantStatus] = useState<any[]>([]);
   const [isLoadingVariantStatus, setIsLoadingVariantStatus] = useState(false);
@@ -1446,13 +1459,13 @@ const Settings: React.FC = () => {
       {/* Tab Content */}
       <Card className="border-0 shadow-lg bg-card/50 backdrop-blur-sm animate-fade-in-up">
         <CardContent className="p-6">
-          {activeTab === 'general' && renderGeneralSettings()}
-          {activeTab === 'users' && <UserManagement />}
-          {activeTab === 'database' && renderDatabaseSettings()}
-          {activeTab === 'admin' && renderAdminSettings()}
-          {activeTab === 'oauth' && renderOAuthSettings()}
-          {activeTab === 'displays' && renderDisplaySettings()}
-          {activeTab === 'utilities' && renderUtilitiesSettings()}
+          {activeTab === 'general' && <div id="general">{renderGeneralSettings()}</div>}
+          {activeTab === 'users' && <div id="users"><UserManagement /></div>}
+          {activeTab === 'database' && <div id="database">{renderDatabaseSettings()}</div>}
+          {activeTab === 'admin' && <div id="admin">{renderAdminSettings()}</div>}
+          {activeTab === 'oauth' && <div id="oauth">{renderOAuthSettings()}</div>}
+          {activeTab === 'displays' && <div id="displays">{renderDisplaySettings()}</div>}
+          {activeTab === 'utilities' && <div id="utilities">{renderUtilitiesSettings()}</div>}
         </CardContent>
       </Card>
 

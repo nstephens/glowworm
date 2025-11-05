@@ -10,8 +10,14 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Sparkles,
   FileText,
+  Database,
+  Users,
+  User,
+  Key,
+  Wrench,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiService } from '@/services/api';
@@ -36,6 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     playlists: 0,
     displays: 0,
   });
+  const [systemExpanded, setSystemExpanded] = useState(false);
 
   // Load counts for badges
   useEffect(() => {
@@ -92,34 +99,97 @@ export const Sidebar: React.FC<SidebarProps> = ({
       description: 'Manage display devices',
       badge: counts.displays > 0 ? counts.displays.toString() : undefined,
     },
-    {
-      name: 'Logs',
-      href: '/admin/logs',
-      icon: FileText,
-      description: 'View system logs and activity',
-    },
-    {
-      name: 'Settings',
-      href: '/admin/settings',
-      icon: Settings,
-      description: 'Configure system settings',
-    },
   ];
+
+  const systemNavigation = {
+    name: 'System',
+    icon: Settings,
+    description: 'System configuration and logs',
+    children: [
+      {
+        name: 'Logs',
+        href: '/admin/logs',
+        icon: FileText,
+        description: 'View system logs and activity',
+      },
+      {
+        name: 'General',
+        href: '/admin/settings#general',
+        icon: Wrench,
+        description: 'General system settings',
+      },
+      {
+        name: 'Users',
+        href: '/admin/settings#users',
+        icon: Users,
+        description: 'User management',
+      },
+      {
+        name: 'Database',
+        href: '/admin/settings#database',
+        icon: Database,
+        description: 'Database configuration',
+      },
+      {
+        name: 'Admin',
+        href: '/admin/settings#admin',
+        icon: User,
+        description: 'Admin user settings',
+      },
+      {
+        name: 'OAuth',
+        href: '/admin/settings#oauth',
+        icon: Key,
+        description: 'OAuth configuration',
+      },
+      {
+        name: 'Display Sizes',
+        href: '/admin/settings#displays',
+        icon: Monitor,
+        description: 'Display resolution settings',
+      },
+      {
+        name: 'Utilities',
+        href: '/admin/settings#utilities',
+        icon: Wrench,
+        description: 'System utilities and tools',
+      },
+    ],
+  };
 
   const isActive = (path: string) => {
     if (path === '/admin') {
       return location.pathname === '/admin';
     }
-    return location.pathname.startsWith(path);
+    return location.pathname.startsWith(path) || location.pathname + location.hash === path;
   };
 
   const handleNavigation = (href: string) => {
-    navigate(href);
+    if (href.includes('#')) {
+      // Handle hash navigation
+      const [path, hash] = href.split('#');
+      navigate(path);
+      setTimeout(() => {
+        const element = document.getElementById(hash);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    } else {
+      navigate(href);
+    }
     // Close mobile sidebar after navigation
     if (isMobile) {
       onToggle();
     }
   };
+  
+  // Auto-expand System if on settings or logs page
+  useEffect(() => {
+    if (location.pathname === '/admin/settings' || location.pathname === '/admin/logs') {
+      setSystemExpanded(true);
+    }
+  }, [location.pathname]);
 
   return (
     <aside 
@@ -175,6 +245,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           role="navigation"
           aria-label="Main navigation"
         >
+          {/* Regular navigation items */}
           {navigation.map((item) => {
             const active = isActive(item.href);
             return (
@@ -218,6 +289,84 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </Button>
             );
           })}
+          
+          {/* System Accordion */}
+          <div className="space-y-1">
+            <Button
+              variant={location.pathname === '/admin/settings' || location.pathname === '/admin/logs' ? 'default' : 'ghost'}
+              className={cn(
+                'w-full justify-start h-11 transition-all duration-200 group',
+                isCollapsed && !isMobile ? 'px-3' : 'px-4',
+                location.pathname === '/admin/settings' || location.pathname === '/admin/logs'
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-lg'
+                  : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+              )}
+              onClick={() => {
+                if (isCollapsed && !isMobile) {
+                  // If collapsed, go to settings
+                  handleNavigation('/admin/settings');
+                } else {
+                  // If expanded, toggle accordion
+                  setSystemExpanded(!systemExpanded);
+                }
+              }}
+              title={isCollapsed && !isMobile ? systemNavigation.description : undefined}
+              aria-label={systemNavigation.description}
+              aria-expanded={systemExpanded}
+            >
+              <systemNavigation.icon 
+                className={cn(
+                  'w-5 h-5 flex-shrink-0',
+                  isCollapsed && !isMobile ? '' : 'mr-3'
+                )}
+                aria-hidden="true"
+              />
+              {(!isCollapsed || isMobile) && (
+                <>
+                  <span className="flex-1 text-left truncate">{systemNavigation.name}</span>
+                  <ChevronDown 
+                    className={cn(
+                      'w-4 h-4 flex-shrink-0 transition-transform duration-200',
+                      systemExpanded && 'transform rotate-180'
+                    )}
+                    aria-hidden="true"
+                  />
+                </>
+              )}
+            </Button>
+            
+            {/* System sub-items */}
+            {systemExpanded && (!isCollapsed || isMobile) && (
+              <div className="ml-4 space-y-1 animate-in slide-in-from-top-2 duration-200">
+                {systemNavigation.children.map((child) => {
+                  const active = isActive(child.href);
+                  return (
+                    <Button
+                      key={child.name}
+                      variant="ghost"
+                      className={cn(
+                        'w-full justify-start h-9 text-sm transition-all duration-200',
+                        'px-3',
+                        active
+                          ? 'bg-sidebar-accent/50 text-sidebar-accent-foreground font-medium'
+                          : 'hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground'
+                      )}
+                      onClick={() => handleNavigation(child.href)}
+                      aria-label={child.description}
+                      aria-current={active ? 'page' : undefined}
+                      role="link"
+                    >
+                      <child.icon 
+                        className="w-4 h-4 flex-shrink-0 mr-3"
+                        aria-hidden="true"
+                      />
+                      <span className="flex-1 text-left truncate">{child.name}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </nav>
       </div>
     </aside>
