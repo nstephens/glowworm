@@ -111,19 +111,17 @@ const Settings: React.FC = () => {
 
   const [newDisplaySize, setNewDisplaySize] = useState({ name: '', width: '', height: '' });
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'database' | 'admin' | 'oauth' | 'displays' | 'general' | 'users' | 'utilities'>('general');
   const [resolutionSuggestions, setResolutionSuggestions] = useState<any[]>([]);
   
-  // Handle hash navigation
-  useEffect(() => {
-    const hash = location.hash.slice(1); // Remove the # symbol
-    if (hash) {
-      const validTabs = ['general', 'users', 'database', 'admin', 'oauth', 'displays', 'utilities'];
-      if (validTabs.includes(hash)) {
-        setActiveTab(hash as any);
-      }
-    }
-  }, [location.hash]);
+  // Determine active section from route
+  const getActiveSection = (): 'database' | 'admin' | 'oauth' | 'displays' | 'general' | 'users' | 'utilities' => {
+    const pathParts = location.pathname.split('/');
+    const section = pathParts[pathParts.length - 1];
+    const validSections = ['general', 'users', 'database', 'admin', 'oauth', 'displays', 'utilities'];
+    return validSections.includes(section) ? section as any : 'general';
+  };
+  
+  const activeTab = getActiveSection();
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [variantStatus, setVariantStatus] = useState<any[]>([]);
   const [isLoadingVariantStatus, setIsLoadingVariantStatus] = useState(false);
@@ -1432,40 +1430,16 @@ const Settings: React.FC = () => {
   // Desktop layout with tabs
   return (
     <div className="space-y-8">
-      {/* Tabs */}
-      <Card className="border-0 shadow-lg bg-card/50 backdrop-blur-sm">
-        <CardContent className="p-0">
-          <div className="border-b border-border">
-            <nav className="flex space-x-1 p-1">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <Button
-                    key={tab.id}
-                    variant={activeTab === tab.id ? "default" : "ghost"}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className="flex items-center gap-2 h-10"
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span>{tab.label}</span>
-                  </Button>
-                );
-              })}
-            </nav>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tab Content */}
+      {/* Content based on route */}
       <Card className="border-0 shadow-lg bg-card/50 backdrop-blur-sm animate-fade-in-up">
         <CardContent className="p-6">
-          {activeTab === 'general' && <div id="general">{renderGeneralSettings()}</div>}
-          {activeTab === 'users' && <div id="users"><UserManagement /></div>}
-          {activeTab === 'database' && <div id="database">{renderDatabaseSettings()}</div>}
-          {activeTab === 'admin' && <div id="admin">{renderAdminSettings()}</div>}
-          {activeTab === 'oauth' && <div id="oauth">{renderOAuthSettings()}</div>}
-          {activeTab === 'displays' && <div id="displays">{renderDisplaySettings()}</div>}
-          {activeTab === 'utilities' && <div id="utilities">{renderUtilitiesSettings()}</div>}
+          {activeTab === 'general' && renderGeneralSettings()}
+          {activeTab === 'users' && <UserManagement />}
+          {activeTab === 'database' && renderDatabaseSettings()}
+          {activeTab === 'admin' && renderAdminSettings()}
+          {activeTab === 'oauth' && renderOAuthSettings()}
+          {activeTab === 'displays' && renderDisplaySettings()}
+          {activeTab === 'utilities' && renderUtilitiesSettings()}
         </CardContent>
       </Card>
 

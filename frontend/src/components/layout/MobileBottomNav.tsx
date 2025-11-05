@@ -118,8 +118,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ className }) =
       badge: counts.displays > 0 ? counts.displays.toString() : undefined,
     },
     {
-      name: 'Settings',
-      href: '/admin/settings',
+      name: 'System',
+      href: '/admin/system/general',
       icon: Settings,
       description: 'Configure system settings',
     },

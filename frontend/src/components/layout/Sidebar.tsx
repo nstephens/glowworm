@@ -114,43 +114,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
       },
       {
         name: 'General',
-        href: '/admin/settings#general',
+        href: '/admin/system/general',
         icon: Wrench,
         description: 'General system settings',
       },
       {
         name: 'Users',
-        href: '/admin/settings#users',
+        href: '/admin/system/users',
         icon: Users,
         description: 'User management',
       },
       {
         name: 'Database',
-        href: '/admin/settings#database',
+        href: '/admin/system/database',
         icon: Database,
         description: 'Database configuration',
       },
       {
         name: 'Admin',
-        href: '/admin/settings#admin',
+        href: '/admin/system/admin',
         icon: User,
         description: 'Admin user settings',
       },
       {
         name: 'OAuth',
-        href: '/admin/settings#oauth',
+        href: '/admin/system/oauth',
         icon: Key,
         description: 'OAuth configuration',
       },
       {
         name: 'Display Sizes',
-        href: '/admin/settings#displays',
+        href: '/admin/system/displays',
         icon: Monitor,
         description: 'Display resolution settings',
       },
       {
         name: 'Utilities',
-        href: '/admin/settings#utilities',
+        href: '/admin/system/utilities',
         icon: Wrench,
         description: 'System utilities and tools',
       },
@@ -165,28 +165,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const handleNavigation = (href: string) => {
-    if (href.includes('#')) {
-      // Handle hash navigation
-      const [path, hash] = href.split('#');
-      navigate(path);
-      setTimeout(() => {
-        const element = document.getElementById(hash);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 100);
-    } else {
-      navigate(href);
-    }
+    navigate(href);
     // Close mobile sidebar after navigation
     if (isMobile) {
       onToggle();
     }
   };
   
-  // Auto-expand System if on settings or logs page
+  // Auto-expand System if on system pages or logs
   useEffect(() => {
-    if (location.pathname === '/admin/settings' || location.pathname === '/admin/logs') {
+    if (location.pathname.startsWith('/admin/system') || location.pathname === '/admin/logs') {
       setSystemExpanded(true);
     }
   }, [location.pathname]);
@@ -293,18 +281,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* System Accordion */}
           <div className="space-y-1">
             <Button
-              variant={location.pathname === '/admin/settings' || location.pathname === '/admin/logs' ? 'default' : 'ghost'}
+              variant={location.pathname.startsWith('/admin/system') || location.pathname === '/admin/logs' ? 'default' : 'ghost'}
               className={cn(
                 'w-full justify-start h-11 transition-all duration-200 group',
                 isCollapsed && !isMobile ? 'px-3' : 'px-4',
-                location.pathname === '/admin/settings' || location.pathname === '/admin/logs'
+                location.pathname.startsWith('/admin/system') || location.pathname === '/admin/logs'
                   ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-lg'
                   : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
               )}
               onClick={() => {
                 if (isCollapsed && !isMobile) {
-                  // If collapsed, go to settings
-                  handleNavigation('/admin/settings');
+                  // If collapsed, go to general system settings
+                  handleNavigation('/admin/system/general');
                 } else {
                   // If expanded, toggle accordion
                   setSystemExpanded(!systemExpanded);
@@ -348,8 +336,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         'w-full justify-start h-9 text-sm transition-all duration-200',
                         'px-3',
                         active
-                          ? 'bg-sidebar-accent/50 text-sidebar-accent-foreground font-medium'
-                          : 'hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground'
+                          ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
                       )}
                       onClick={() => handleNavigation(child.href)}
                       aria-label={child.description}
