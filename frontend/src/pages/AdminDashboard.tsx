@@ -36,7 +36,12 @@ const AdminDashboard: React.FC = () => {
     recentUploads: 0,
     totalStorage: 0,
     imageStorage: 0,
-    videoStorage: 0
+    videoStorage: 0,
+    uploadTrends: {
+      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      values: [0, 0, 0, 0, 0, 0, 0],
+      trend: 'stable' as const
+    }
   });
   const [loading, setLoading] = useState(true);
   
@@ -88,6 +93,34 @@ const AdminDashboard: React.FC = () => {
       const videoFiles = images.filter(img => img.mime_type?.startsWith('video/'));
       const imageStorage = imageFiles.reduce((sum, img) => sum + (img.file_size || 0), 0);
       const videoStorage = videoFiles.reduce((sum, img) => sum + (img.file_size || 0), 0);
+      
+      // Calculate real upload trends for last 7 days
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const uploadCounts = new Array(7).fill(0);
+      const labels = [];
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        labels.push(dayNames[date.getDay()]);
+        
+        // Count uploads for this day
+        const dayStart = new Date(date);
+        const dayEnd = new Date(date);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        uploadCounts[6 - i] = images.filter(img => {
+          const uploadDate = new Date(img.uploaded_at);
+          return uploadDate >= dayStart && uploadDate <= dayEnd;
+        }).length;
+      }
+      
+      // Determine trend (compare last 3 days vs previous 4 days)
+      const recent = uploadCounts.slice(4).reduce((a, b) => a + b, 0);
+      const previous = uploadCounts.slice(0, 4).reduce((a, b) => a + b, 0);
+      const trend = recent > previous ? 'up' : recent < previous ? 'down' : 'stable';
 
       setStats({
         totalImages: images.length,
@@ -97,7 +130,12 @@ const AdminDashboard: React.FC = () => {
         recentUploads,
         totalStorage,
         imageStorage,
-        videoStorage
+        videoStorage,
+        uploadTrends: {
+          labels,
+          values: uploadCounts,
+          trend
+        }
       });
     } catch (error) {
       console.error('Failed to load stats:', error);
@@ -260,15 +298,11 @@ const AdminDashboard: React.FC = () => {
       },
     },
     trends: {
-      uploads: {
-        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        values: [12, 19, 8, 15, 22, 18, 14],
-        trend: 'up' as const,
-      },
+      uploads: stats.uploadTrends,
       downloads: {
-        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        values: [8, 15, 12, 18, 25, 20, 16],
-        trend: 'up' as const,
+        labels: stats.uploadTrends.labels,
+        values: stats.uploadTrends.values, // Using upload data for now (downloads not tracked)
+        trend: stats.uploadTrends.trend,
       },
     },
     activities: [
