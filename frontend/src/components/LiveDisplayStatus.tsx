@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -9,7 +10,8 @@ import {
   Play, 
   Pause,
   Clock,
-  RefreshCw
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react';
 import { apiService } from '../services/api';
 
@@ -27,9 +29,14 @@ interface DisplayDevice {
 }
 
 const LiveDisplayStatus: React.FC = () => {
+  const navigate = useNavigate();
   const [displays, setDisplays] = useState<DisplayDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filter to show only pending and authorized displays
+  const activeDisplays = displays.filter(d => d.status === 'pending' || d.status === 'authorized');
+  const rejectedCount = displays.filter(d => d.status === 'rejected').length;
 
   const fetchDisplays = async () => {
     try {
@@ -148,29 +155,52 @@ const LiveDisplayStatus: React.FC = () => {
   return (
     <Card className="animate-fade-in-up border-0 shadow-lg bg-card/50 backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 justify-between">
-          <div className="flex items-center gap-2">
-            <Monitor className="w-5 h-5 text-primary" />
-            Live Display Status
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Monitor className="w-5 h-5 text-primary" />
+              Live Display Status
+              {rejectedCount > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {rejectedCount} rejected
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription>Pending and active displays</CardDescription>
           </div>
-          <Button onClick={fetchDisplays} variant="ghost" size="sm">
-            <RefreshCw className="w-4 h-4" />
-          </Button>
-        </CardTitle>
-        <CardDescription>Real-time status of your photo displays</CardDescription>
+          <div className="flex items-center gap-2">
+            <Button onClick={fetchDisplays} variant="ghost" size="sm">
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+            <Button 
+              onClick={() => navigate('/admin/displays')} 
+              variant="outline" 
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              Manage All
+              <ExternalLink className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
-        {displays.length === 0 ? (
+        {activeDisplays.length === 0 ? (
           <div className="text-center py-8">
             <Monitor className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground mb-4">No display devices registered</p>
+            <p className="text-muted-foreground mb-2">No active or pending displays</p>
+            {rejectedCount > 0 && (
+              <p className="text-sm text-muted-foreground mb-4">
+                {rejectedCount} rejected device{rejectedCount > 1 ? 's' : ''} (view in Manage All)
+              </p>
+            )}
             <Button variant="outline" size="sm" onClick={() => window.open('/display', '_blank')}>
               Register First Display
             </Button>
           </div>
         ) : (
           <div className="space-y-4">
-            {displays.map((display) => {
+            {activeDisplays.map((display) => {
               const isOnline = display.status === 'authorized' && 
                 Math.floor((new Date().getTime() - new Date(display.last_seen).getTime()) / (1000 * 60)) < 5;
               
