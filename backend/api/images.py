@@ -1,11 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status, Request, BackgroundTasks
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 import logging
 from pathlib import Path
 from datetime import datetime, timedelta
+import zipfile
+import io
+import os
 
 from models import get_db, Image, Album, Playlist
 from models.user import User
@@ -1141,4 +1144,70 @@ async def process_all_image_colors(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to start color processing"
+        )
+
+class BulkDownloadRequest(BaseModel):
+    image_ids: List[int]
+
+@router.post("/download-zip")
+async def download_images_as_zip(
+    request: BulkDownloadRequest,
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """Download multiple images as a zip file"""
+    try:
+        if not request.image_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No image IDs provided"
+            )
+        
+        # Get images from database
+        images = db.query(Image).filter(Image.id.in_(request.image_ids)).all()
+        
+        if not images:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No images found"
+            )
+        
+        # Create zip file in memory
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for image in images:
+                try:
+                    # Get the image file path
+                    image_path = image_storage_service.get_image_path(image.filename)
+                    
+                    if image_path and os.path.exists(image_path):
+                        # Add file to zip with its original filename
+                        zip_file.write(image_path, image.original_filename)
+                        logger.info(f"Added {image.original_filename} to zip")
+                    else:
+                        logger.warning(f"Image file not found: {image.filename}")
+                except Exception as e:
+                    logger.error(f"Error adding image {image.id} to zip: {e}")
+                    # Continue with other images
+        
+        # Seek to beginning of buffer
+        zip_buffer.seek(0)
+        
+        # Return zip file as streaming response
+        return StreamingResponse(
+            zip_buffer,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename=glowworm-images-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating zip download: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create download: {str(e)}"
         )

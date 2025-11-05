@@ -5,7 +5,6 @@ import {
   Search, 
   FolderPlus,
   Trash2, 
-  Copy,
   Download,
   Calendar,
   Filter,
@@ -22,6 +21,7 @@ import {
 import type { Image, Album } from '../types';
 import { ConfirmationModal } from './ConfirmationModal';
 import { apiService } from '../services/api';
+import { urlResolver } from '../services/urlResolver';
 import { MobileMasonryGallery } from './gallery/MobileMasonryGallery';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { ImageGallerySkeleton } from './gallery/ImageGallerySkeleton';
@@ -206,6 +206,45 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const handleBulkDelete = () => {
     if (selectedImages.size === 0 || !onBulkDelete) return;
     setShowDeleteModal(true);
+  };
+  
+  const handleBulkDownload = async () => {
+    if (selectedImages.size === 0) return;
+    
+    try {
+      const imageIds = Array.from(selectedImages);
+      
+      // Call backend endpoint to create zip file
+      const response = await fetch(urlResolver.getApiUrl('/images/download-zip'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ image_ids: imageIds }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create download');
+      }
+      
+      // Get the blob and trigger download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `glowworm-images-${Date.now()}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      // Clear selection after download
+      setSelectedImages(new Set());
+    } catch (error) {
+      console.error('Failed to download images:', error);
+      alert('Failed to download images. Please try again.');
+    }
   };
 
   // Drag and Drop Handlers
@@ -697,11 +736,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 <FolderPlus className="w-4 h-4" />
                 <span>Move</span>
               </button>
-              <button className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex-1 sm:flex-none justify-center">
-                <Copy className="w-4 h-4" />
-                <span>Copy</span>
-              </button>
-              <button className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex-1 sm:flex-none justify-center">
+              <button 
+                className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex-1 sm:flex-none justify-center"
+                onClick={handleBulkDownload}
+              >
                 <Download className="w-4 h-4" />
                 <span>Download</span>
               </button>
