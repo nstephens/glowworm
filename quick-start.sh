@@ -62,24 +62,29 @@ echo ""
 if [ ! -f .env ]; then
     echo -e "${YELLOW}📝 Creating configuration file (.env)...${NC}"
     echo ""
+    echo -e "${BLUE}🔐 Generating secure passwords...${NC}"
     
-    # Create .env from embedded template
-    cat > .env << 'EOF'
+    # Generate secure random passwords
+    MYSQL_ROOT_PASS=$(openssl rand -base64 32)
+    MYSQL_APP_PASS=$(openssl rand -base64 32)
+    SECRET_KEY=$(openssl rand -base64 32)
+    
+    echo -e "${GREEN}✅ Passwords generated${NC}"
+    echo ""
+    
+    # Create .env with generated passwords
+    cat > .env << EOF
 # Glowworm Docker Environment Configuration
 # 
-# SECURITY WARNING: Do NOT use default passwords!
-# Generate strong, random passwords for production use.
-#
-# Quick password generation:
-#   openssl rand -base64 32
-#   or use: https://passwordsgenerator.net/
+# Auto-generated secure passwords - DO NOT SHARE THIS FILE
+# Generated: $(date)
 
 # ===========================================
 # MYSQL CONFIGURATION
 # ===========================================
-# REQUIRED: Replace with strong, unique passwords (minimum 20 characters)
-MYSQL_ROOT_PASSWORD=CHANGE_ME_TO_STRONG_PASSWORD
-MYSQL_PASSWORD=CHANGE_ME_TO_STRONG_PASSWORD
+# Secure passwords auto-generated
+MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASS
+MYSQL_PASSWORD=$MYSQL_APP_PASS
 
 # Database settings
 MYSQL_DATABASE=glowworm
@@ -90,16 +95,15 @@ MYSQL_PORT=3306
 # ===========================================
 # BACKEND CONFIGURATION
 # ===========================================
-# REQUIRED: Generate a secure random secret key for JWT tokens
-# Run: openssl rand -base64 32
-SECRET_KEY=CHANGE_ME_TO_RANDOM_SECRET_KEY
+# Secure secret key auto-generated for JWT tokens
+SECRET_KEY=$SECRET_KEY
 
 # Server settings
 # IMPORTANT: Set SERVER_BASE_URL to your server's IP address or domain
 # Example: http://192.168.1.100:8001 or http://myserver.local:8001
 SERVER_BASE_URL=http://localhost:8001
 BACKEND_PORT=8001
-FRONTEND_PORT=80
+FRONTEND_PORT=3003
 
 # Application settings
 DEFAULT_DISPLAY_TIME_SECONDS=30
@@ -120,20 +124,13 @@ DISPLAY_NETWORK_INTERFACE=localhost
 # LOG_LEVEL=DEBUG
 EOF
     
-    echo -e "${RED}⚠️  SECURITY CRITICAL: You must set secure passwords!${NC}"
+    echo -e "${GREEN}✅ Secure passwords generated and saved to .env${NC}"
     echo ""
-    echo -e "${YELLOW}Generate secure passwords:${NC}"
-    echo "  openssl rand -base64 24  # Generates ~32 character password (safe for all uses)"
+    echo -e "${YELLOW}📝 Please review and update these settings if needed:${NC}"
     echo ""
-    echo -e "${YELLOW}REQUIRED changes in .env:${NC}"
-    echo "  1. MYSQL_ROOT_PASSWORD - Replace CHANGE_ME_TO_STRONG_PASSWORD"
-    echo "  2. MYSQL_PASSWORD - Replace CHANGE_ME_TO_STRONG_PASSWORD"
-    echo "  3. SECRET_KEY - Replace CHANGE_ME_TO_RANDOM_SECRET_KEY (can be longer)"
-    echo ""
-    echo -e "${BLUE}Optional but RECOMMENDED for headless servers:${NC}"
-    echo "  4. SERVER_BASE_URL - Set to your server's IP address"
+    echo -e "${BLUE}RECOMMENDED for remote/headless servers:${NC}"
+    echo "  SERVER_BASE_URL - Set to your server's IP address"
     echo "     Example: http://192.168.1.100:8001"
-    echo "  5. FRONTEND_PORT - Change if port 80 is in use"
     echo ""
     echo -e "${YELLOW}💡 Find your server's IP address:${NC}"
     echo "  hostname -I"
@@ -147,43 +144,20 @@ EOF
     EDITOR="${EDITOR:-${VISUAL:-nano}}"
     
     if command -v $EDITOR &> /dev/null; then
-        read -p "Press Enter to edit .env with $EDITOR (or Ctrl+C to edit manually)..."
+        read -p "Press Enter to review/edit .env with $EDITOR (or Ctrl+C to skip)..."
         $EDITOR .env
     elif command -v nano &> /dev/null; then
-        read -p "Press Enter to edit .env with nano (or Ctrl+C to edit manually)..."
+        read -p "Press Enter to review/edit .env with nano (or Ctrl+C to skip)..."
         nano .env
     elif command -v vi &> /dev/null; then
-        read -p "Press Enter to edit .env with vi (or Ctrl+C to edit manually)..."
+        read -p "Press Enter to review/edit .env with vi (or Ctrl+C to skip)..."
         vi .env
     else
-        echo -e "${YELLOW}No editor found. Please edit .env file manually with your text editor.${NC}"
-        read -p "Press Enter after editing .env file..."
+        echo -e "${YELLOW}No editor found. You can edit .env file manually if needed.${NC}"
+        read -p "Press Enter to continue..."
     fi
     
     echo ""
-fi
-
-# Validate .env has been edited
-if grep -q "CHANGE_ME" .env; then
-    echo -e "${RED}❌ SECURITY ERROR: .env file contains default placeholder values${NC}"
-    echo ""
-    echo "You MUST replace ALL placeholders in .env:"
-    echo "  ❌ CHANGE_ME_TO_STRONG_PASSWORD"
-    echo "  ❌ CHANGE_ME_TO_RANDOM_SECRET_KEY"
-    echo ""
-    echo "Generate secure passwords:"
-    echo "  openssl rand -base64 24  # Generates ~32 char password (under 72 byte bcrypt limit)"
-    echo ""
-    echo "Glowworm will NOT start with default passwords for security reasons."
-    exit 1
-fi
-
-# Additional validation for empty or weak passwords
-if grep -qE "(MYSQL_ROOT_PASSWORD=|MYSQL_PASSWORD=|SECRET_KEY=)$" .env; then
-    echo -e "${RED}❌ SECURITY ERROR: Empty password detected in .env${NC}"
-    echo ""
-    echo "All passwords must be set to strong, unique values."
-    exit 1
 fi
 
 echo -e "${GREEN}✅ Configuration file ready${NC}"
