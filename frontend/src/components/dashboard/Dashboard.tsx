@@ -192,28 +192,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Overview of your GlowWorm activity and insights
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
-            Refresh
-          </Button>
-        </div>
-      </div>
-
       {/* Stats Cards - Mobile-First Compact Grid */}
       <div className="dashboard-grid">
         <CompactInfoCard
