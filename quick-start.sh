@@ -8,6 +8,28 @@ set -e
 # Configuration
 REPO_BASE="https://raw.githubusercontent.com/nstephens/glowworm/main"
 
+# Parse command line arguments
+CLEAN_INSTALL=false
+for arg in "$@"; do
+    case $arg in
+        --clean)
+            CLEAN_INSTALL=true
+            shift
+            ;;
+        --help|-h)
+            echo "Glowworm Quick Start Script"
+            echo ""
+            echo "Usage: ./quick-start.sh [options]"
+            echo ""
+            echo "Options:"
+            echo "  --clean    Delete existing data and .env for a fresh install"
+            echo "  --help     Show this help message"
+            echo ""
+            exit 0
+            ;;
+    esac
+done
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -27,6 +49,48 @@ echo -e "${NC}"
 echo -e "${GREEN}🐛 Glowworm Digital Signage - Quick Start${NC}"
 echo "========================================="
 echo ""
+
+# Handle clean install
+if [ "$CLEAN_INSTALL" = true ]; then
+    echo -e "${YELLOW}🧹 Clean install requested${NC}"
+    echo ""
+    
+    # Stop containers if running
+    if [ -f docker-compose.yml ]; then
+        echo -e "${YELLOW}Stopping containers...${NC}"
+        if command -v docker compose &> /dev/null; then
+            DOCKER_COMPOSE="docker compose"
+        else
+            DOCKER_COMPOSE="docker-compose"
+        fi
+        $DOCKER_COMPOSE down 2>/dev/null || true
+        echo -e "${GREEN}✅ Containers stopped${NC}"
+    fi
+    
+    # Delete data directory
+    if [ -d data ]; then
+        echo -e "${YELLOW}Deleting data directory...${NC}"
+        if [ -w data ]; then
+            rm -rf data
+        else
+            echo -e "${YELLOW}Need sudo to delete data directory...${NC}"
+            sudo rm -rf data
+        fi
+        echo -e "${GREEN}✅ Data directory deleted${NC}"
+    fi
+    
+    # Delete .env file
+    if [ -f .env ]; then
+        echo -e "${YELLOW}Deleting .env file...${NC}"
+        rm -f .env
+        echo -e "${GREEN}✅ .env file deleted${NC}"
+    fi
+    
+    echo ""
+    echo -e "${GREEN}✅ Clean install preparation complete${NC}"
+    echo -e "${BLUE}Starting fresh installation...${NC}"
+    echo ""
+fi
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
