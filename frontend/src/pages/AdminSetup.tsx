@@ -28,25 +28,12 @@ const AdminSetup: React.FC = () => {
 
   const fetchVersion = async () => {
     try {
-      // Try to get version from Docker Hub
-      const response = await fetch('https://registry.hub.docker.com/v2/repositories/nickstephens/glowworm-frontend/tags/?page_size=10');
+      // Fetch version from backend API (avoids CORS issues)
+      const response = await fetch(urlResolver.getApiUrl('/setup/version'));
       if (response.ok) {
         const data = await response.json();
-        const versionTags = data.results
-          ?.filter((tag: any) => /^\d+\.\d+\.\d+$/.test(tag.name))
-          ?.sort((a: any, b: any) => {
-            const aParts = a.name.split('.').map(Number);
-            const bParts = b.name.split('.').map(Number);
-            for (let i = 0; i < 3; i++) {
-              if (aParts[i] !== bParts[i]) {
-                return bParts[i] - aParts[i];
-              }
-            }
-            return 0;
-          });
-        
-        if (versionTags && versionTags.length > 0) {
-          setVersion(versionTags[0].name);
+        if (data.success && data.version) {
+          setVersion(data.version);
         }
       }
     } catch (error) {

@@ -8,6 +8,8 @@ import string
 import logging
 import socket
 import psutil
+import httpx
+import re
 from config.settings import settings, is_configured, is_database_accessible, save_config
 from utils.database import db_manager
 from models.database import get_db, Base
@@ -666,3 +668,40 @@ async def reset_setup():
     except Exception as e:
         logger.error(f"Error in reset_setup: {e}")
         raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+@router.get("/version")
+async def get_version():
+    """
+    Fetch the latest version from Docker Hub
+    This endpoint proxies the Docker Hub API to avoid CORS issues
+    """
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                'https://registry.hub.docker.com/v2/repositories/nickstephens/glowworm-frontend/tags/?page_size=20'
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                # Filter for semantic version tags (e.g., 1.8.20)
+                version_tags = [
+                    tag['name'] for tag in data.get('results', [])
+                    if re.match(r'^\d+\.\d+\.\d+$', tag['name'])
+                ]
+                
+                # Sort versions (newest first)
+                version_tags.sort(
+                    key=lambda v: list(map(int, v.split('.'))),
+                    reverse=True
+                )
+                
+                if version_tags:
+                    return {"version": version_tags[0], "success": True}
+                else:
+                    return {"version": None, "success": False, "message": "No version tags found"}
+            else:
+                logger.warning(f"Failed to fetch version from Docker Hub: {response.status_code}")
+                return {"version": None, "success": False, "message": "Failed to fetch version"}
+    except Exception as e:
+        logger.error(f"Error fetching version: {e}")
+        return {"version": None, "success": False, "message": str(e)}
