@@ -642,8 +642,28 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                   key={`thumb-${image.id}-${image.album_id}`}
                 />
                 
+                {/* Selection Overlay - Colored highlight when selected */}
+                {selectedImages.has(image.id) && (
+                  <div className="absolute inset-0 bg-blue-500/30 backdrop-blur-[2px] ring-4 ring-blue-500 ring-inset" />
+                )}
+                
                 {/* Gradient Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                
+                {/* Checkbox for Selection */}
+                <div className="absolute top-3 left-3 z-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedImages.has(image.id)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleImageSelect(image, e);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-5 h-5 rounded border-2 border-white shadow-lg cursor-pointer bg-white/90 checked:bg-blue-600 checked:border-blue-600 hover:scale-110 transition-transform"
+                    title="Select image"
+                  />
+                </div>
                 
                 {/* Action Buttons Overlay */}
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200">
@@ -668,15 +688,6 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     </button>
                   </div>
                 </div>
-
-                {/* Selection Indicator */}
-                {selectedImages.has(image.id) && (
-                  <div className="absolute top-3 right-3 w-7 h-7 bg-primary-600 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
-                    <span className="text-white text-sm font-semibold">
-                      {Array.from(selectedImages).indexOf(image.id) + 1}
-                    </span>
-                  </div>
-                )}
 
                 {/* Album Badge */}
                 {image.album_id && viewMode === 'grid' && (
