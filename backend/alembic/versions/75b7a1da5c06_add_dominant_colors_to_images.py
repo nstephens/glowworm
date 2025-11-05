@@ -20,8 +20,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # Add dominant_colors JSON column to images table
-    op.add_column('images', sa.Column('dominant_colors', sa.JSON(), nullable=True))
+    # Check if dominant_colors column already exists before adding it
+    connection = op.get_bind()
+    result = connection.execute(sa.text(
+        "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'images' AND column_name = 'dominant_colors'"
+    ))
+    column_exists = result.scalar() > 0
+    
+    if not column_exists:
+        op.add_column('images', sa.Column('dominant_colors', sa.JSON(), nullable=True))
 
 
 def downgrade() -> None:
