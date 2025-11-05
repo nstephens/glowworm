@@ -28,47 +28,112 @@ import type { Playlist, Image, Album, DisplayDevice, DisplayMode } from '../type
 import { DISPLAY_MODE_CONFIGS, getDisplayModeConfig, getDisplayModesByTier, PERFORMANCE_TIER_LABELS, PerformanceTier } from '../types/displayModes';
 import { getDeviceCapabilities } from '../utils/deviceCapabilities';
 import { PlaylistPairingView } from '../components/PlaylistPairingView';
+import { validateDragMove } from '../utils/dragValidation';
 
 // Draggable Image Item Component
 const DraggableImageItem: React.FC<{
   image: Image;
   index: number;
   moveImage: (draggedId: number, targetId: number) => void;
+  onDragEnd: () => void;
   onDelete: (image: Image) => void;
   isEditing: boolean;
   displayMode: DisplayMode;
-}> = ({ image, index, moveImage, onDelete, isEditing, displayMode }) => {
+  pairInfo?: { isPaired: boolean; pairNumber?: number; positionInPair?: number; pairColor?: string };
+  totalImages: number;
+}> = ({ image, index, moveImage, onDragEnd, onDelete, isEditing, displayMode, pairInfo, totalImages }) => {
   const [{ isDragging }, drag] = useDrag({
     type: 'IMAGE',
     item: { id: image.id },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
-    canDrag: isEditing, // Allow dragging when in edit mode
+    canDrag: isEditing,
+    end: () => {
+      // Call onDragEnd when drag completes
+      onDragEnd();
+    },
   });
 
-  const [, drop] = useDrop({
+  const [{ isOver }, drop] = useDrop({
     accept: 'IMAGE',
     hover: (item: { id: number }) => {
       if (item.id !== image.id && isEditing) {
         moveImage(item.id, image.id);
       }
     },
+    collect: (monitor) => ({
+      isOver: monitor.isOver(),
+    }),
     canDrop: () => isEditing, // Allow dropping when in edit mode
   });
 
+  // Keyboard navigation handlers
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isEditing) return;
+    
+    // Arrow keys for reordering
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (index > 0) {
+        // Get previous image's ID from the grid
+        const prevImage = (e.currentTarget.previousElementSibling as HTMLElement);
+        const prevImageId = prevImage?.getAttribute('data-image-id');
+        if (prevImageId) {
+          moveImage(image.id, parseInt(prevImageId));
+        }
+      }
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (index < totalImages - 1) {
+        // Get next image's ID from the grid
+        const nextImage = (e.currentTarget.nextElementSibling as HTMLElement);
+        const nextImageId = nextImage?.getAttribute('data-image-id');
+        if (nextImageId) {
+          moveImage(image.id, parseInt(nextImageId));
+        }
+      }
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      onDelete(image);
+    }
+  };
+
+  const borderColor = pairInfo?.isPaired && pairInfo?.pairColor ? pairInfo.pairColor : '';
+  
   return (
     <div
       ref={(node) => drag(drop(node))}
       className={`relative group rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
-        isDragging ? 'opacity-50 scale-95' : 'hover:scale-105'
-      } ${isEditing ? 'cursor-move' : 'cursor-default'}`}
+        isDragging ? 'opacity-50 scale-95 ring-2 ring-blue-500' : 'hover:scale-105'
+      } ${isOver && isEditing ? 'ring-2 ring-green-500' : ''} ${
+        isEditing ? 'cursor-move' : 'cursor-default'
+      } ${pairInfo?.isPaired ? `ring-4 ${borderColor}` : ''} focus:outline-none focus:ring-2 focus:ring-blue-400`}
+      tabIndex={isEditing ? 0 : -1}
+      onKeyDown={handleKeyDown}
+      data-image-id={image.id}
+      role="button"
+      aria-label={`${image.filename}, position ${index + 1} of ${totalImages}${pairInfo?.isPaired ? ', paired image' : ''}`}
+      aria-grabbed={isDragging}
     >
       <img
         src={getThumbnailUrl(image.id)}
         alt={image.filename}
         className="w-full h-full object-cover aspect-square"
       />
+      
+      {/* Pairing indicator badges */}
+      {pairInfo?.isPaired && pairInfo.pairNumber !== undefined && (
+        <div className="absolute top-2 left-2 flex items-center space-x-1">
+          <div className={`${borderColor.replace('ring-', 'bg-')} text-white text-xs px-2 py-1 rounded-full shadow-lg flex items-center space-x-1 font-semibold`}>
+            <span>👥</span>
+            <span>Pair {pairInfo.pairNumber}</span>
+            {pairInfo.positionInPair && (
+              <span className="opacity-75">• {pairInfo.positionInPair === 1 ? '1st' : '2nd'}</span>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Overlay with actions */}
       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 flex items-center justify-center">
@@ -131,6 +196,9 @@ const PlaylistDetail: React.FC = () => {
   const [editIsDefault, setEditIsDefault] = useState(false);
   const [editShowImageInfo, setEditShowImageInfo] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [showDragWarning, setShowDragWarning] = useState(false);
+  const [dragValidationResult, setDragValidationResult] = useState<{warning?: string; pairLoss?: number} | null>(null);
+  const [pendingDragMove, setPendingDragMove] = useState<{draggedId: number; targetId: number} | null>(null);
   const wsRef = useRef<AdminWebSocketClient | null>(null);
 
   // Get device capabilities for recommendations
@@ -260,6 +328,13 @@ const PlaylistDetail: React.FC = () => {
         updateData.show_image_info
       );
       
+      // If image order changed, save it too
+      if (hasChanges) {
+        const newImageIds = playlistImages.map(img => img.id);
+        await apiService.reorderPlaylist(playlist.id, newImageIds);
+        playlistLogger.info('Playlist order saved', { playlistId: playlist.id, imageCount: newImageIds.length });
+      }
+      
       // Update local state
       setPlaylist(prev => prev ? { ...prev, ...updateData } : null);
       setIsEditing(false);
@@ -274,55 +349,136 @@ const PlaylistDetail: React.FC = () => {
     }
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = async () => {
     if (playlist) {
       setEditName(playlist.name);
       setEditDisplayMode(playlist.display_mode || 'default');
       setEditDisplayTime(playlist.display_time_seconds || 30);
       setEditIsDefault(playlist.is_default || false);
       setEditShowImageInfo(playlist.show_image_info || false);
+      
+      // Reload playlist to revert any unsaved image order changes
+      if (hasChanges) {
+        await loadPlaylist();
+      }
     }
     setIsEditing(false);
     setHasChanges(false);
   };
 
-  const handleRandomizePlaylist = async () => {
+  const handleRandomizePlaylist = () => {
     if (!playlist) return;
     
     try {
-      await apiService.randomizePlaylist(playlist.id);
-      await loadPlaylist(); // Reload to get new order
-      playlistLogger.info('Playlist randomized', { playlistId: playlist.id });
+      // Perform local shuffle (Fisher-Yates algorithm)
+      const shuffled = [...playlistImages];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      
+      setPlaylistImages(shuffled);
+      setHasChanges(true);
+      
+      playlistLogger.info('Playlist randomized locally', { playlistId: playlist.id });
     } catch (error) {
       console.error('Error randomizing playlist:', error);
       playlistLogger.error('Failed to randomize playlist', { error, playlistId: playlist.id });
     }
   };
 
-  const moveImage = async (draggedId: number, targetId: number) => {
+  // Store original order for reverting
+  const [originalOrder, setOriginalOrder] = useState<Image[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const moveImage = (draggedId: number, targetId: number) => {
     if (!playlist) return;
     
-    try {
-      // Update local state first
-      const draggedIndex = playlistImages.findIndex(img => img.id === draggedId);
-      const targetIndex = playlistImages.findIndex(img => img.id === targetId);
-      
-      if (draggedIndex !== -1 && targetIndex !== -1) {
-        const newImages = [...playlistImages];
-        const [draggedImage] = newImages.splice(draggedIndex, 1);
-        newImages.splice(targetIndex, 0, draggedImage);
-        setPlaylistImages(newImages);
-        
-        // Send the new order to the API
-        const newImageIds = newImages.map(img => img.id);
-        await apiService.reorderPlaylist(playlist.id, newImageIds);
-      }
-      
-      playlistLogger.info('Image reordered', { playlistId: playlist.id, draggedId, targetId });
-    } catch (error) {
-      console.error('Error reordering image:', error);
-      playlistLogger.error('Failed to reorder image', { error, playlistId: playlist.id });
+    const draggedIndex = playlistImages.findIndex(img => img.id === draggedId);
+    const targetIndex = playlistImages.findIndex(img => img.id === targetId);
+    
+    if (draggedIndex === -1 || targetIndex === -1) return;
+    
+    // Store original order on first drag
+    if (!isDragging) {
+      setOriginalOrder([...playlistImages]);
+      setIsDragging(true);
     }
+    
+    // Update local state only (no API call, no validation yet)
+    const newImages = [...playlistImages];
+    const [draggedImage] = newImages.splice(draggedIndex, 1);
+    newImages.splice(targetIndex, 0, draggedImage);
+    setPlaylistImages(newImages);
+    
+    playlistLogger.info('Image moved (hover)', { playlistId: playlist.id, draggedId, targetId });
+  };
+  
+  const handleDragEnd = () => {
+    if (!playlist || !isDragging) return;
+    
+    // Get display orientation (default to portrait if not set)
+    const displayOrientation = 'portrait'; // TODO: Get from assigned display device
+    
+    // Validate the final order
+    const currentSequence = playlistImages.map(img => img.id);
+    const originalSequence = originalOrder.map(img => img.id);
+    
+    // Find what changed
+    const draggedIndex = originalSequence.findIndex((id, idx) => currentSequence[idx] !== id);
+    const targetIndex = currentSequence.indexOf(originalSequence[draggedIndex]);
+    
+    if (draggedIndex !== -1 && targetIndex !== -1 && draggedIndex !== targetIndex) {
+      const validation = validateDragMove(
+        draggedIndex,
+        targetIndex,
+        originalSequence,
+        originalOrder,
+        displayOrientation
+      );
+      
+      // If move breaks pairing, show warning
+      if (validation.breaksPairing && validation.pairLoss && validation.pairLoss > 0) {
+        setPendingDragMove({ 
+          draggedId: originalSequence[draggedIndex], 
+          targetId: originalSequence[targetIndex] 
+        });
+        setDragValidationResult(validation);
+        setShowDragWarning(true);
+        setIsDragging(false);
+        return;
+      }
+    }
+    
+    // Valid move - mark as changed but don't save yet
+    setHasChanges(true);
+    setIsDragging(false);
+    setOriginalOrder([]);
+    
+    playlistLogger.info('Drag completed', { playlistId: playlist.id });
+  };
+  
+  const confirmDragMove = () => {
+    // Keep the current order
+    setShowDragWarning(false);
+    setPendingDragMove(null);
+    setDragValidationResult(null);
+    setHasChanges(true);
+    
+    playlistLogger.info('Suboptimal reorder confirmed', { playlistId: playlist.id });
+  };
+  
+  const cancelDragMove = () => {
+    // Revert to original order
+    if (originalOrder.length > 0) {
+      setPlaylistImages(originalOrder);
+    }
+    setShowDragWarning(false);
+    setPendingDragMove(null);
+    setDragValidationResult(null);
+    setOriginalOrder([]);
+    
+    playlistLogger.info('Suboptimal reorder cancelled', { playlistId: playlist.id });
   };
 
   const handleAddSelectedImages = async () => {
@@ -481,11 +637,7 @@ const PlaylistDetail: React.FC = () => {
         "bg-card/50 backdrop-blur-sm rounded-xl border-0 shadow-lg",
         isMobile ? "p-4" : "p-6"
       )}>
-        <div className={cn(
-          "flex items-start justify-between",
-          isMobile ? "flex-col space-y-4" : ""
-        )}>
-          <div className="flex-1">
+        <div className="w-full">
             {isEditing ? (
               <div className={cn("space-y-4", isMobile && "space-y-3")}>
                 {/* Playlist Name */}
@@ -519,29 +671,21 @@ const PlaylistDetail: React.FC = () => {
                         isMobile ? "px-4 py-3 text-base" : "px-3 py-2 text-sm"
                       )}
                     >
-                      <optgroup label={PERFORMANCE_TIER_LABELS[PerformanceTier.TIER_1].label}>
-                        {tier1Modes.map((config) => (
-                          <option key={config.mode} value={config.mode}>
-                            {config.displayName}
-                          </option>
-                        ))}
-                      </optgroup>
-                      
-                      <optgroup label={PERFORMANCE_TIER_LABELS[PerformanceTier.TIER_2].label}>
-                        {tier2Modes.map((config) => (
-                          <option key={config.mode} value={config.mode}>
-                            {config.displayName}
-                          </option>
-                        ))}
-                      </optgroup>
-                      
-                      <optgroup label={PERFORMANCE_TIER_LABELS[PerformanceTier.TIER_3].label}>
-                        {tier3Modes.map((config) => (
-                          <option key={config.mode} value={config.mode}>
-                            {config.displayName}
-                          </option>
-                        ))}
-                      </optgroup>
+                      {tier1Modes.map((config) => (
+                        <option key={config.mode} value={config.mode}>
+                          {config.displayName}
+                        </option>
+                      ))}
+                      {tier2Modes.map((config) => (
+                        <option key={config.mode} value={config.mode}>
+                          {config.displayName}
+                        </option>
+                      ))}
+                      {tier3Modes.map((config) => (
+                        <option key={config.mode} value={config.mode}>
+                          {config.displayName}
+                        </option>
+                      ))}
                     </select>
                     
                     {/* Mode description */}
@@ -554,15 +698,6 @@ const PlaylistDetail: React.FC = () => {
                       <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                         <p className="text-sm text-yellow-800">
                           ⚡ {currentModeConfig.warningMessage || 'This mode requires high-performance hardware.'}
-                        </p>
-                      </div>
-                    )}
-                    
-                    {/* Tier recommendation */}
-                    {currentModeConfig.tier > deviceCapabilities.tier && (
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                        <p className="text-sm text-blue-800">
-                          💡 Your device is optimized for {PERFORMANCE_TIER_LABELS[deviceCapabilities.tier].label}. This mode may not run smoothly.
                         </p>
                       </div>
                     )}
@@ -630,101 +765,131 @@ const PlaylistDetail: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div>
+              <div className="w-full">
+                {/* Title - Full Width, First Row */}
                 <h1 className={cn(
-                  "font-bold text-gray-900 mb-2",
-                  isMobile ? "text-xl flex-wrap" : "text-2xl"
+                  "font-bold text-gray-900 mb-4",
+                  isMobile ? "text-xl" : "text-3xl"
                 )}>
-                  <div className={cn("flex items-center", isMobile ? "flex-wrap gap-2" : "space-x-2")}>
-                    <span>{playlist.name}</span>
-                    {playlist.is_default && (
-                      <span className={cn(
-                        "inline-flex items-center rounded-full font-medium bg-green-100 text-green-800",
-                        isMobile ? "px-2 py-1 text-xs" : "px-2 py-1 text-xs"
-                      )}>
-                        Default
-                      </span>
-                    )}
-                    {playlist.display_mode && playlist.display_mode !== 'default' && (
-                      <span className={cn(
-                        "inline-flex items-center rounded-full font-medium bg-blue-100 text-blue-800",
-                        isMobile ? "px-2 py-1 text-xs" : "px-2 py-1 text-xs"
-                      )}>
-                        {getDisplayModeConfig(playlist.display_mode).displayName}
-                      </span>
-                    )}
-                  </div>
+                  {playlist.name}
                 </h1>
+                
+                {/* Badges + Metadata - Second Row */}
                 <div className={cn(
-                  "flex items-center text-gray-600 mb-3",
-                  isMobile ? "flex-wrap gap-x-2 gap-y-1 text-sm" : "space-x-4 text-sm"
+                  "flex items-center flex-wrap gap-2 mb-4",
+                  isMobile ? "text-sm" : "text-sm"
                 )}>
-                  <span>{playlistImages.length} images</span>
-                  {!isMobile && <span>•</span>}
-                  {!isMobile && <span>Slug: {playlist.slug}</span>}
+                  {/* Status Badges */}
+                  {playlist.is_default && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Default
+                    </span>
+                  )}
+                  
+                  {playlist.display_mode && playlist.display_mode !== 'default' && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {getDisplayModeConfig(playlist.display_mode).displayName}
+                    </span>
+                  )}
+                  
+                  {/* Metadata */}
+                  <span className="text-gray-600">{playlistImages.length} images</span>
                   {!isMobile && playlist.display_time_seconds && (
                     <>
-                      <span>•</span>
-                      <span>{playlist.display_time_seconds}s display time</span>
+                      <span className="text-gray-400">•</span>
+                      <span className="text-gray-600">{playlist.display_time_seconds}s per image</span>
+                    </>
+                  )}
+                  {!isMobile && (
+                    <>
+                      <span className="text-gray-400">•</span>
+                      <span className="text-gray-500 text-xs">{playlist.slug}</span>
+                    </>
+                  )}
+                  
+                  {/* Action Buttons - Same Row as Badges */}
+                  {!isMobile && (
+                    <>
+                      <span className="text-gray-400">•</span>
+                      <button
+                        onClick={() => {
+                          setShowAddImages(true);
+                          loadAlbums();
+                          loadAllImages();
+                        }}
+                        className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Images</span>
+                      </button>
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                      </button>
                     </>
                   )}
                 </div>
-                {/* Display Mode Info */}
-                {!isMobile && (
-                  <div className="flex items-center space-x-2 text-sm text-gray-600 mb-3">
-                    <span className="font-medium">Display Mode:</span>
-                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
-                      {getDisplayModeConfig(playlist.display_mode || 'default').displayName}
-                    </span>
-                    <span className="text-gray-500">
-                      - {getDisplayModeConfig(playlist.display_mode || 'default').description}
-                    </span>
-                  </div>
-                )}
                 
                 {/* Pairing Structure Visualization */}
-                {!isMobile && playlist.computed_sequence && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <h3 className="text-sm font-medium text-gray-700 mb-3">Image Pairing Structure</h3>
-                    <PlaylistPairingView
-                      computedSequence={playlist.computed_sequence}
-                      images={playlistImages}
-                      displayOrientation={playlist.computed_sequence ? 'portrait' : 'portrait'} // TODO: Get from assigned display
-                      showWarnings={true}
-                      compact={false}
-                    />
-                  </div>
-                )}
+                {!isMobile && playlist.computed_sequence && playlistImages.length > 0 && (() => {
+                  // Check if pairing is suboptimal (only if images are loaded)
+                  const currentSequence = playlistImages.map(img => img.id);
+                  const computedSequence = playlist.computed_sequence.flatMap((entry: any) => entry.images);
+                  const isOptimal = currentSequence.length === computedSequence.length && 
+                                     currentSequence.every((id, idx) => id === computedSequence[idx]);
+                  
+                  if (!isOptimal && playlist.computed_sequence.length > 0) {
+                    const optimalPairs = playlist.computed_sequence.filter((e: any) => e.type === 'pair').length;
+                    return (
+                      <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-300">
+                        <div className="flex items-start space-x-3">
+                          <div className="flex-shrink-0 text-yellow-600 text-xl">⚠️</div>
+                          <div className="flex-1">
+                            <h3 className="text-sm font-semibold text-yellow-800 mb-1">Pairing Not Optimized</h3>
+                            <p className="text-sm text-yellow-700 mb-2">
+                              The current image order doesn't use optimal pairing ({optimalPairs} possible pairs available).
+                            </p>
+                            <p className="text-xs text-yellow-600">
+                              <strong>To fix:</strong> Click Edit, then Save to automatically recompute optimal pairing, or use the Randomize button to shuffle while maintaining pairs.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className={cn(
-            "flex items-center",
-            isMobile ? "w-full flex-col space-y-2" : "space-x-2 ml-6"
-          )}>
-            {isEditing ? (
-              <div className={cn("flex items-center", isMobile ? "w-full flex-col space-y-2" : "space-x-2")}>
+            
+            {/* Action Buttons for Editing Mode */}
+            {isEditing && (
+              <div className={cn(
+                "flex items-center flex-wrap gap-2 mt-4",
+                isMobile && "flex-col w-full"
+              )}>
                 <button
                   onClick={handleSave}
                   disabled={isSaving || !editName.trim() || !hasChanges}
                   className={cn(
-                    "flex items-center justify-center space-x-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
-                    isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
+                    "inline-flex items-center space-x-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
+                    isMobile ? "w-full px-4 py-3 text-base" : "px-3 py-1.5 text-xs"
                   )}
                 >
-                  <Save className={cn(isMobile ? "w-5 h-5" : "w-4 h-4")} />
+                  <Save className={cn(isMobile ? "w-5 h-5" : "w-3.5 h-3.5")} />
                   <span>{isSaving ? 'Saving...' : 'Save'}</span>
                 </button>
                 <button
                   onClick={handleCancelEdit}
                   className={cn(
-                    "flex items-center justify-center space-x-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors",
-                    isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
+                    "inline-flex items-center space-x-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors",
+                    isMobile ? "w-full px-4 py-3 text-base" : "px-3 py-1.5 text-xs"
                   )}
                 >
-                  <X className={cn(isMobile ? "w-5 h-5" : "w-4 h-4")} />
+                  <X className={cn(isMobile ? "w-5 h-5" : "w-3.5 h-3.5")} />
                   <span>Cancel</span>
                 </button>
                 {/* Randomize Button - only show when not auto_sort and playlist has multiple images */}
@@ -732,57 +897,41 @@ const PlaylistDetail: React.FC = () => {
                   <button
                     onClick={handleRandomizePlaylist}
                     className={cn(
-                      "flex items-center justify-center space-x-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors",
-                      isMobile ? "w-full px-4 py-3 text-base" : "px-3 py-2 text-sm"
+                      "inline-flex items-center space-x-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors",
+                      isMobile ? "w-full px-4 py-3 text-base" : "px-3 py-1.5 text-xs"
                     )}
                     title="Randomize the order of images in this playlist"
                   >
-                    <Shuffle className={cn(isMobile ? "w-5 h-5" : "w-4 h-4")} />
+                    <Shuffle className={cn(isMobile ? "w-5 h-5" : "w-3.5 h-3.5")} />
                     <span>Randomize</span>
                   </button>
                 )}
               </div>
-            ) : (
-              <div className={cn("flex items-center", isMobile ? "w-full flex-col space-y-2" : "space-x-2")}>
+            )}
+            
+            {/* Mobile Action Buttons - Below badges */}
+            {!isEditing && isMobile && (
+              <div className="flex flex-col w-full space-y-2 mt-4">
                 <button
                   onClick={() => {
                     setShowAddImages(true);
                     loadAlbums();
                     loadAllImages();
                   }}
-                  className={cn(
-                    "flex items-center justify-center space-x-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors",
-                    isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
-                  )}
+                  className="flex items-center justify-center space-x-2 w-full px-4 py-3 text-base bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                 >
-                  <Plus className={cn(isMobile ? "w-5 h-5" : "w-4 h-4")} />
+                  <Plus className="w-5 h-5" />
                   <span>Add Images</span>
                 </button>
                 <button
                   onClick={() => setIsEditing(true)}
-                  className={cn(
-                    "flex items-center justify-center space-x-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors",
-                    isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
-                  )}
+                  className="flex items-center justify-center space-x-2 w-full px-4 py-3 text-base bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
                 >
-                  <Edit className={cn(isMobile ? "w-5 h-5" : "w-4 h-4")} />
+                  <Edit className="w-5 h-5" />
                   <span>Edit</span>
-                </button>
-                <button
-                  onClick={handleGenerateVariants}
-                  disabled={isGeneratingVariants}
-                  className={cn(
-                    "flex items-center justify-center space-x-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
-                    isMobile ? "w-full px-4 py-3 text-base" : "px-4 py-2"
-                  )}
-                  title="Generate resolution-optimized variants for display devices"
-                >
-                  <Sparkles className={cn(isMobile ? "w-5 h-5" : "w-4 h-4")} />
-                  <span>{isGeneratingVariants ? 'Generating...' : 'Generate Variants'}</span>
                 </button>
               </div>
             )}
-          </div>
         </div>
       </div>
 
@@ -795,12 +944,6 @@ const PlaylistDetail: React.FC = () => {
               <div className="flex items-center space-x-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
                 <Filter className="w-4 h-4" />
                 <span>Auto Sort</span>
-              </div>
-            )}
-            {editDisplayMode === 'movement' && (
-              <div className="flex items-center space-x-2 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
-                <Filter className="w-4 h-4" />
-                <span>Movement</span>
               </div>
             )}
           </div>
@@ -824,20 +967,59 @@ const PlaylistDetail: React.FC = () => {
           ) : (
             <DndProvider backend={HTML5Backend}>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {playlistImages.map((image, index) => (
-                  <DraggableImageItem
-                    key={image.id}
-                    image={image}
-                    index={index}
-                    moveImage={moveImage}
-                    onDelete={(img) => {
-                      setImageToDelete(img);
-                      setShowDeleteModal(true);
-                    }}
-                    isEditing={isEditing}
-                    displayMode={editDisplayMode}
-                  />
-                ))}
+                {playlistImages.map((image, index) => {
+                  // Compute pairing info with colors and positions
+                  let pairInfo: { isPaired: boolean; pairNumber?: number; positionInPair?: number; pairColor?: string } = { isPaired: false };
+                  
+                  if (playlist?.computed_sequence) {
+                    // Color palette for pairs (cycling through distinct colors)
+                    const pairColors = [
+                      'ring-blue-500',
+                      'ring-purple-500',
+                      'ring-pink-500',
+                      'ring-green-500',
+                      'ring-yellow-500',
+                      'ring-red-500',
+                      'ring-indigo-500',
+                      'ring-cyan-500',
+                    ];
+                    
+                    let pairNumber = 0;
+                    for (const entry of playlist.computed_sequence) {
+                      if (entry.type === 'pair') {
+                        pairNumber++;
+                        const imagePosition = entry.images.indexOf(image.id);
+                        if (imagePosition !== -1) {
+                          pairInfo = {
+                            isPaired: true,
+                            pairNumber,
+                            positionInPair: imagePosition + 1,
+                            pairColor: pairColors[(pairNumber - 1) % pairColors.length]
+                          };
+                          break;
+                        }
+                      }
+                    }
+                  }
+                  
+                  return (
+                    <DraggableImageItem
+                      key={image.id}
+                      image={image}
+                      index={index}
+                      moveImage={moveImage}
+                      onDragEnd={handleDragEnd}
+                      onDelete={(img) => {
+                        setImageToDelete(img);
+                        setShowDeleteModal(true);
+                      }}
+                      isEditing={isEditing}
+                      displayMode={editDisplayMode}
+                      pairInfo={pairInfo}
+                      totalImages={playlistImages.length}
+                    />
+                  );
+                })}
               </div>
             </DndProvider>
           )}
@@ -1062,6 +1244,18 @@ const PlaylistDetail: React.FC = () => {
           setVariantGenerationError(null);
           setVariantCount(undefined);
         }}
+      />
+      
+      {/* Drag Validation Warning Modal */}
+      <ConfirmationModal
+        isOpen={showDragWarning}
+        onClose={cancelDragMove}
+        onConfirm={confirmDragMove}
+        title="⚠️ Pairing Consistency Warning"
+        message={dragValidationResult?.warning || 'This move may affect image pairing. Continue anyway?'}
+        confirmText="Keep This Order"
+        cancelText="Undo Move"
+        variant="warning"
       />
     </div>
   );

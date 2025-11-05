@@ -39,11 +39,6 @@ interface PlaylistCreateData {
   display_time_seconds: number;
   display_mode: string;
   is_default: boolean;
-  transition_type?: 'fade' | 'slide' | 'zoom' | 'random';
-  shuffle?: boolean;
-  loop?: boolean;
-  tags?: string[];
-  priority?: 'low' | 'normal' | 'high';
 }
 
 interface Step {
@@ -69,18 +64,39 @@ const DISPLAY_MODES = [
     color: 'bg-blue-500'
   },
   { 
-    value: 'random', 
-    label: 'Random', 
-    description: 'Random image order',
-    icon: <Zap className="w-4 h-4" />,
-    color: 'bg-purple-500'
+    value: 'ken_burns_plus', 
+    label: 'Ken Burns Plus', 
+    description: 'Cinematic zoom & pan with breathing fades',
+    icon: <Star className="w-4 h-4" />,
+    color: 'bg-purple-600'
   },
   { 
-    value: 'movement', 
-    label: 'Movement', 
-    description: 'Motion-based transitions',
-    icon: <Star className="w-4 h-4" />,
-    color: 'bg-orange-500'
+    value: 'soft_glow', 
+    label: 'Soft Glow', 
+    description: 'Subtle brightness transitions',
+    icon: <Zap className="w-4 h-4" />,
+    color: 'bg-amber-500'
+  },
+  { 
+    value: 'ambient_pulse', 
+    label: 'Ambient Pulse', 
+    description: 'Gentle edge vignette effect',
+    icon: <Clock className="w-4 h-4" />,
+    color: 'bg-teal-500'
+  },
+  { 
+    value: 'dreamy_reveal', 
+    label: 'Dreamy Reveal', 
+    description: 'Blur-to-focus reveal effect',
+    icon: <Settings className="w-4 h-4" />,
+    color: 'bg-pink-500'
+  },
+  { 
+    value: 'stacked_reveal', 
+    label: 'Stacked Reveal', 
+    description: 'Layered image reveals',
+    icon: <Plus className="w-4 h-4" />,
+    color: 'bg-indigo-500'
   },
 ];
 
@@ -92,18 +108,7 @@ const DISPLAY_TIMES = [
   { value: 300, label: '5 minutes', description: 'Extended viewing' },
 ];
 
-const TRANSITION_TYPES = [
-  { value: 'fade', label: 'Fade', description: 'Smooth crossfade' },
-  { value: 'slide', label: 'Slide', description: 'Horizontal slide' },
-  { value: 'zoom', label: 'Zoom', description: 'Zoom in/out effect' },
-  { value: 'random', label: 'Random', description: 'Mixed transitions' },
-];
-
-const PRIORITY_LEVELS = [
-  { value: 'low', label: 'Low', color: 'text-gray-500', bg: 'bg-gray-100' },
-  { value: 'normal', label: 'Normal', color: 'text-blue-600', bg: 'bg-blue-100' },
-  { value: 'high', label: 'High', color: 'text-red-600', bg: 'bg-red-100' },
-];
+// Removed TRANSITION_TYPES and PRIORITY_LEVELS - not needed for playlist creation
 
 const STEPS: Step[] = [
   {
@@ -151,15 +156,9 @@ const MobilePlaylistCreateModal: React.FC<MobilePlaylistCreateModalProps> = ({
     description: '',
     display_time_seconds: 30,
     display_mode: 'default',
-    is_default: false,
-    transition_type: 'fade',
-    shuffle: false,
-    loop: true,
-    tags: [],
-    priority: 'normal'
+    is_default: false
   });
   const [errors, setErrors] = useState<FormErrors>({});
-  const [newTag, setNewTag] = useState('');
   const [steps, setSteps] = useState<Step[]>(STEPS);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -181,15 +180,9 @@ const MobilePlaylistCreateModal: React.FC<MobilePlaylistCreateModalProps> = ({
         description: '',
         display_time_seconds: 30,
         display_mode: 'default',
-        is_default: false,
-        transition_type: 'fade',
-        shuffle: false,
-        loop: true,
-        tags: [],
-        priority: 'normal'
+        is_default: false
       });
       setErrors({});
-      setNewTag('');
       setSteps(STEPS.map(step => ({ ...step, completed: false })));
       setSubmitError(null);
       setHasUnsavedChanges(false);
@@ -233,7 +226,7 @@ const MobilePlaylistCreateModal: React.FC<MobilePlaylistCreateModalProps> = ({
         localStorage.setItem('playlist-create-autosave', JSON.stringify(autoSaveData));
         setLastSaved(new Date());
         setAutoSaveStatus('saved');
-        if (enableHaptic) hapticPatterns.light();
+        if (enableHaptic) hapticPatterns.buttonPress();
       } catch (error) {
         console.error('Auto-save failed:', error);
         setAutoSaveStatus('error');
@@ -402,32 +395,7 @@ const MobilePlaylistCreateModal: React.FC<MobilePlaylistCreateModalProps> = ({
     }
   };
 
-  const addTag = () => {
-    if (newTag.trim() && !formData.tags?.includes(newTag.trim())) {
-      if (enableHaptic) hapticPatterns.selection();
-      setFormData(prev => ({
-        ...prev,
-        tags: [...(prev.tags || []), newTag.trim()]
-      }));
-      setNewTag('');
-      setHasUnsavedChanges(true);
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    if (enableHaptic) hapticPatterns.selection();
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags?.filter(tag => tag !== tagToRemove) || []
-    }));
-    setHasUnsavedChanges(true);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      addTag();
-    }
-  };
+  // Removed tag management functions and handleKeyPress - not needed for playlist creation
 
   const renderStepContent = () => {
     const currentStepData = steps[currentStep];
@@ -486,47 +454,7 @@ const MobilePlaylistCreateModal: React.FC<MobilePlaylistCreateModalProps> = ({
                 />
               </div>
 
-              <div>
-                <Label className="text-sm font-medium text-gray-700">
-                  Tags
-                </Label>
-                <div className="mt-1 flex gap-2">
-                  <Input
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Add a tag"
-                    className="text-base"
-                  />
-                  <Button
-                    type="button"
-                    onClick={addTag}
-                    size="sm"
-                    className="px-3"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-                {formData.tags && formData.tags.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {formData.tags.map((tag, index) => (
-                      <Badge
-                        key={index}
-                        variant="secondary"
-                        className="px-2 py-1 text-xs"
-                      >
-                        {tag}
-                        <button
-                          onClick={() => removeTag(tag)}
-                          className="ml-1 hover:text-red-500"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* Tags section removed - not needed for playlist creation */}
             </div>
           </motion.div>
         );
@@ -632,105 +560,21 @@ const MobilePlaylistCreateModal: React.FC<MobilePlaylistCreateModalProps> = ({
             className="space-y-6"
           >
             <div className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-3 block">
-                  Transition Type
-                </Label>
-                <div className="grid grid-cols-2 gap-3">
-                  {TRANSITION_TYPES.map((type) => (
-                    <button
-                      key={type.value}
-                      onClick={() => setFormData(prev => ({ ...prev, transition_type: type.value as any }))}
-                      className={cn(
-                        "p-3 rounded-lg border-2 text-left transition-all",
-                        "hover:shadow-md active:scale-95",
-                        formData.transition_type === type.value
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-200 hover:border-gray-300"
-                      )}
-                    >
-                      <div className="font-medium text-sm">{type.label}</div>
-                      <div className="text-xs text-gray-500">{type.description}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-3 block">
-                  Priority Level
-                </Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {PRIORITY_LEVELS.map((priority) => (
-                    <button
-                      key={priority.value}
-                      onClick={() => setFormData(prev => ({ ...prev, priority: priority.value as any }))}
-                      className={cn(
-                        "p-3 rounded-lg border-2 text-center transition-all",
-                        "hover:shadow-md active:scale-95",
-                        formData.priority === priority.value
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-200 hover:border-gray-300"
-                      )}
-                    >
-                      <div className={cn("font-medium text-sm", priority.color)}>
-                        {priority.label}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <Label className="text-sm font-medium text-gray-700 mb-3 block">
+                  Additional Options
+                </Label>
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg touch-target">
                   <div>
-                    <div className="font-medium text-sm">Shuffle Images</div>
-                    <div className="text-xs text-gray-500">Randomize image order</div>
+                    <div className="font-medium text-sm">Set as Default Playlist</div>
+                    <div className="text-xs text-gray-500">Use this playlist for new displays</div>
                   </div>
                   <button
                     onClick={() => {
                       if (enableHaptic) hapticPatterns.selection();
-                      setFormData(prev => ({ ...prev, shuffle: !prev.shuffle }));
+                      setFormData(prev => ({ ...prev, is_default: !prev.is_default }));
                       setHasUnsavedChanges(true);
                     }}
-                    className={cn(
-                      "w-12 h-6 rounded-full transition-colors touch-target",
-                      formData.shuffle ? "bg-blue-500" : "bg-gray-300"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-5 h-5 bg-white rounded-full transition-transform",
-                      formData.shuffle ? "translate-x-6" : "translate-x-0.5"
-                    )} />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <div className="font-medium text-sm">Loop Playlist</div>
-                    <div className="text-xs text-gray-500">Restart when finished</div>
-                  </div>
-                  <button
-                    onClick={() => setFormData(prev => ({ ...prev, loop: !prev.loop }))}
-                    className={cn(
-                      "w-12 h-6 rounded-full transition-colors",
-                      formData.loop ? "bg-blue-500" : "bg-gray-300"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-5 h-5 bg-white rounded-full transition-transform",
-                      formData.loop ? "translate-x-6" : "translate-x-0.5"
-                    )} />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <div className="font-medium text-sm">Set as Default</div>
-                    <div className="text-xs text-gray-500">Use for new displays</div>
-                  </div>
-                  <button
-                    onClick={() => setFormData(prev => ({ ...prev, is_default: !prev.is_default }))}
                     className={cn(
                       "w-12 h-6 rounded-full transition-colors",
                       formData.is_default ? "bg-blue-500" : "bg-gray-300"
@@ -786,33 +630,13 @@ const MobilePlaylistCreateModal: React.FC<MobilePlaylistCreateModalProps> = ({
                 </div>
 
                 <div>
-                  <div className="text-sm font-medium text-gray-500">Transition</div>
-                  <div className="text-sm text-gray-700">
-                    {TRANSITION_TYPES.find(t => t.value === formData.transition_type)?.label}
-                  </div>
-                </div>
-
-                <div>
                   <div className="text-sm font-medium text-gray-500">Options</div>
                   <div className="flex flex-wrap gap-2 mt-1">
-                    {formData.shuffle && <Badge variant="secondary">Shuffle</Badge>}
-                    {formData.loop && <Badge variant="secondary">Loop</Badge>}
                     {formData.is_default && <Badge variant="secondary">Default</Badge>}
                   </div>
                 </div>
 
-                {formData.tags && formData.tags.length > 0 && (
-                  <div>
-                    <div className="text-sm font-medium text-gray-500">Tags</div>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {formData.tags.map((tag, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* Tags display removed - not needed for playlist creation */}
               </div>
 
               {submitError && (

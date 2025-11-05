@@ -15,7 +15,17 @@ import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { cn } from '../lib/utils';
 import type { Playlist } from '../types';
 
-export const Playlists: React.FC = () => {
+interface PlaylistsProps {
+  onPlaylistsLoad?: (count: number) => void;
+  showCreateModal?: boolean;
+  setShowCreateModal?: (show: boolean) => void;
+}
+
+export const Playlists: React.FC<PlaylistsProps> = ({ 
+  onPlaylistsLoad,
+  showCreateModal: propShowCreateModal,
+  setShowCreateModal: propSetShowCreateModal 
+}) => {
   const navigate = useNavigate();
   const { isMobile } = useResponsiveLayout();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -23,7 +33,9 @@ export const Playlists: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [localShowCreateModal, setLocalShowCreateModal] = useState(false);
+  const showCreateModal = propShowCreateModal !== undefined ? propShowCreateModal : localShowCreateModal;
+  const setShowCreateModal = propSetShowCreateModal || setLocalShowCreateModal;
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [playlistThumbnails, setPlaylistThumbnails] = useState<Record<number, string>>({});
@@ -38,6 +50,13 @@ export const Playlists: React.FC = () => {
   useEffect(() => {
     loadPlaylists();
   }, []);
+
+  // Notify parent when playlists change
+  useEffect(() => {
+    if (onPlaylistsLoad) {
+      onPlaylistsLoad(playlists.length);
+    }
+  }, [playlists, onPlaylistsLoad]);
 
   const loadPlaylists = async () => {
     try {
@@ -103,11 +122,20 @@ export const Playlists: React.FC = () => {
   const handleCreatePlaylistMobile = async (data: any) => {
     try {
       setIsCreating(true);
-      const response = await apiService.createPlaylist(data.name, {
-        display_time_seconds: data.display_time_seconds,
-        display_mode: data.display_mode,
-        is_default: data.is_default,
-      });
+      // Create playlist with just name and is_default
+      const response = await apiService.createPlaylist(data.name, data.is_default || false);
+      
+      // If display settings were provided, update the playlist
+      if (data.display_time_seconds || data.display_mode) {
+        await apiService.updatePlaylist(
+          response.data.id,
+          undefined, // name - already set
+          undefined, // isDefault - already set
+          data.display_time_seconds,
+          data.display_mode
+        );
+      }
+      
       setPlaylists(prev => [...prev, response.data]);
       setShowCreateModal(false);
       
@@ -136,7 +164,7 @@ export const Playlists: React.FC = () => {
 
   const handleSetDefault = async (playlist: Playlist) => {
     try {
-      await apiService.updatePlaylist(playlist.id, { is_default: true });
+      await apiService.updatePlaylist(playlist.id, undefined, true);
       // Reload playlists to update default status
       loadPlaylists();
     } catch (err: any) {
@@ -224,42 +252,6 @@ export const Playlists: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Action Bar */}
-      <div className="animate-fade-in-up">
-        {/* Badge on separate line for mobile */}
-        <div className={cn("mb-4", isMobile && "mb-3")}>
-          <Badge variant="secondary" className="px-3 py-1">
-            <Play className="w-4 h-4 mr-2" />
-            {playlists.length} playlists
-          </Badge>
-        </div>
-        
-        {/* Buttons row */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <Button 
-            variant="outline"
-            onClick={handleGenerateAllVariants}
-            disabled={generatingAllVariants || playlists.length === 0}
-            title="Generate resolution variants for all playlists"
-            className={cn("flex-1", !isMobile && "flex-none")}
-          >
-            {generatingAllVariants ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            {isMobile ? 'All Variants' : 'Generate All Variants'}
-          </Button>
-          <Button 
-            className="shadow-lg"
-            onClick={() => setShowCreateModal(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Create
-          </Button>
-        </div>
-      </div>
-
       {/* Playlists Grid */}
       {(() => {
         console.log('🔍 Playlists render check:', { isMobile, playlistCount: playlists.length });
@@ -278,9 +270,7 @@ export const Playlists: React.FC = () => {
             }}
             onPlaylistSettings={(playlist) => navigate(`/admin/playlists/${playlist.slug}`)}
             onPlaylistPreview={(playlist) => navigate(`/admin/playlists/${playlist.slug}`)}
-            onGenerateVariants={handleGenerateVariants}
             onCreatePlaylist={() => setShowCreateModal(true)}
-            isGeneratingVariants={generatingVariants}
             hapticFeedback={true}
           />
         ) : (
@@ -346,9 +336,7 @@ export const Playlists: React.FC = () => {
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       {playlist.display_mode && playlist.display_mode !== 'default' && (
                         <Badge variant="outline" className="text-xs">
-                          {playlist.display_mode === 'auto_sort' ? 'Auto Sort' :
-                           playlist.display_mode === 'movement' ? 'Movement' :
-                           playlist.display_mode}
+                          {playlist.display_mode === 'auto_sort' ? 'Auto Sort' : playlist.display_mode}
                         </Badge>
                       )}
                       <span className="flex items-center gap-1">
@@ -360,22 +348,6 @@ export const Playlists: React.FC = () => {
                   
                   {/* Actions */}
                   <div className="flex items-center space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleGenerateVariants(playlist.id);
-                      }}
-                      disabled={generatingVariants}
-                      title="Generate resolution variants"
-                    >
-                      {generatingVariants ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="w-4 h-4" />
-                      )}
-                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"

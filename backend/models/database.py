@@ -34,21 +34,26 @@ def initialize_database():
     """Initialize database connection - only call after setup is complete"""
     global engine, SessionLocal
     
+    logger.info(f"🔍 initialize_database() called - engine: {'present' if engine else 'None'}, SessionLocal: {'present' if SessionLocal else 'None'}")
+    
     if engine is not None:
+        logger.info("✅ Database already initialized, skipping")
         return  # Already initialized
     
     from config.settings import is_configured
     if not is_configured():
-        logger.warning("Database initialization skipped - setup not complete")
+        logger.warning("⚠️  Database initialization skipped - setup not complete")
         return
     
     try:
-        logger.info("Initializing database connection...")
+        logger.info("🔄 Initializing database connection...")
         engine = create_database_engine()
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        logger.info("Database connection initialized successfully")
+        logger.info(f"✅ Database connection initialized successfully - engine: {engine is not None}, SessionLocal: {SessionLocal is not None}")
     except Exception as e:
-        logger.error(f"Failed to initialize database connection: {e}")
+        logger.error(f"❌ Failed to initialize database connection: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
         raise
 
 def ensure_database_initialized():
@@ -94,12 +99,21 @@ metadata = MetaData()
 
 def get_db():
     """Dependency to get database session"""
-    ensure_database_initialized()
-    db = SessionLocal()
     try:
-        yield db
-    finally:
-        db.close()
+        ensure_database_initialized()
+        if SessionLocal is None:
+            logger.error(f"❌ SessionLocal is None after ensure_database_initialized()")
+            raise RuntimeError("Database session factory not initialized")
+        db = SessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"❌ get_db() error: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        raise
 
 def create_tables():
     """Create all tables"""

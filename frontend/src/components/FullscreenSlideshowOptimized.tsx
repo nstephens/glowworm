@@ -44,6 +44,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   displayResolution
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [previousIndex, setPreviousIndex] = useState<number | null>(null); // Holds old image during fade-out
   const [settings, setSettings] = useState<SlideshowSettings>({ ...defaultSettings, ...initialSettings });
   
   // Debug settings
@@ -58,8 +59,10 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const [isPlaying, setIsPlaying] = useState(true);
   const [showControls, setShowControls] = useState(false);
   const [imageOpacity, setImageOpacity] = useState(1);
+  const [previousImageOpacity, setPreviousImageOpacity] = useState(0); // For fading out old image
   const [nextImageOpacity, setNextImageOpacity] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [opacityTransitionDuration, setOpacityTransitionDuration] = useState('600ms'); // Dynamic fade duration
   const [imagesLoaded, setImagesLoaded] = useState<Set<number>>(new Set());
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [nextImageReady, setNextImageReady] = useState(false);
@@ -77,11 +80,6 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const [bottomImageOpacity, setBottomImageOpacity] = useState(0);
   const [topImageTransform, setTopImageTransform] = useState('translateX(5%)');
   const [bottomImageTransform, setBottomImageTransform] = useState('translateX(-5%)');
-  
-  // Movement animation state
-  const [movementTransform, setMovementTransform] = useState('translateX(0%)');
-  const [movementObjectPosition, setMovementObjectPosition] = useState('center');
-  const [movementDirection, setMovementDirection] = useState<'left' | 'right'>('right');
 
   // Calculate display mode logic early to avoid hoisting issues
   const currentImage = images[currentIndex];
@@ -106,11 +104,11 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   }, [playlist?.computed_sequence, currentImage?.id, nextImageData?.id]);
   
   // Use computed_sequence if available, otherwise fall back to orientation-based logic
+  // Apply pairing for ALL modes (not just default) when consecutive landscape images are detected
   const shouldShowSplitScreen = isPairedFromSequence || 
-    (playlist?.display_mode === 'default' && isCurrentImageLandscape && isNextImageLandscape);
+    (isCurrentImageLandscape && isNextImageLandscape);
   const shouldShowStackedReveal = (isPairedFromSequence && playlist?.display_mode === 'stacked_reveal') ||
     (playlist?.display_mode === 'stacked_reveal' && isCurrentImageLandscape && isNextImageLandscape);
-  const shouldShowMovement = playlist?.display_mode === 'movement' && isCurrentImageLandscape;
   const shouldShowKenBurns = playlist?.display_mode === 'ken_burns_plus';
   const shouldShowSoftGlow = playlist?.display_mode === 'soft_glow';
   const shouldShowAmbientPulse = playlist?.display_mode === 'ambient_pulse';
@@ -119,80 +117,29 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   const displayAspectRatio = window.innerWidth / window.innerHeight;
   const isImageSignificantlyWider = imageAspectRatio > displayAspectRatio * 1.2; // 20% wider than display (less restrictive)
 
-  // Handle split-screen fade-in when images change
+  // Handle initial setup when images change (only when NOT transitioning)
+  // NOTE: Removed waitingForLoad from dependencies to prevent re-running after fade-in completes
   useEffect(() => {
-    if (images.length > 0) {
-      displayLogger.debug('🎬 OPTIMIZED: Setting up fade-in for split-screen:', shouldShowSplitScreen);
-      
-      // Always ensure movement starts centered when images change
-      setMovementObjectPosition('center');
+    if (images.length > 0 && !isTransitioning && !waitingForLoad && isInitialLoad) {
+      displayLogger.debug('🎬 OPTIMIZED: Setting up initial state for split-screen:', shouldShowSplitScreen);
       
       if (shouldShowSplitScreen) {
-        // Reset and fade in split-screen images
-        setTopImageOpacity(0);
-        setBottomImageOpacity(0);
-        setTopImageTransform('translateX(5%)');
-        setBottomImageTransform('translateX(-5%)');
-        
-        // Fade in top image first
-        setTimeout(() => {
-          setTopImageOpacity(1);
-          setTopImageTransform('translateX(0)');
-          displayLogger.debug('🎬 OPTIMIZED: Top image faded in');
-        }, 100);
-        
-        // Fade in bottom image after delay
-        setTimeout(() => {
-          setBottomImageOpacity(1);
-          setBottomImageTransform('translateX(0)');
-          displayLogger.debug('🎬 OPTIMIZED: Bottom image faded in');
-        }, 1000);
+        // Initialize split-screen images (already visible, no fade needed on initial load)
+        console.log(`🎬 SPLIT [${currentImage?.id}/${nextImageData?.id}]: Initial setup - setting opacity to 1`);
+        setTopImageOpacity(1);
+        setBottomImageOpacity(1);
+        setTopImageTransform('translateX(0%)');
+        setBottomImageTransform('translateX(0%)');
       } else {
         // Single image mode
         setImageOpacity(1);
         displayLogger.debug('🎬 OPTIMIZED: Single image mode');
       }
-    }
-  }, [currentIndex, images, shouldShowSplitScreen]);
-
-  // Handle movement animation for landscape images
-  useEffect(() => {
-    displayLogger.debug(`🎬 MOVEMENT DEBUG: shouldShowMovement=${shouldShowMovement}, isCurrentImageLandscape=${isCurrentImageLandscape}`);
-    displayLogger.debug(`🎬 MOVEMENT DEBUG: imageAspectRatio=${imageAspectRatio}, displayAspectRatio=${displayAspectRatio}`);
-    
-    if (shouldShowMovement && isCurrentImageLandscape) {
-      // Calculate safe pan distance to avoid showing borders
-      // Only pan if image is wider than display
-      const imageIsWiderThanDisplay = imageAspectRatio > displayAspectRatio;
       
-      if (imageIsWiderThanDisplay) {
-        // Calculate how much extra width the image has beyond the display
-        const extraWidthRatio = imageAspectRatio / displayAspectRatio - 1;
-        // Pan by a percentage of the extra width (not the display width) - slowed down by 2% total
-        const panDistance = Math.min(49.5, Math.max(9.9, extraWidthRatio * 29.4)); // 9.9-49.5% of extra width (2% slower)
-        
-        const newDirection = Math.random() > 0.5 ? 'left' : 'right';
-        setMovementDirection(newDirection);
-        
-        // Reset position immediately when image changes
-        setMovementObjectPosition('center');
-        
-        // Start slow pan after 1 second
-        const movementTimer = setTimeout(() => {
-          const endPosition = newDirection === 'left' ? `${50 - panDistance}% center` : `${50 + panDistance}% center`;
-          setMovementObjectPosition(endPosition);
-          displayLogger.debug(`🎬 MOVEMENT: object-position to: ${endPosition}`);
-        }, 1000);
-        
-        return () => clearTimeout(movementTimer);
-      } else {
-        setMovementObjectPosition('center');
-      }
-    } else {
-      // Reset movement state
-      setMovementObjectPosition('center');
+      // Mark initial load as complete
+      setIsInitialLoad(false);
     }
-  }, [currentIndex, shouldShowMovement, isCurrentImageLandscape, settings.interval, imageAspectRatio, displayAspectRatio]);
+  }, [currentIndex, images, shouldShowSplitScreen, isTransitioning, waitingForLoad, isInitialLoad]);
 
   // Trigger Dreamy Reveal on initial load and when first image appears
   useEffect(() => {
@@ -303,9 +250,6 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
     
     // Use requestAnimationFrame for smoother transitions on Pi
     const startTransition = () => {
-      // Reset movement position to center during transition
-      setMovementObjectPosition('center');
-      
       // Log fade out start
       transitionLogger.logEvent({
         timestamp: Date.now(),
@@ -315,16 +259,74 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
         additionalData: { isShowingSplitScreen }
       });
       
-      if (isShowingSplitScreen) {
-        // Fade out both split-screen images
-        setTopImageOpacity(0);
-        setBottomImageOpacity(0);
-        setTopImageTransform('translateX(5%)');
-        setBottomImageTransform('translateX(-5%)');
-        displayLogger.debug('🎬 OPTIMIZED: Fading out split-screen images');
+      // Calculate next index first
+      const advanceBy = isShowingSplitScreen ? 2 : 1;
+      const nextIndex = (currentIndex + advanceBy) % images.length;
+      
+      // KEN BURNS & STACKED: Fade to BLACK, then change image
+      // OTHER MODES: Use crossfade for smoother transition
+      
+      if (shouldShowKenBurns || shouldShowStackedReveal) {
+        // FADE TO BLACK APPROACH (Ken Burns & Stacked)
+        // Step 1: Set fade-out duration to 800ms (breathing effect - slower exhale)
+        setOpacityTransitionDuration('800ms');
+        
+        // Step 2: Fade current image(s) to black (opacity 0)
+        requestAnimationFrame(() => {
+          if (isShowingSplitScreen) {
+            setTopImageOpacity(0);
+            setBottomImageOpacity(0);
+            setTopImageTransform('translateX(5%)');
+            setBottomImageTransform('translateX(-5%)');
+            displayLogger.debug('🎬 KEN BURNS/STACKED: Fading stacked images to black (800ms - breathing)');
+          } else {
+            setImageOpacity(0);
+            displayLogger.debug('🎬 KEN BURNS: Fading single image to black (800ms - breathing)');
+          }
+        });
+        
+        // Step 3: WAIT for fade to black to complete, THEN change image
+        // (Image source changes during black screen - invisible to user)
       } else {
-        // Fade out single image
-        setImageOpacity(0);
+        // CROSSFADE APPROACH (All other modes)
+        if (isShowingSplitScreen) {
+          // For split-screen, just fade out normally
+          console.log(`🎬 SPLIT [${currentImage?.id}/${nextImageData?.id}]: FADE OUT - setting opacity to 0`);
+          setTopImageOpacity(0);
+          setBottomImageOpacity(0);
+          setTopImageTransform('translateX(5%)');
+          setBottomImageTransform('translateX(-5%)');
+          displayLogger.debug('🎬 CROSSFADE: Fading out split-screen images');
+          
+          // Soft Glow: Dim outgoing paired images to 70% brightness
+          if (shouldShowSoftGlow) {
+            setImageBrightness(0.7);
+          }
+        } else {
+          // For single images: Use crossfade overlay
+          setPreviousIndex(currentIndex);
+          setPreviousImageOpacity(1);
+          
+          // Change to next image immediately (at opacity 0, underneath)
+          setCurrentIndex(nextIndex);
+          setImageOpacity(0);
+          setWaitingForLoad(true);
+          setNextImageReady(false);
+          
+          // Notify parent of image change
+          if (onImageChange) {
+            onImageChange(images[nextIndex], nextIndex);
+          }
+          
+          displayLogger.debug('🎬 CROSSFADE: Starting crossfade - previous visible, new at 0');
+          
+          // Start fading out the previous image overlay
+          requestAnimationFrame(() => {
+            setPreviousImageOpacity(0);
+            displayLogger.debug('🎬 CROSSFADE: Fading out previous image overlay');
+          });
+        }
+        
         // Soft Glow: Dim outgoing image to 70% brightness
         if (shouldShowSoftGlow) {
           setImageBrightness(0.7);
@@ -333,35 +335,61 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
         if (shouldShowDreamyReveal) {
           setIsDreamyRevealing(false);
         }
-        displayLogger.debug('🎬 OPTIMIZED: Fading out single image');
       }
       
-      // After fade out completes, change image and WAIT for load
-      setTimeout(() => {
+      // Use requestAnimationFrame to ensure state changes are flushed to DOM
+      // THEN start the timer for when to complete the transition
+      requestAnimationFrame(() => {
+        // Now the opacity change has been applied to the DOM, start the fade-out timer
+        setTimeout(() => {
         transitionLogger.logEvent({
           timestamp: Date.now(),
           eventType: 'fade_out_complete',
-          currentIndex
+          currentIndex: nextIndex
         });
         
-        // Advance by 2 if we were showing split-screen, otherwise advance by 1
-        const advanceBy = isShowingSplitScreen ? 2 : 1;
-        const nextIndex = (currentIndex + advanceBy) % images.length;
-        
-        transitionLogger.logEvent({
-          timestamp: Date.now(),
-          eventType: 'index_change',
-          currentIndex,
-          nextIndex
-        });
-        
-        // Mark that we're waiting for the new image to load
-        setWaitingForLoad(true);
-        setNextImageReady(false);
-        setCurrentIndex(nextIndex);
-        
-        // Ensure new image starts centered for movement
-        setMovementObjectPosition('center');
+        // Handle index change based on transition type
+        if (shouldShowKenBurns || shouldShowStackedReveal) {
+          // KEN BURNS/STACKED: Change image AFTER fade to black completes
+          transitionLogger.logEvent({
+            timestamp: Date.now(),
+            eventType: 'index_change',
+            currentIndex,
+            nextIndex
+          });
+          
+          // Mark that we're waiting for the new image to load
+          setWaitingForLoad(true);
+          setNextImageReady(false);
+          setCurrentIndex(nextIndex);
+          
+          // Notify parent of image change
+          if (onImageChange) {
+            onImageChange(images[nextIndex], nextIndex);
+          }
+          
+          displayLogger.debug('🎬 KEN BURNS/STACKED: Image changed during black screen');
+        } else if (isShowingSplitScreen) {
+          // CROSSFADE: Split-screen index change
+          transitionLogger.logEvent({
+            timestamp: Date.now(),
+            eventType: 'index_change',
+            currentIndex,
+            nextIndex
+          });
+          
+          setWaitingForLoad(true);
+          setNextImageReady(false);
+          setCurrentIndex(nextIndex);
+          
+          if (onImageChange) {
+            onImageChange(images[nextIndex], nextIndex);
+          }
+        } else {
+          // CROSSFADE: Single images - clear the previous image overlay
+          setPreviousIndex(null);
+          displayLogger.debug('🎬 CROSSFADE: Cleared previous image overlay');
+        }
         
         displayLogger.debug(`🎬 OPTIMIZED: Advanced by ${advanceBy}, now at index ${nextIndex}, waiting for image load...`);
         
@@ -397,7 +425,8 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
         
         // Store timeout ref for cleanup
         transitionTimeoutRef.current = loadTimeout;
-      }, 300); // Shorter transition for better Pi performance
+        }, shouldShowKenBurns || shouldShowStackedReveal ? 850 : 650); // 850ms for Ken Burns (800ms fade + buffer), 650ms for others
+      }); // Close requestAnimationFrame - ensures opacity change is applied before timer starts
     };
     
     requestAnimationFrame(startTransition);
@@ -408,18 +437,45 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
     if (!waitingForLoad || !nextImageReady) return;
     
     const currentImg = images[currentIndex];
-    const nextImg = images[currentIndex + 1];
-    const isCurrentLandscape = currentImg && currentImg.width && currentImg.height && currentImg.width > currentImg.height;
-    const isNextLandscape = nextImg && nextImg.width && nextImg.height && nextImg.width > nextImg.height;
-    const shouldShowSplit = isCurrentLandscape && isNextLandscape;
+    const nextImg = images[(currentIndex + 1) % images.length];
     
-    displayLogger.debug('🎬 OPTIMIZED: Image loaded, starting fade in');
+    // Use computed_sequence to determine if we should show split-screen for the NEW images
+    let shouldShowSplitForNew = false;
+    if (playlist?.computed_sequence) {
+      for (const entry of playlist.computed_sequence) {
+        if (entry.type === 'pair' && entry.images.length === 2) {
+          if (entry.images[0] === currentImg?.id && entry.images[1] === nextImg?.id) {
+            shouldShowSplitForNew = true;
+            break;
+          }
+        }
+      }
+    }
+    // Fallback to orientation-based logic if not found in computed_sequence
+    if (!shouldShowSplitForNew) {
+      const isCurrentLandscape = currentImg && currentImg.width && currentImg.height && currentImg.width > currentImg.height;
+      const isNextLandscape = nextImg && nextImg.width && nextImg.height && nextImg.width > nextImg.height;
+      shouldShowSplitForNew = isCurrentLandscape && isNextLandscape;
+      if (shouldShowSplitForNew) {
+        console.log(`🎬 SPLIT [${currentImg?.id}/${nextImg?.id}]: Using orientation-based pairing`);
+      }
+    } else {
+      console.log(`🎬 SPLIT [${currentImg?.id}/${nextImg?.id}]: Using computed_sequence pairing`);
+    }
+    
+    displayLogger.debug('🎬 OPTIMIZED: Image loaded, starting fade in', {
+      shouldShowSplit: shouldShowSplitForNew,
+      currentIndex,
+      currentImgId: currentImg?.id,
+      nextImgId: nextImg?.id
+    });
     
     transitionLogger.logEvent({
       timestamp: Date.now(),
       eventType: 'fade_in_start',
       currentIndex,
-      currentImageId: currentImg?.id
+      currentImageId: currentImg?.id,
+      shouldShowSplit: shouldShowSplitForNew
     });
     
     // Clear the timeout since image loaded successfully
@@ -428,14 +484,46 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
       transitionTimeoutRef.current = null;
     }
     
-    // Fade in the new image
-    if (shouldShowSplit) {
-      setTopImageOpacity(1);
-      setBottomImageOpacity(1);
+    // Fade in the new image(s)
+    // Set fade-in duration: 1200ms for Ken Burns/Stacked (breathing effect), 600ms for others
+    const fadeInDurationStr = (shouldShowKenBurns || shouldShowStackedReveal) ? '1200ms' : '600ms';
+    setOpacityTransitionDuration(fadeInDurationStr);
+    
+    if (shouldShowSplitForNew) {
+      // Paired images fade in
+      console.log(`🎬 SPLIT [${currentImg?.id}/${nextImg?.id}]: Fade in paired images (mode: ${playlist?.display_mode})`);
+      
+      // Set initial opacity to 0 for fade-in effect
+      setTopImageOpacity(0);
+      setBottomImageOpacity(0);
       setTopImageTransform('translateX(0%)');
       setBottomImageTransform('translateX(0%)');
+      
+      // Soft Glow: Start incoming paired images at 130% brightness
+      if (shouldShowSoftGlow) {
+        setImageBrightness(1.3);
+      }
+      
+      // Fade in both images
+      requestAnimationFrame(() => {
+        console.log(`🎬 SPLIT [${currentImg?.id}/${nextImg?.id}]: Setting opacity to 1 for fade-in`);
+        setTopImageOpacity(1);
+        setBottomImageOpacity(1);
+        
+        // Soft Glow: Settle to 100% brightness after 900ms
+        if (shouldShowSoftGlow) {
+          setTimeout(() => {
+            console.log(`🎬 SOFT GLOW: Settling brightness to 1.0`);
+            setImageBrightness(1.0);
+          }, 900);
+        }
+      });
     } else {
-      setImageOpacity(1);
+      // Single image - ensure it starts at 0, then fade in
+      setImageOpacity(0);
+      requestAnimationFrame(() => {
+        setImageOpacity(1);
+      });
       // Soft Glow: Start incoming image at 130% brightness
       if (shouldShowSoftGlow) {
         setImageBrightness(1.3);
@@ -444,16 +532,16 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
           setImageBrightness(1.0);
         }, 900);
       }
-      // Dreamy Reveal: Trigger reveal animation
-      if (shouldShowDreamyReveal) {
-        // Small delay to ensure component is ready
-        setTimeout(() => {
-          setIsDreamyRevealing(true);
-        }, 50);
-      }
     }
     
-    // Mark transition complete after fade in
+    // Dreamy Reveal: Trigger reveal animation immediately (works for both single and paired)
+    if (shouldShowDreamyReveal) {
+      // Trigger immediately to avoid visible blur
+      setIsDreamyRevealing(true);
+    }
+    
+    // Mark transition complete after fade in (1200ms for Ken Burns/Stacked, 600ms for others)
+    const fadeInDurationMs = (shouldShowKenBurns || shouldShowStackedReveal) ? 1200 : 600;
     setTimeout(() => {
       setWaitingForLoad(false);
       setIsTransitioning(false);
@@ -465,9 +553,9 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
       });
       
       transitionLogger.completeTransition(true);
-    }, 300);
+    }, fadeInDurationMs);
     
-  }, [waitingForLoad, nextImageReady, currentIndex, images]);
+  }, [waitingForLoad, nextImageReady, currentIndex, images, playlist]);
 
   // Auto-advance slideshow
   useEffect(() => {
@@ -579,9 +667,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
   
   displayLogger.debug(`🎬 OPTIMIZED: Playlist display_mode: ${playlist?.display_mode}`);
   displayLogger.debug(`🎬 OPTIMIZED: Should show split-screen: ${shouldShowSplitScreen}`);
-  displayLogger.debug(`🎬 OPTIMIZED: Should show movement: ${shouldShowMovement}`);
   displayLogger.debug(`🎬 OPTIMIZED: Is current image landscape: ${isCurrentImageLandscape}`);
-  displayLogger.debug(`🎬 OPTIMIZED: Movement transform: ${movementTransform}`);
   
   displayLogger.debug(`🎬 OPTIMIZED: Image ${currentIndex + 1}: ${currentImage?.original_filename} (${currentImage?.width}x${currentImage?.height}) - ${isCurrentImageLandscape ? 'landscape' : 'portrait'}`);
   if (nextImageData) {
@@ -644,7 +730,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                       backfaceVisibility: 'hidden',
                       willChange: 'opacity, transform',
                       // Base transition (StackedReveal handles transform)
-                      transition: 'opacity 300ms ease-out'
+                      transition: `opacity ${opacityTransitionDuration} ease-in-out`
                     }}
                     onLoad={(e) => {
                       const img = e.target as HTMLImageElement;
@@ -679,6 +765,207 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                     loading="eager"
                   />
                 </StackedReveal>
+              ) : shouldShowDreamyReveal ? (
+                <DreamyReveal
+                  key={`dreamy-top-${currentImage.id}`}
+                  isRevealing={isDreamyRevealing}
+                  duration={1500}
+                  includeScale={true}
+                  externalOpacityControl={true}
+                  className="w-full h-full"
+                >
+                  <img
+                    src={getSmartImageUrlFromImage(currentImage, deviceToken)}
+                    alt={currentImage.original_filename}
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      opacity: topImageOpacity,
+                      // Hardware acceleration and transform handled by DreamyReveal wrapper
+                      willChange: 'opacity',
+                      transition: `opacity ${opacityTransitionDuration} ease-in-out`
+                    }}
+                    onLoad={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      displayLogger.debug('✅ Top image loaded (Dreamy Reveal paired)');
+                      
+                      displayDeviceLogger.logImageDimensions(
+                        currentImage.id,
+                        getSmartImageUrlFromImage(currentImage, deviceToken),
+                        img.naturalWidth,
+                        img.naturalHeight,
+                        img.clientWidth,
+                        img.clientHeight
+                      );
+                      
+                      transitionLogger.logEvent({
+                        timestamp: Date.now(),
+                        eventType: 'image_load_complete',
+                        currentIndex,
+                        currentImageId: currentImage.id,
+                        loadTime: img.complete ? 0 : undefined
+                      });
+                      
+                      setImagesLoaded(prev => new Set([...prev, currentImage.id]));
+                      
+                      if (waitingForLoad) {
+                        setNextImageReady(true);
+                      }
+                    }}
+                    onError={() => {
+                      displayLogger.error('❌ Top image failed to load (Dreamy Reveal paired)');
+                    }}
+                    loading="eager"
+                  />
+                </DreamyReveal>
+              ) : shouldShowAmbientPulse ? (
+                <AmbientPulse
+                  displayInterval={settings.interval}
+                  isActive={true}
+                  className="w-full h-full"
+                >
+                  <img
+                    src={getSmartImageUrlFromImage(currentImage, deviceToken)}
+                    alt={currentImage.original_filename}
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      opacity: topImageOpacity,
+                      // Hardware acceleration
+                      transform: 'translateZ(0)',
+                      backfaceVisibility: 'hidden',
+                      willChange: 'opacity',
+                      transition: `opacity ${opacityTransitionDuration} ease-in-out`
+                    }}
+                    onLoad={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      displayLogger.debug('✅ Top image loaded (Ambient Pulse paired)');
+                      
+                      displayDeviceLogger.logImageDimensions(
+                        currentImage.id,
+                        getSmartImageUrlFromImage(currentImage, deviceToken),
+                        img.naturalWidth,
+                        img.naturalHeight,
+                        img.clientWidth,
+                        img.clientHeight
+                      );
+                      
+                      transitionLogger.logEvent({
+                        timestamp: Date.now(),
+                        eventType: 'image_load_complete',
+                        currentIndex,
+                        currentImageId: currentImage.id,
+                        loadTime: img.complete ? 0 : undefined
+                      });
+                      
+                      setImagesLoaded(prev => new Set([...prev, currentImage.id]));
+                      
+                      if (waitingForLoad) {
+                        setNextImageReady(true);
+                      }
+                    }}
+                    onError={() => {
+                      displayLogger.error('❌ Top image failed to load (Ambient Pulse paired)');
+                    }}
+                    loading="eager"
+                  />
+                </AmbientPulse>
+              ) : shouldShowSoftGlow ? (
+                <img
+                  src={getSmartImageUrlFromImage(currentImage, deviceToken)}
+                  alt={currentImage.original_filename}
+                  className="w-full h-full object-cover"
+                  style={{ 
+                    opacity: topImageOpacity,
+                    // Hardware acceleration
+                    transform: 'translateZ(0)',
+                    backfaceVisibility: 'hidden',
+                    willChange: 'opacity, filter',
+                    // Soft Glow: Apply brightness filter
+                    filter: `brightness(${imageBrightness})`,
+                    // Smooth transitions for both opacity and brightness
+                    transition: `opacity ${opacityTransitionDuration} ease-in-out, filter 1200ms ease-in-out`
+                  }}
+                  onLoad={(e) => {
+                    const img = e.target as HTMLImageElement;
+                    displayLogger.debug('✅ Top image loaded (Soft Glow paired)');
+                    
+                    displayDeviceLogger.logImageDimensions(
+                      currentImage.id,
+                      getSmartImageUrlFromImage(currentImage, deviceToken),
+                      img.naturalWidth,
+                      img.naturalHeight,
+                      img.clientWidth,
+                      img.clientHeight
+                    );
+                    
+                    transitionLogger.logEvent({
+                      timestamp: Date.now(),
+                      eventType: 'image_load_complete',
+                      currentIndex,
+                      currentImageId: currentImage.id,
+                      loadTime: img.complete ? 0 : undefined
+                    });
+                    
+                    setImagesLoaded(prev => new Set([...prev, currentImage.id]));
+                    
+                    if (waitingForLoad) {
+                      setNextImageReady(true);
+                    }
+                  }}
+                  onError={() => {
+                    displayLogger.error('❌ Top image failed to load (Soft Glow paired)');
+                  }}
+                  loading="eager"
+                />
+              ) : shouldShowKenBurns ? (
+                <KenBurnsPlus
+                  key={`kenburns-top-${currentImage.id}`}
+                  image={currentImage}
+                  isActive={topImageOpacity > 0.5}
+                  displayInterval={settings.interval}
+                  externalOpacityControl={false}
+                  className="w-full h-full"
+                >
+                  <img
+                    src={getSmartImageUrlFromImage(currentImage, deviceToken)}
+                    alt={currentImage.original_filename}
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      // Let Ken Burns handle all transforms AND opacity internally
+                      // No external opacity control
+                    }}
+                    onLoad={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      displayLogger.debug('✅ Top image loaded (Ken Burns paired)');
+                      
+                      displayDeviceLogger.logImageDimensions(
+                        currentImage.id,
+                        getSmartImageUrlFromImage(currentImage, deviceToken),
+                        img.naturalWidth,
+                        img.naturalHeight,
+                        img.clientWidth,
+                        img.clientHeight
+                      );
+                      
+                      transitionLogger.logEvent({
+                        timestamp: Date.now(),
+                        eventType: 'image_load_complete',
+                        currentIndex,
+                        currentImageId: currentImage.id,
+                        loadTime: img.complete ? 0 : undefined
+                      });
+                      
+                      setImagesLoaded(prev => new Set([...prev, currentImage.id]));
+                      
+                      if (waitingForLoad) {
+                        setNextImageReady(true);
+                      }
+                    }}
+                    onError={() => {
+                      displayLogger.error('❌ Top image failed to load (Ken Burns paired)');
+                    }}
+                    loading="eager"
+                  />
+                </KenBurnsPlus>
               ) : (
                 <img
                   src={getSmartImageUrlFromImage(currentImage, deviceToken)}
@@ -689,9 +976,13 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                     transform: topImageTransform,
                     // Hardware acceleration
                     backfaceVisibility: 'hidden',
-                    willChange: 'opacity, transform',
+                    willChange: shouldShowSoftGlow ? 'opacity, transform, filter' : 'opacity, transform',
+                    // Soft Glow: Add brightness filter
+                    filter: shouldShowSoftGlow ? `brightness(${imageBrightness})` : undefined,
                     // Optimized transition for Pi
-                    transition: 'opacity 300ms ease-out, transform 300ms ease-out'
+                    transition: shouldShowSoftGlow ? 
+                      `opacity ${opacityTransitionDuration} ease-in-out, transform 600ms ease-out, filter 1200ms ease-in-out` : 
+                      `opacity ${opacityTransitionDuration} ease-in-out, transform 600ms ease-out`
                   }}
                 onLoad={(e) => {
                   const img = e.target as HTMLImageElement;
@@ -753,7 +1044,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                       backfaceVisibility: 'hidden',
                       willChange: 'opacity, transform',
                       // Base transition (StackedReveal handles transform)
-                      transition: 'opacity 300ms ease-out'
+                      transition: `opacity ${opacityTransitionDuration} ease-in-out`
                     }}
                     onLoad={(e) => {
                       const img = e.target as HTMLImageElement;
@@ -788,6 +1079,207 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                     loading="eager"
                   />
                 </StackedReveal>
+              ) : shouldShowDreamyReveal ? (
+                <DreamyReveal
+                  key={`dreamy-bottom-${nextImageData.id}`}
+                  isRevealing={isDreamyRevealing}
+                  duration={1500}
+                  includeScale={true}
+                  externalOpacityControl={true}
+                  className="w-full h-full"
+                >
+                  <img
+                    src={getSmartImageUrlFromImage(nextImageData, deviceToken)}
+                    alt={nextImageData.original_filename}
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      opacity: bottomImageOpacity,
+                      // Hardware acceleration and transform handled by DreamyReveal wrapper
+                      willChange: 'opacity',
+                      transition: `opacity ${opacityTransitionDuration} ease-in-out`
+                    }}
+                    onLoad={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      displayLogger.debug('✅ Bottom image loaded (Dreamy Reveal paired)');
+                      
+                      displayDeviceLogger.logImageDimensions(
+                        nextImageData.id,
+                        getSmartImageUrlFromImage(nextImageData, deviceToken),
+                        img.naturalWidth,
+                        img.naturalHeight,
+                        img.clientWidth,
+                        img.clientHeight
+                      );
+                      
+                      transitionLogger.logEvent({
+                        timestamp: Date.now(),
+                        eventType: 'image_load_complete',
+                        currentIndex,
+                        currentImageId: nextImageData.id,
+                        loadTime: img.complete ? 0 : undefined
+                      });
+                      
+                      setImagesLoaded(prev => new Set([...prev, nextImageData.id]));
+                      
+                      if (waitingForLoad) {
+                        setNextImageReady(true);
+                      }
+                    }}
+                    onError={() => {
+                      displayLogger.error('❌ Bottom image failed to load (Dreamy Reveal paired)');
+                    }}
+                    loading="eager"
+                  />
+                </DreamyReveal>
+              ) : shouldShowAmbientPulse ? (
+                <AmbientPulse
+                  displayInterval={settings.interval}
+                  isActive={true}
+                  className="w-full h-full"
+                >
+                  <img
+                    src={getSmartImageUrlFromImage(nextImageData, deviceToken)}
+                    alt={nextImageData.original_filename}
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      opacity: bottomImageOpacity,
+                      // Hardware acceleration
+                      transform: 'translateZ(0)',
+                      backfaceVisibility: 'hidden',
+                      willChange: 'opacity',
+                      transition: `opacity ${opacityTransitionDuration} ease-in-out`
+                    }}
+                    onLoad={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      displayLogger.debug('✅ Bottom image loaded (Ambient Pulse paired)');
+                      
+                      displayDeviceLogger.logImageDimensions(
+                        nextImageData.id,
+                        getSmartImageUrlFromImage(nextImageData, deviceToken),
+                        img.naturalWidth,
+                        img.naturalHeight,
+                        img.clientWidth,
+                        img.clientHeight
+                      );
+                      
+                      transitionLogger.logEvent({
+                        timestamp: Date.now(),
+                        eventType: 'image_load_complete',
+                        currentIndex,
+                        currentImageId: nextImageData.id,
+                        loadTime: img.complete ? 0 : undefined
+                      });
+                      
+                      setImagesLoaded(prev => new Set([...prev, nextImageData.id]));
+                      
+                      if (waitingForLoad) {
+                        setNextImageReady(true);
+                      }
+                    }}
+                    onError={() => {
+                      displayLogger.error('❌ Bottom image failed to load (Ambient Pulse paired)');
+                    }}
+                    loading="eager"
+                  />
+                </AmbientPulse>
+              ) : shouldShowSoftGlow ? (
+                <img
+                  src={getSmartImageUrlFromImage(nextImageData, deviceToken)}
+                  alt={nextImageData.original_filename}
+                  className="w-full h-full object-cover"
+                  style={{ 
+                    opacity: bottomImageOpacity,
+                    // Hardware acceleration
+                    transform: 'translateZ(0)',
+                    backfaceVisibility: 'hidden',
+                    willChange: 'opacity, filter',
+                    // Soft Glow: Apply brightness filter
+                    filter: `brightness(${imageBrightness})`,
+                    // Smooth transitions for both opacity and brightness
+                    transition: `opacity ${opacityTransitionDuration} ease-in-out, filter 1200ms ease-in-out`
+                  }}
+                  onLoad={(e) => {
+                    const img = e.target as HTMLImageElement;
+                    displayLogger.debug('✅ Bottom image loaded (Soft Glow paired)');
+                    
+                    displayDeviceLogger.logImageDimensions(
+                      nextImageData.id,
+                      getSmartImageUrlFromImage(nextImageData, deviceToken),
+                      img.naturalWidth,
+                      img.naturalHeight,
+                      img.clientWidth,
+                      img.clientHeight
+                    );
+                    
+                    transitionLogger.logEvent({
+                      timestamp: Date.now(),
+                      eventType: 'image_load_complete',
+                      currentIndex,
+                      currentImageId: nextImageData.id,
+                      loadTime: img.complete ? 0 : undefined
+                    });
+                    
+                    setImagesLoaded(prev => new Set([...prev, nextImageData.id]));
+                    
+                    if (waitingForLoad) {
+                      setNextImageReady(true);
+                    }
+                  }}
+                  onError={() => {
+                    displayLogger.error('❌ Bottom image failed to load (Soft Glow paired)');
+                  }}
+                  loading="eager"
+                />
+              ) : shouldShowKenBurns ? (
+                <KenBurnsPlus
+                  key={`kenburns-bottom-${nextImageData.id}`}
+                  image={nextImageData}
+                  isActive={bottomImageOpacity > 0.5}
+                  displayInterval={settings.interval}
+                  externalOpacityControl={false}
+                  className="w-full h-full"
+                >
+                  <img
+                    src={getSmartImageUrlFromImage(nextImageData, deviceToken)}
+                    alt={nextImageData.original_filename}
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      // Let Ken Burns handle all transforms AND opacity internally
+                      // No external opacity control
+                    }}
+                    onLoad={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      displayLogger.debug('✅ Bottom image loaded (Ken Burns paired)');
+                      
+                      displayDeviceLogger.logImageDimensions(
+                        nextImageData.id,
+                        getSmartImageUrlFromImage(nextImageData, deviceToken),
+                        img.naturalWidth,
+                        img.naturalHeight,
+                        img.clientWidth,
+                        img.clientHeight
+                      );
+                      
+                      transitionLogger.logEvent({
+                        timestamp: Date.now(),
+                        eventType: 'image_load_complete',
+                        currentIndex,
+                        currentImageId: nextImageData.id,
+                        loadTime: img.complete ? 0 : undefined
+                      });
+                      
+                      setImagesLoaded(prev => new Set([...prev, nextImageData.id]));
+                      
+                      if (waitingForLoad) {
+                        setNextImageReady(true);
+                      }
+                    }}
+                    onError={() => {
+                      displayLogger.error('❌ Bottom image failed to load (Ken Burns paired)');
+                    }}
+                    loading="eager"
+                  />
+                </KenBurnsPlus>
               ) : (
                 <img
                   src={getSmartImageUrlFromImage(nextImageData, deviceToken)}
@@ -798,9 +1290,13 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                     transform: bottomImageTransform,
                     // Hardware acceleration
                     backfaceVisibility: 'hidden',
-                    willChange: 'opacity, transform',
+                    willChange: shouldShowSoftGlow ? 'opacity, transform, filter' : 'opacity, transform',
+                    // Soft Glow: Add brightness filter
+                    filter: shouldShowSoftGlow ? `brightness(${imageBrightness})` : undefined,
                     // Optimized transition for Pi
-                    transition: 'opacity 300ms ease-out, transform 300ms ease-out'
+                    transition: shouldShowSoftGlow ? 
+                      `opacity ${opacityTransitionDuration} ease-in-out, transform 600ms ease-out, filter 1200ms ease-in-out` : 
+                      `opacity ${opacityTransitionDuration} ease-in-out, transform 600ms ease-out`
                   }}
                 onLoad={(e) => {
                   const img = e.target as HTMLImageElement;
@@ -910,7 +1406,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                     backfaceVisibility: 'hidden',
                     willChange: 'opacity',
                     // Smooth transition for opacity
-                    transition: 'opacity 300ms ease-out'
+                    transition: `opacity ${opacityTransitionDuration} ease-in-out`
                   }}
                   onLoad={(e) => {
                     const img = e.target as HTMLImageElement;
@@ -947,6 +1443,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
               </AmbientPulse>
             ) : shouldShowKenBurns ? (
               <KenBurnsPlus
+                key={`kenburns-${currentImage.id}`}
                 image={currentImage}
                 isActive={imageOpacity > 0.5}
                 displayInterval={settings.interval}
@@ -963,7 +1460,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                     backfaceVisibility: 'hidden',
                     willChange: 'opacity',
                     // Smooth transition for opacity
-                    transition: 'opacity 300ms ease-out'
+                    transition: `opacity ${opacityTransitionDuration} ease-in-out`
                   }}
                   onLoad={(e) => {
                     const img = e.target as HTMLImageElement;
@@ -1013,13 +1510,11 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
                   willChange: shouldShowSoftGlow ? 'opacity, filter' : 'opacity',
                   // Soft Glow: Add brightness filter
                   filter: shouldShowSoftGlow ? `brightness(${imageBrightness})` : undefined,
-                  // Use object-position for movement instead of transform
-                  objectPosition: shouldShowMovement && isCurrentImageLandscape ? movementObjectPosition : 'center',
-                  // Smooth transition for opacity, brightness, and object-position
+                  objectPosition: 'center',
+                  // Smooth transition for opacity and brightness
                   transition: shouldShowSoftGlow ? 
-                    'opacity 800ms ease-in-out, filter 1200ms ease-in-out' : 
-                    (shouldShowMovement && isCurrentImageLandscape ? 
-                      'opacity 300ms ease-out, object-position 30s ease-in-out' : 'opacity 300ms ease-out')
+                    `opacity ${opacityTransitionDuration} ease-in-out, filter 1200ms ease-in-out` : 
+                    `opacity ${opacityTransitionDuration} ease-in-out`
                 }}
               onLoad={(e) => {
                 const img = e.target as HTMLImageElement;
@@ -1060,6 +1555,28 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
             {!imagesLoaded.has(currentImage.id) && imageOpacity > 0 && (
               <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
                 <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            )}
+            
+            {/* Previous image overlay for crossfade effect (NOT used for Ken Burns - it fades to black) */}
+            {!shouldShowKenBurns && previousIndex !== null && images[previousIndex] && (
+              <div 
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  opacity: previousImageOpacity,
+                  transition: `opacity ${opacityTransitionDuration} ease-in-out`,
+                  zIndex: 10
+                }}
+              >
+                <img
+                  src={getSmartImageUrlFromImage(images[previousIndex], deviceToken)}
+                  alt={images[previousIndex].original_filename}
+                  className="w-full h-full object-cover"
+                  style={{
+                    transform: 'translateZ(0)',
+                    backfaceVisibility: 'hidden'
+                  }}
+                />
               </div>
             )}
           </>

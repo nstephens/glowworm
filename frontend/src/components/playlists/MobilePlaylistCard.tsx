@@ -66,8 +66,6 @@ export const MobilePlaylistCard: React.FC<MobilePlaylistCardProps> = ({
 
   const getDisplayModeLabel = (mode: string) => {
     switch (mode) {
-      case 'movement':
-        return 'Movement';
       case 'random':
         return 'Random';
       default:

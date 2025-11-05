@@ -153,9 +153,26 @@ async def logout(
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(
+    request: Request,
+    response: Response,
     current_user: User = Depends(require_auth)
 ):
     """Get current user information"""
+    # Ensure CSRF token is set
+    csrf_cookie = request.cookies.get(cookie_manager.CSRF_COOKIE)
+    if not csrf_cookie:
+        csrf_token = cookie_manager.generate_csrf_token()
+        cookie_config = cookie_manager._get_cookie_config(request)
+        csrf_cookie_config = cookie_config.copy()
+        csrf_cookie_config["httponly"] = False
+        response.set_cookie(
+            key=cookie_manager.CSRF_COOKIE,
+            value=csrf_token,
+            max_age=settings.cookie_max_age,
+            **csrf_cookie_config
+        )
+        logger.info(f"Set CSRF token for user {current_user.username}")
+    
     return UserResponse(**current_user.to_dict())
 
 @router.post("/register")

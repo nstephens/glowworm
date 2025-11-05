@@ -838,7 +838,7 @@ const Displays: React.FC = () => {
                       className="w-4 h-4 text-blue-600"
                     />
                     <span className="text-sm text-gray-700">
-                      Portrait {deviceToUpdate && deviceToUpdate.screen_height && deviceToUpdate.screen_width && deviceToUpdate.screen_height > deviceToUpdate.screen_width && '(Recommended)'}
+                      Portrait {deviceToUpdate && deviceToUpdate.screen_height && deviceToUpdate.screen_width && deviceToUpdate.screen_height > deviceToUpdate.screen_width * 1.05 && '(Recommended)'}
                     </span>
                   </label>
                   
@@ -859,7 +859,7 @@ const Displays: React.FC = () => {
                       className="w-4 h-4 text-blue-600"
                     />
                     <span className="text-sm text-gray-700">
-                      Landscape {deviceToUpdate && deviceToUpdate.screen_width && deviceToUpdate.screen_height && deviceToUpdate.screen_width > deviceToUpdate.screen_height && '(Recommended)'}
+                      Landscape {deviceToUpdate && deviceToUpdate.screen_width && deviceToUpdate.screen_height && deviceToUpdate.screen_width > deviceToUpdate.screen_height * 1.05 && '(Recommended)'}
                     </span>
                   </label>
                 </div>

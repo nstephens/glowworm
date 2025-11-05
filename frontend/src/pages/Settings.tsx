@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
-import { Save, Monitor, Database, User, Key, Plus, Trash2, AlertTriangle, Users, Settings as SettingsIcon, Server, Shield, Info, RefreshCw, Loader2 } from 'lucide-react';
+import { Save, Monitor, Database, User, Key, Plus, Trash2, AlertTriangle, Users, Settings as SettingsIcon, Server, Shield, Info, RefreshCw, Loader2, Wrench, Sparkles } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { apiService } from '../services/api';
 import { urlResolver } from '../services/urlResolver';
@@ -109,9 +109,11 @@ const Settings: React.FC = () => {
 
   const [newDisplaySize, setNewDisplaySize] = useState({ name: '', width: '', height: '' });
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'database' | 'admin' | 'oauth' | 'displays' | 'general' | 'users'>('general');
+  const [activeTab, setActiveTab] = useState<'database' | 'admin' | 'oauth' | 'displays' | 'general' | 'users' | 'utilities'>('general');
   const [resolutionSuggestions, setResolutionSuggestions] = useState<any[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [variantStatus, setVariantStatus] = useState<any[]>([]);
+  const [isLoadingVariantStatus, setIsLoadingVariantStatus] = useState(false);
   const [dockerEnv, setDockerEnv] = useState<DockerEnvironment>({
     isDocker: false,
     isDockerCompose: false,
@@ -123,12 +125,32 @@ const Settings: React.FC = () => {
   const [regenerationTaskId, setRegenerationTaskId] = useState<string | null>(null);
   const [initialProgress, setInitialProgress] = useState<RegenerationProgress | null>(null);
 
+  // Variant generation state
+  const [isGeneratingImageVariants, setIsGeneratingImageVariants] = useState(false);
+  const [isGeneratingPlaylistVariants, setIsGeneratingPlaylistVariants] = useState(false);
+  
+  // Track original display sizes for change detection
+  const [originalDisplaySizes, setOriginalDisplaySizes] = useState<string[]>([]);
+  
+  // Variant deletion confirmation
+  const [showVariantDeletionModal, setShowVariantDeletionModal] = useState(false);
+  const [resolutionToRemove, setResolutionToRemove] = useState<{id: string, resolution: string} | null>(null);
+  const [removedResolutions, setRemovedResolutions] = useState<string[]>([]); // Track resolutions to clean up on save
+
   // Load settings and detect Docker environment on component mount
   useEffect(() => {
     loadSettings();
     loadResolutionSuggestions();
+    loadVariantStatus();
     detectDockerEnvironment().then(setDockerEnv);
   }, []);
+
+  // Reload variant status when switching to displays tab
+  useEffect(() => {
+    if (activeTab === 'displays') {
+      loadVariantStatus();
+    }
+  }, [activeTab]);
 
   const loadResolutionSuggestions = async () => {
     try {
@@ -141,6 +163,20 @@ const Settings: React.FC = () => {
       console.error('Failed to load resolution suggestions:', error);
     } finally {
       setIsLoadingSuggestions(false);
+    }
+  };
+
+  const loadVariantStatus = async () => {
+    try {
+      setIsLoadingVariantStatus(true);
+      const response = await apiService.getVariantStatusByResolution();
+      if (response.success) {
+        setVariantStatus(response.status || []);
+      }
+    } catch (error) {
+      console.error('Failed to load variant status:', error);
+    } finally {
+      setIsLoadingVariantStatus(false);
     }
   };
 
@@ -184,6 +220,9 @@ const Settings: React.FC = () => {
       const response = await apiService.getSettings();
       if (response.success) {
         setSettings(response.settings);
+        // Store original display sizes for change detection
+        setOriginalDisplaySizes(response.settings.target_display_sizes || []);
+        
         // Update urlResolver with the loaded server URL
         if (response.settings.server_base_url) {
           urlResolver.updateServerUrl(response.settings.server_base_url);
@@ -277,11 +316,60 @@ const Settings: React.FC = () => {
           enableDebugLogging: settings.enable_debug_logging
         });
         
-        toast({
-          title: "Settings Saved",
-          description: "System settings have been updated successfully",
-          variant: "success",
-        });
+        // Check if display sizes have changed
+        const currentDisplaySizes = settings.target_display_sizes || [];
+        
+        // Check for ADDED resolutions (new ones that weren't in original)
+        const addedResolutions = currentDisplaySizes.filter(
+          size => !originalDisplaySizes.includes(size)
+        );
+        
+        // Clean up variants for removed resolutions
+        if (removedResolutions.length > 0) {
+          console.log('🧹 Cleaning up variants for removed resolutions:', removedResolutions);
+          try {
+            for (const resolution of removedResolutions) {
+              await apiService.deleteVariantsForResolution(resolution);
+            }
+            toast({
+              title: "Variants Cleaned Up",
+              description: `Removed variants for ${removedResolutions.length} resolution(s)`,
+            });
+          } catch (err: any) {
+            console.error('Failed to clean up variants:', err);
+            toast({
+              title: "Cleanup Warning",
+              description: "Some variants may not have been deleted. Check logs for details.",
+              variant: "warning",
+            });
+          }
+          setRemovedResolutions([]); // Clear the list
+        }
+        
+        if (addedResolutions.length > 0) {
+          // New resolutions added - automatically trigger variant regeneration
+          console.log('🆕 New resolutions detected:', addedResolutions);
+          
+          // Update the original sizes tracker
+          setOriginalDisplaySizes(currentDisplaySizes);
+          
+          // Trigger image variant regeneration and show progress modal
+          handleRegenerateResolutions();
+          
+          toast({
+            title: "Settings Saved",
+            description: `New resolution(s) added. Variant regeneration started automatically.`,
+            variant: "success",
+          });
+        } else {
+          // No new resolutions - just save settings
+          setOriginalDisplaySizes(currentDisplaySizes); // Still update the tracker
+          toast({
+            title: "Settings Saved",
+            description: "System settings have been updated successfully",
+            variant: "success",
+          });
+        }
       }
     } catch (err: any) {
       toast({
@@ -352,9 +440,16 @@ const Settings: React.FC = () => {
     
     const dimensionString = `${displaySize.width}x${displaySize.height}`;
     const isSelected = settings.target_display_sizes.includes(dimensionString);
-    const newDisplaySizes = isSelected
-      ? settings.target_display_sizes.filter(sizeId => sizeId !== dimensionString)
-      : [...settings.target_display_sizes, dimensionString];
+    
+    // If deselecting (removing), show confirmation modal
+    if (isSelected) {
+      setResolutionToRemove({ id, resolution: dimensionString });
+      setShowVariantDeletionModal(true);
+      return;
+    }
+    
+    // If selecting (adding), toggle immediately
+    const newDisplaySizes = [...settings.target_display_sizes, dimensionString];
     
     setSettings(prev => ({
       ...prev,
@@ -368,6 +463,35 @@ const Settings: React.FC = () => {
       // Settings API not available yet, just update local state
       console.log('Display sizes updated locally, will sync when API is available');
     }
+  };
+
+  const confirmRemoveResolution = () => {
+    if (!resolutionToRemove) return;
+    
+    const dimensionString = resolutionToRemove.resolution;
+    const newDisplaySizes = settings.target_display_sizes.filter(sizeId => sizeId !== dimensionString);
+    
+    setSettings(prev => ({
+      ...prev,
+      target_display_sizes: newDisplaySizes
+    }));
+    
+    // Track this resolution for cleanup on save
+    setRemovedResolutions(prev => [...prev, dimensionString]);
+    
+    setShowVariantDeletionModal(false);
+    setResolutionToRemove(null);
+    
+    toast({
+      title: "Resolution Removed",
+      description: `${dimensionString} will be removed and variants cleaned up when you save settings.`,
+      variant: "warning",
+    });
+  };
+
+  const cancelRemoveResolution = () => {
+    setShowVariantDeletionModal(false);
+    setResolutionToRemove(null);
   };
 
   const handleRegenerateResolutions = async () => {
@@ -804,11 +928,24 @@ const Settings: React.FC = () => {
 
       {/* Selected Display Sizes */}
       <div>
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Selected Display Sizes</h4>
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-sm font-medium text-gray-700">Selected Display Sizes</h4>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={loadVariantStatus}
+            disabled={isLoadingVariantStatus}
+            title="Refresh variant generation status"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoadingVariantStatus ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
         <div className="space-y-2">
           {displaySizes.map((size) => {
             const dimensionString = `${size.width}x${size.height}`;
             const isSelected = settings.target_display_sizes.includes(dimensionString);
+            const status = variantStatus.find(s => s.resolution === dimensionString);
+            
             return (
               <div
                 key={size.id}
@@ -816,28 +953,40 @@ const Settings: React.FC = () => {
                   isSelected ? 'border-primary-200 bg-primary-50' : 'border-gray-200 bg-white'
                 }`}
               >
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 flex-1">
                   <input
                     type="checkbox"
                     checked={isSelected}
                     onChange={() => handleToggleDisplaySize(size.id)}
                     className="w-4 h-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                   />
-                  <div>
+                  <div className="flex-1">
                     <div className="font-medium text-gray-900">{size.name}</div>
                     <div className="text-sm text-gray-500">
                       {size.width} × {size.height} pixels
                     </div>
+                    {isSelected && status && (
+                      <div className="text-xs text-gray-600 mt-1 flex items-center gap-3">
+                        <span className={status.images_with_variants === status.total_images ? 'text-green-600 font-medium' : ''}>
+                          📸 {status.images_with_variants}/{status.total_images} images
+                        </span>
+                        <span className={status.playlists_with_variants === status.total_playlists ? 'text-green-600 font-medium' : ''}>
+                          🎵 {status.playlists_with_variants}/{status.total_playlists} playlists
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
-                {size.isCustom && (
-                  <button
-                    onClick={() => handleRemoveDisplaySize(size.id)}
-                    className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {size.isCustom && (
+                    <button
+                      onClick={() => handleRemoveDisplaySize(size.id)}
+                      className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -1000,13 +1149,139 @@ const Settings: React.FC = () => {
     </div>
   );
 
+  const handleGenerateImageVariants = async () => {
+    // Use the same approach as handleRegenerateResolutions to show progress modal
+    handleRegenerateResolutions();
+  };
+
+  const handleGeneratePlaylistVariants = async () => {
+    try {
+      setIsGeneratingPlaylistVariants(true);
+      const response = await apiService.generateAllPlaylistVariants();
+      
+      const results = (response as any).results || {};
+      const totalVariants = results.variants_created || 0;
+      
+      toast({
+        title: 'Success',
+        description: `Generated ${totalVariants} playlist variants successfully`,
+      });
+    } catch (error: any) {
+      console.error('Failed to generate playlist variants:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to generate playlist variants',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingPlaylistVariants(false);
+    }
+  };
+
+  const renderUtilitiesSettings = () => (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+          <Wrench className="w-5 h-5 text-purple-600" />
+        </div>
+        <div>
+          <h3 className="text-lg font-medium">Utilities & Jobs</h3>
+          <p className="text-sm text-gray-500">Background tasks and maintenance operations</p>
+        </div>
+      </div>
+
+      {/* Image Variant Generation */}
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="text-sm font-medium text-purple-900 flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              Image Variant Generation
+            </h4>
+            <p className="text-sm text-purple-700 mt-1">
+              Generate resolution-optimized variants for all images to match your configured display sizes.
+              This improves performance on display devices.
+            </p>
+          </div>
+          <Button
+            onClick={handleGenerateImageVariants}
+            disabled={isGeneratingImageVariants}
+            variant="outline"
+            className="border-purple-300 text-purple-700 hover:bg-purple-100"
+          >
+            {isGeneratingImageVariants ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate Image Variants
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Playlist Variant Generation */}
+      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="text-sm font-medium text-indigo-900 flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              Playlist Variant Generation
+            </h4>
+            <p className="text-sm text-indigo-700 mt-1">
+              Generate resolution-optimized variants for all images in all playlists.
+              This pre-generates variants for efficient playlist serving.
+            </p>
+          </div>
+          <Button
+            onClick={handleGeneratePlaylistVariants}
+            disabled={isGeneratingPlaylistVariants}
+            variant="outline"
+            className="border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+          >
+            {isGeneratingPlaylistVariants ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate Playlist Variants
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Info box */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex gap-3">
+          <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-blue-900">
+            <p className="font-medium mb-1">Automatic Variant Generation</p>
+            <p className="text-blue-700">
+              Variants are automatically generated when you modify display sizes in Settings.
+              Use these buttons to manually regenerate variants if needed.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const tabs = [
     { id: 'general', label: 'General', icon: Monitor },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'database', label: 'Database', icon: Database },
     { id: 'admin', label: 'Admin', icon: User },
     { id: 'oauth', label: 'OAuth', icon: Key },
-    { id: 'displays', label: 'Displays', icon: Monitor }
+    { id: 'displays', label: 'Displays', icon: Monitor },
+    { id: 'utilities', label: 'Utilities', icon: Wrench }
   ];
 
   // Mobile layout with collapsible sections
@@ -1071,16 +1346,71 @@ const Settings: React.FC = () => {
           >
             {renderDisplaySettings()}
           </SettingsSection>
+
+          <SettingsSection
+            title="Utilities"
+            description="Background tasks and maintenance"
+            icon={<Wrench className="w-5 h-5" />}
+            defaultExpanded={activeTab === 'utilities'}
+          >
+            {renderUtilitiesSettings()}
+          </SettingsSection>
         </div>
 
         {/* Regeneration Progress Modal */}
         {regenerationTaskId && (
           <RegenerationProgressModal
             isOpen={showProgressModal}
-            onClose={() => setShowProgressModal(false)}
+            onClose={() => {
+              setShowProgressModal(false);
+              loadVariantStatus(); // Refresh variant status after regeneration
+            }}
             taskId={regenerationTaskId}
             initialProgress={initialProgress}
           />
+        )}
+
+        {/* Variant Deletion Confirmation Modal */}
+        {showVariantDeletionModal && resolutionToRemove && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+              <div className="flex items-start gap-4 mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Remove Resolution & Delete Variants?
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Removing <span className="font-mono font-semibold">{resolutionToRemove.resolution}</span> will delete all generated variants for this resolution, including:
+                  </p>
+                  <ul className="text-sm text-gray-600 space-y-1 ml-4 mb-4">
+                    <li>• Scaled image files for all images</li>
+                    <li>• Playlist variants for all playlists</li>
+                  </ul>
+                  <p className="text-sm text-red-600 font-medium">
+                    This action cannot be undone. The variants will be deleted when you save settings.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <Button
+                  onClick={cancelRemoveResolution}
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmRemoveResolution}
+                  variant="destructive"
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Remove & Delete Variants
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
       </MobileSettingsWrapper>
     );
@@ -1089,9 +1419,6 @@ const Settings: React.FC = () => {
   // Desktop layout with tabs
   return (
     <div className="space-y-8">
-      
-      {/* Header */}
-
       {/* Tabs */}
       <Card className="border-0 shadow-lg bg-card/50 backdrop-blur-sm">
         <CardContent className="p-0">
@@ -1125,6 +1452,7 @@ const Settings: React.FC = () => {
           {activeTab === 'admin' && renderAdminSettings()}
           {activeTab === 'oauth' && renderOAuthSettings()}
           {activeTab === 'displays' && renderDisplaySettings()}
+          {activeTab === 'utilities' && renderUtilitiesSettings()}
         </CardContent>
       </Card>
 
@@ -1144,10 +1472,56 @@ const Settings: React.FC = () => {
       {regenerationTaskId && (
         <RegenerationProgressModal
           isOpen={showProgressModal}
-          onClose={() => setShowProgressModal(false)}
+          onClose={() => {
+            setShowProgressModal(false);
+            loadVariantStatus(); // Refresh variant status after regeneration
+          }}
           taskId={regenerationTaskId}
           initialProgress={initialProgress}
         />
+      )}
+
+      {/* Variant Deletion Confirmation Modal */}
+      {showVariantDeletionModal && resolutionToRemove && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Remove Resolution & Delete Variants?
+                </h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  Removing <span className="font-mono font-semibold">{resolutionToRemove.resolution}</span> will delete all generated variants for this resolution, including:
+                </p>
+                <ul className="text-sm text-gray-600 space-y-1 ml-4 mb-4">
+                  <li>• Scaled image files for all images</li>
+                  <li>• Playlist variants for all playlists</li>
+                </ul>
+                <p className="text-sm text-red-600 font-medium">
+                  This action cannot be undone. The variants will be deleted when you save settings.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button
+                onClick={cancelRemoveResolution}
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmRemoveResolution}
+                variant="destructive"
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Remove & Delete Variants
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

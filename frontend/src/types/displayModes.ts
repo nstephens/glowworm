@@ -6,9 +6,8 @@
  */
 
 export enum DisplayMode {
-  // Original modes
+  // Original mode
   DEFAULT = 'default',
-  MOVEMENT = 'movement',
   
   // Tier 1: Raspberry Pi Safe (30fps)
   KEN_BURNS_PLUS = 'ken_burns_plus',
@@ -60,15 +59,6 @@ export const DISPLAY_MODE_CONFIGS: Record<DisplayMode, DisplayModeConfig> = {
     emotionalTone: 'Classic',
     tier: PerformanceTier.TIER_1,
     supportsSplitScreen: true
-  },
-  
-  [DisplayMode.MOVEMENT]: {
-    mode: DisplayMode.MOVEMENT,
-    displayName: 'Movement (Legacy)',
-    description: 'Ken Burns-style pan for landscape images',
-    emotionalTone: 'Dynamic',
-    tier: PerformanceTier.TIER_1,
-    landscapeOnly: true
   },
   
   [DisplayMode.KEN_BURNS_PLUS]: {

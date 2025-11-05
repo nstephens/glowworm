@@ -30,6 +30,8 @@ import PlaylistDetailHeader from './components/PlaylistDetailHeader';
 import ImagesPageHeader from './components/ImagesHeader';
 import DisplaysHeader from './components/DisplaysHeader';
 import PlaylistsHeader from './components/PlaylistsHeader';
+import AdminLogsHeader from './components/AdminLogsHeader';
+import SettingsHeader from './components/SettingsHeader';
 
 // Wrapper component for Images with custom header
 const ImagesWithHeader: React.FC = () => {
@@ -62,6 +64,59 @@ const ImagesWithHeader: React.FC = () => {
   );
 };
 
+// Wrapper component for Playlists with custom header
+const PlaylistsWithHeader: React.FC = () => {
+  const [playlistCount, setPlaylistCount] = useState(0);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const handlePlaylistsLoad = (count: number) => {
+    setPlaylistCount(count);
+  };
+
+  const headerContent = (
+    <PlaylistsHeader 
+      playlistCount={playlistCount}
+      onCreateClick={() => setShowCreateModal(true)}
+    />
+  );
+
+  return (
+    <AdminLayout headerContent={headerContent}>
+      <Playlists 
+        onPlaylistsLoad={handlePlaylistsLoad}
+        showCreateModal={showCreateModal}
+        setShowCreateModal={setShowCreateModal}
+      />
+    </AdminLayout>
+  );
+};
+
+// Wrapper component for Displays with custom header
+const DisplaysWithHeader: React.FC = () => {
+  const [activeCount, setActiveCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const handleDisplaysLoad = (active: number, pending: number) => {
+    setActiveCount(active);
+    setPendingCount(pending);
+  };
+
+  const headerContent = (
+    <DisplaysHeader 
+      activeCount={activeCount}
+      pendingCount={pendingCount}
+    />
+  );
+
+  return (
+    <AdminLayout headerContent={headerContent}>
+      <Displays 
+        onDisplaysLoad={handleDisplaysLoad}
+      />
+    </AdminLayout>
+  );
+};
+
 function AppContent() {
   const { isConfigured, needsBootstrap, needsAdmin, isLoading } = useSetup();
 
@@ -86,12 +141,12 @@ function AppContent() {
             <Route path="/login" element={<Login />} />
             <Route path="/admin" element={<ProtectedRoute><AdminLayout headerContent={<AdminDashboardHeader />}><AdminDashboard /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/images" element={<ProtectedRoute><ImagesWithHeader /></ProtectedRoute>} />
-            <Route path="/admin/playlists" element={<ProtectedRoute><AdminLayout><Playlists /></AdminLayout></ProtectedRoute>} />
+            <Route path="/admin/playlists" element={<ProtectedRoute><PlaylistsWithHeader /></ProtectedRoute>} />
             <Route path="/admin/playlists/:slug" element={<ProtectedRoute><AdminLayout headerContent={<PlaylistDetailHeader />}><PlaylistDetail /></AdminLayout></ProtectedRoute>} />
-            <Route path="/admin/displays" element={<ProtectedRoute><AdminLayout headerContent={<DisplaysHeader />}><Displays /></AdminLayout></ProtectedRoute>} />
+            <Route path="/admin/displays" element={<ProtectedRoute><DisplaysWithHeader /></ProtectedRoute>} />
             <Route path="/admin/displays/logs" element={<ProtectedRoute><AdminLayout><DisplayLogs /></AdminLayout></ProtectedRoute>} />
-            <Route path="/admin/logs" element={<AdminProtectedRoute><AdminLayout><AdminLogs /></AdminLayout></AdminProtectedRoute>} />
-            <Route path="/admin/settings" element={<AdminProtectedRoute><AdminLayout><Settings /></AdminLayout></AdminProtectedRoute>} />
+            <Route path="/admin/logs" element={<AdminProtectedRoute><AdminLayout headerContent={<AdminLogsHeader />}><AdminLogs /></AdminLayout></AdminProtectedRoute>} />
+            <Route path="/admin/settings" element={<AdminProtectedRoute><AdminLayout headerContent={<SettingsHeader />}><Settings /></AdminLayout></AdminProtectedRoute>} />
             <Route path="/display" element={<DisplayRegistration />} />
             <Route path="/display/:slug" element={<DisplayView />} />
             {/* Redirect setup routes to home if already configured */}

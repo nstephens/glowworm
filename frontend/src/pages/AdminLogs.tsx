@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { ArrowLeft, RefreshCw, AlertCircle, Info, AlertTriangle, Bug, Zap, Filter, Copy, CheckCircle2, Monitor, Server, Globe, User } from 'lucide-react';
+import { ArrowLeft, RefreshCw, AlertCircle, Info, AlertTriangle, Bug, Zap, Filter, Copy, CheckCircle2, Monitor, Server, Globe, User, Trash2 } from 'lucide-react';
 import { urlResolver } from '../services/urlResolver';
+import { useToast } from '../hooks/use-toast';
 
 interface DeviceLog {
   id: number;
@@ -43,9 +44,11 @@ type LogTab = 'display' | 'backend' | 'frontend' | 'user';
 
 const AdminLogs: React.FC = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<LogTab>('display');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isClearing, setIsClearing] = useState(false);
   
   // Display logs
   const [displayLogs, setDisplayLogs] = useState<DeviceLog[]>([]);
@@ -105,11 +108,14 @@ const AdminLogs: React.FC = () => {
     }
   };
 
-  const fetchDisplayLogs = async () => {
+  const fetchDisplayLogs = async (overrideFilters?: Partial<typeof displayFilters>) => {
+    const filters = { ...displayFilters, ...overrideFilters };
     const params = new URLSearchParams();
-    if (displayFilters.deviceId) params.append('device_id', displayFilters.deviceId.toString());
-    if (displayFilters.logLevel) params.append('log_level', displayFilters.logLevel);
-    params.append('limit', displayFilters.limit.toString());
+    if (filters.deviceId) params.append('device_id', filters.deviceId.toString());
+    if (filters.logLevel) params.append('log_level', filters.logLevel);
+    params.append('limit', filters.limit.toString());
+
+    console.log('[DISPLAY_LOGS] Fetching with filter:', filters.logLevel);
 
     const response = await fetch(urlResolver.getApiUrl(`/display-devices/admin/logs?${params}`), {
       credentials: 'include',
@@ -117,6 +123,10 @@ const AdminLogs: React.FC = () => {
 
     if (!response.ok) throw new Error('Failed to fetch display logs');
     const data = await response.json();
+    console.log('[DISPLAY_LOGS] Received', data.length, 'logs');
+    if (data.length > 0) {
+      console.log('[DISPLAY_LOGS] First 3 log levels:', data.slice(0, 3).map((l: any) => l.log_level));
+    }
     setDisplayLogs(data);
   };
 
@@ -282,26 +292,100 @@ const AdminLogs: React.FC = () => {
     }
   };
 
+  const clearCurrentTabLogs = async () => {
+    if (!confirm(`Are you sure you want to clear all ${activeTab} logs? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setIsClearing(true);
+      let endpoint = '';
+      
+      switch (activeTab) {
+        case 'display':
+          endpoint = '/display-devices/admin/logs';
+          break;
+        case 'backend':
+          endpoint = '/logs/backend';
+          break;
+        case 'frontend':
+          endpoint = '/logs/frontend';
+          break;
+        case 'user':
+          endpoint = '/logs/user';
+          break;
+      }
+
+      const response = await fetch(urlResolver.getApiUrl(endpoint), {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) throw new Error('Failed to clear logs');
+      
+      const data = await response.json();
+      
+      toast({
+        title: 'Logs Cleared',
+        description: data.message || `${activeTab} logs cleared successfully`,
+      });
+
+      // Refresh the logs
+      await fetchLogs();
+      
+    } catch (err) {
+      console.error('Failed to clear logs:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to clear logs',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  const clearAllLogs = async () => {
+    if (!confirm('Are you sure you want to clear ALL logs (display, user, backend, frontend)? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setIsClearing(true);
+
+      const response = await fetch(urlResolver.getApiUrl('/logs/all'), {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) throw new Error('Failed to clear all logs');
+      
+      const data = await response.json();
+      
+      toast({
+        title: 'All Logs Cleared',
+        description: data.message || 'All logs cleared successfully',
+      });
+
+      // Refresh the current tab
+      await fetchLogs();
+      
+    } catch (err) {
+      console.error('Failed to clear all logs:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to clear all logs',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/admin')}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">System Logs</h1>
-            <p className="text-gray-600">Monitor and troubleshoot system activity</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
+      {/* Action Bar */}
+      <div className="flex items-center justify-end gap-2">
           {selectedIds.size > 0 && (
             <Button
               onClick={exportLogs}
@@ -321,6 +405,15 @@ const AdminLogs: React.FC = () => {
             </Button>
           )}
           <Button
+            onClick={clearAllLogs}
+            disabled={isClearing || isLoading}
+            variant="destructive"
+            className="flex items-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            Clear All Logs
+          </Button>
+          <Button
             onClick={fetchLogs}
             disabled={isLoading}
             variant="outline"
@@ -330,7 +423,6 @@ const AdminLogs: React.FC = () => {
             Refresh
           </Button>
         </div>
-      </div>
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
@@ -406,8 +498,10 @@ const AdminLogs: React.FC = () => {
                   <select
                     value={displayFilters.logLevel}
                     onChange={(e) => {
-                      setDisplayFilters({ ...displayFilters, logLevel: e.target.value });
-                      setTimeout(fetchDisplayLogs, 100);
+                      const newLevel = e.target.value;
+                      setDisplayFilters({ ...displayFilters, logLevel: newLevel });
+                      setDisplayLogs([]); // Clear stale data immediately
+                      fetchDisplayLogs({ logLevel: newLevel }); // Pass new value directly
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
@@ -423,8 +517,9 @@ const AdminLogs: React.FC = () => {
                   <select
                     value={displayFilters.limit}
                     onChange={(e) => {
-                      setDisplayFilters({ ...displayFilters, limit: parseInt(e.target.value) });
-                      setTimeout(fetchDisplayLogs, 100);
+                      const newLimit = parseInt(e.target.value);
+                      setDisplayFilters({ ...displayFilters, limit: newLimit });
+                      fetchDisplayLogs({ limit: newLimit }); // Pass new value directly
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
@@ -441,7 +536,19 @@ const AdminLogs: React.FC = () => {
           {/* Display Logs Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Device Logs ({displayLogs.length})</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Device Logs ({displayLogs.length})</CardTitle>
+                <Button
+                  onClick={clearCurrentTabLogs}
+                  disabled={isClearing || isLoading || displayLogs.length === 0}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Clear Display Logs
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {displayLogs.length === 0 ? (
@@ -550,7 +657,9 @@ const AdminLogs: React.FC = () => {
                   <select
                     value={userFilters.logLevel}
                     onChange={(e) => {
-                      setUserFilters({ ...userFilters, logLevel: e.target.value });
+                      const newLevel = e.target.value;
+                      setUserFilters({ ...userFilters, logLevel: newLevel });
+                      setUserLogs([]); // Clear stale data immediately
                       setTimeout(fetchUserLogs, 100);
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
@@ -583,7 +692,19 @@ const AdminLogs: React.FC = () => {
           {/* User Logs Table */}
           <Card>
             <CardHeader>
-              <CardTitle>User Activity ({userLogs.length})</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>User Activity ({userLogs.length})</CardTitle>
+                <Button
+                  onClick={clearCurrentTabLogs}
+                  disabled={isClearing || isLoading || userLogs.length === 0}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Clear User Logs
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {userLogs.length === 0 ? (
@@ -670,7 +791,19 @@ const AdminLogs: React.FC = () => {
           {/* File Logs Display */}
           <Card>
             <CardHeader>
-              <CardTitle>{activeTab === 'backend' ? 'Backend' : 'Frontend'} Logs ({fileLogs.length} lines)</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>{activeTab === 'backend' ? 'Backend' : 'Frontend'} Logs ({fileLogs.length} lines)</CardTitle>
+                <Button
+                  onClick={clearCurrentTabLogs}
+                  disabled={isClearing || isLoading || fileLogs.length === 0}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Clear {activeTab === 'backend' ? 'Backend' : 'Frontend'} Logs
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {fileLogs.length === 0 ? (

@@ -44,6 +44,8 @@ export interface KenBurnsPlusProps {
   children: React.ReactNode;
   /** Class name for the wrapper */
   className?: string;
+  /** If true, don't control opacity (for use with external opacity management) */
+  externalOpacityControl?: boolean;
 }
 
 /**
@@ -84,8 +86,8 @@ const generateKenBurnsConfig = (
     };
   }
 
-  // Slower movement: 35-45 seconds (was 25-35)
-  const duration = (displayInterval * 1.17 + Math.random() * displayInterval * 0.33) * 1000;
+  // Subtle, slow movement for immersive effect: 70-90 seconds (doubled from 35-45s)
+  const duration = (displayInterval * 2.34 + Math.random() * displayInterval * 0.66) * 1000;
 
   return {
     zoomDirection,
@@ -107,7 +109,8 @@ export const KenBurnsPlus: React.FC<KenBurnsPlusProps> = ({
   displayInterval,
   config: configOverride,
   children,
-  className = ''
+  className = '',
+  externalOpacityControl = false
 }) => {
   // Generate configuration once per image
   const config = useMemo(
@@ -125,52 +128,111 @@ export const KenBurnsPlus: React.FC<KenBurnsPlusProps> = ({
     opacity: 0.0,  // Start invisible for fade-in
     isAnimating: false
   });
+  
+  // Track if animation has started for this image to prevent restarts
+  const [hasStarted, setHasStarted] = useState(false);
 
+  // Reset hasStarted when image changes
+  useEffect(() => {
+    console.log(`🎬 KB+ [${image.id}]: New image - resetting hasStarted`);
+    setHasStarted(false);
+  }, [image.id]);
+  
   // Start animation when image becomes active
   useEffect(() => {
-    if (!isActive) {
-      // Reset to initial state when not active
-      setState({
-        scale: config.zoomDirection === 'in' ? 1.15 : 1.3,  // Start more zoomed in
-        objectPosition: config.zoomDirection === 'in' ? 'center' : `${config.panTarget.x}% ${config.panTarget.y}%`,
-        rotation: config.zoomDirection === 'in' ? -config.rotation : config.rotation,
-        opacity: 0.0,  // Fade out
-        isAnimating: false
-      });
+    console.log(`🎬 KB+ [${image.id}]: Effect triggered - isActive=${isActive}, externalControl=${externalOpacityControl}, hasStarted=${hasStarted}`);
+    
+    // Prevent restarting animation if it's already been started for this image
+    if (hasStarted && !externalOpacityControl) {
+      console.log(`🎬 KB+ [${image.id}]: Animation already started - skipping restart`);
       return;
     }
-
-    // Small delay to ensure initial state is rendered before animation starts
-    const startDelay = setTimeout(() => {
+    
+    if (externalOpacityControl) {
+      // For external opacity, wait for isActive to be true before starting animation
+      if (!isActive) {
+        // Reset to initial state when not active
+        console.log(`🎬 KB+ [${image.id}]: NOT ACTIVE - resetting to initial state`);
+        setState({
+          scale: config.zoomDirection === 'in' ? 1.15 : 1.3,
+          objectPosition: config.zoomDirection === 'in' ? 'center' : `${config.panTarget.x}% ${config.panTarget.y}%`,
+          rotation: config.zoomDirection === 'in' ? -config.rotation : config.rotation,
+          opacity: 1.0,  // Always visible
+          isAnimating: false
+        });
+        return;
+      }
+      
+      // Start animation immediately when active
+      console.log(`🎬 KB+ [${image.id}]: ACTIVE - setting initial position (${config.zoomDirection} ${config.zoomDirection === 'in' ? 'from center' : 'from offset'})`);
       setState({
-        scale: config.zoomDirection === 'in' ? 1.3 : 1.15,  // End more zoomed in
-        objectPosition: config.zoomDirection === 'in' ? `${config.panTarget.x}% ${config.panTarget.y}%` : 'center',
-        rotation: config.zoomDirection === 'in' ? config.rotation : -config.rotation,
-        opacity: 1.0,  // Fade in
-        isAnimating: true
+        scale: config.zoomDirection === 'in' ? 1.15 : 1.3,
+        objectPosition: config.zoomDirection === 'in' ? 'center' : `${config.panTarget.x}% ${config.panTarget.y}%`,
+        rotation: config.zoomDirection === 'in' ? -config.rotation : config.rotation,
+        opacity: 1.0,  // Always visible
+        isAnimating: false
       });
-    }, 50);
+      
+      // Start animation on next frame to ensure initial state renders
+      requestAnimationFrame(() => {
+        console.log(`🎬 KB+ [${image.id}]: Starting animation to ${config.zoomDirection === 'in' ? 'offset' : 'center'}, scale: ${config.zoomDirection === 'in' ? 1.3 : 1.15}, duration: ${config.duration}ms`);
+        setState({
+          scale: config.zoomDirection === 'in' ? 1.3 : 1.15,
+          objectPosition: config.zoomDirection === 'in' ? `${config.panTarget.x}% ${config.panTarget.y}%` : 'center',
+          rotation: config.zoomDirection === 'in' ? config.rotation : -config.rotation,
+          opacity: 1.0,
+          isAnimating: true
+        });
+      });
+    } else {
+      // For internal opacity control, use delay for fade-in
+      console.log(`🎬 KB+ [${image.id}]: Internal control - setting initial position (${config.zoomDirection} ${config.zoomDirection === 'in' ? 'from center' : 'from offset'}), opacity 0`);
+      setState({
+        scale: config.zoomDirection === 'in' ? 1.15 : 1.3,
+        objectPosition: config.zoomDirection === 'in' ? 'center' : `${config.panTarget.x}% ${config.panTarget.y}%`,
+        rotation: config.zoomDirection === 'in' ? -config.rotation : config.rotation,
+        opacity: 0.0,
+        isAnimating: false
+      });
 
-    return () => clearTimeout(startDelay);
-  }, [isActive, config, image.id]);
+      const startDelay = setTimeout(() => {
+        console.log(`🎬 KB+ [${image.id}]: Internal control - starting fade + animation to ${config.zoomDirection === 'in' ? 'offset' : 'center'}, scale: ${config.zoomDirection === 'in' ? 1.3 : 1.15}, duration: ${config.duration}ms`);
+        setState({
+          scale: config.zoomDirection === 'in' ? 1.3 : 1.15,
+          objectPosition: config.zoomDirection === 'in' ? `${config.panTarget.x}% ${config.panTarget.y}%` : 'center',
+          rotation: config.zoomDirection === 'in' ? config.rotation : -config.rotation,
+          opacity: 1.0,
+          isAnimating: true
+        });
+        setHasStarted(true);
+      }, 50);
 
-  const transformStyle = state.isAnimating ? {
-    transform: `scale(${state.scale}) rotate(${state.rotation}deg)`,
+      return () => clearTimeout(startDelay);
+    }
+  }, [config, image.id, externalOpacityControl, isActive, hasStarted]);
+
+  const transformStyle: any = state.isAnimating ? {
+    transform: `scale(${state.scale}) rotate(${state.rotation}deg) translateZ(0)`,  // Add translateZ for hardware acceleration
     objectPosition: state.objectPosition,
-    opacity: state.opacity,
-    transition: `transform ${config.duration}ms cubic-bezier(0.25, 0.1, 0.25, 1.0), object-position ${config.duration}ms cubic-bezier(0.25, 0.1, 0.25, 1.0), opacity 800ms ease-in-out`,
-    willChange: 'transform, object-position, opacity',
+    transition: externalOpacityControl
+      ? `transform ${config.duration}ms cubic-bezier(0.25, 0.1, 0.25, 1.0), object-position ${config.duration}ms cubic-bezier(0.25, 0.1, 0.25, 1.0)`
+      : `transform ${config.duration}ms cubic-bezier(0.25, 0.1, 0.25, 1.0), object-position ${config.duration}ms cubic-bezier(0.25, 0.1, 0.25, 1.0), opacity 800ms ease-in-out`,
+    willChange: externalOpacityControl ? 'transform, object-position' : 'transform, object-position, opacity',
     backfaceVisibility: 'hidden' as const,
     transformStyle: 'preserve-3d' as const
   } : {
-    transform: `scale(${state.scale}) rotate(${state.rotation}deg)`,
+    transform: `scale(${state.scale}) rotate(${state.rotation}deg) translateZ(0)`,  // Add translateZ for hardware acceleration
     objectPosition: state.objectPosition,
-    opacity: state.opacity,
-    transition: 'opacity 800ms ease-in-out',
-    willChange: 'transform, object-position, opacity',
+    transition: externalOpacityControl ? 'none' : 'opacity 800ms ease-in-out',
+    willChange: externalOpacityControl ? 'transform, object-position' : 'transform, object-position, opacity',
     backfaceVisibility: 'hidden' as const,
     transformStyle: 'preserve-3d' as const
   };
+  
+  // Only control opacity if not externally controlled
+  if (!externalOpacityControl) {
+    transformStyle.opacity = state.opacity;
+  }
 
   return (
     <div 

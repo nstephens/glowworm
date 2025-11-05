@@ -32,6 +32,10 @@ class PlaylistUpdateRequest(BaseModel):
 class PlaylistReorderRequest(BaseModel):
     image_ids: List[int]
 
+class PlaylistRandomizeRequest(BaseModel):
+    display_orientation: Optional[str] = 'portrait'
+    preserve_pairing: Optional[bool] = True
+
 router = APIRouter(prefix="/api/playlists", tags=["playlists"])
 
 @router.post("/")
@@ -556,6 +560,7 @@ async def validate_playlist_order(
 async def randomize_playlist(
     request: Request,
     playlist_id: int,
+    randomize_data: PlaylistRandomizeRequest = PlaylistRandomizeRequest(),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -564,10 +569,8 @@ async def randomize_playlist(
         # CSRF protection
         csrf_protection.require_csrf_token(request)
         
-        # Get request body for display orientation
-        body = await request.json()
-        display_orientation = body.get('display_orientation', 'portrait')
-        preserve_pairing = body.get('preserve_pairing', True)
+        display_orientation = randomize_data.display_orientation
+        preserve_pairing = randomize_data.preserve_pairing
         
         from services.image_pairing_service import image_classification_service
         from models.image import Image

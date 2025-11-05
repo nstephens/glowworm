@@ -95,3 +95,23 @@ def write_frontend_log(log_level: str, message: str, context: dict = None):
     except Exception as e:
         logging.error(f"Failed to write frontend log: {e}")
 
+def clear_log_file(log_type: str) -> bool:
+    """Clear a log file by truncating it"""
+    log_file = get_log_file_path(log_type)
+    
+    if not log_file.exists():
+        logging.warning(f"Log file does not exist: {log_file}")
+        return False
+    
+    try:
+        # Truncate the file
+        with open(log_file, 'w', encoding='utf-8') as f:
+            f.write("")  # Clear the file
+        
+        logging.info(f"Cleared log file: {log_file}")
+        return True
+        
+    except Exception as e:
+        logging.error(f"Failed to clear log file {log_file}: {e}")
+        return False
+

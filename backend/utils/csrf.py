@@ -36,16 +36,22 @@ class CSRFProtection:
         """Validate CSRF token for request"""
         from utils.cookies import cookie_manager
         
+        logger.info(f"🔒 CSRF Validation - Method: {request.method}, Path: {request.url.path}")
+        
         # Skip CSRF validation for exempt endpoints
         if CSRFProtection.is_exempt_endpoint(request.url.path):
+            logger.info(f"✅ CSRF skipped - exempt endpoint: {request.url.path}")
             return True
         
         # Skip CSRF validation for non-protected methods
         if not CSRFProtection.is_protected_method(request.method):
+            logger.info(f"✅ CSRF skipped - non-protected method: {request.method}")
             return True
         
         # Validate CSRF token
-        return cookie_manager.validate_csrf_token(request, token)
+        result = cookie_manager.validate_csrf_token(request, token)
+        logger.info(f"🔒 CSRF token validation result: {result}")
+        return result
     
     @staticmethod
     def require_csrf_token(request: Request, token: Optional[str] = None) -> None:

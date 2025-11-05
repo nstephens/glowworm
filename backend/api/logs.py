@@ -271,3 +271,99 @@ async def get_user_logs(
         logger.error(f"Get user logs failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to get user logs")
 
+# Clear/Delete log endpoints
+@router.delete("/user")
+async def clear_user_logs(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Clear all user logs from database (admin only)"""
+    try:
+        count = db.query(UserLog).delete()
+        db.commit()
+        
+        logger.info(f"Cleared {count} user log entries by admin {current_user.username}")
+        
+        return {"success": True, "message": f"Cleared {count} user log entries", "count": count}
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Clear user logs failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear user logs")
+
+@router.delete("/frontend")
+async def clear_frontend_logs(
+    current_user: User = Depends(require_admin),
+):
+    """Clear frontend log file (admin only)"""
+    try:
+        from utils.file_logger import clear_log_file
+        cleared = clear_log_file("frontend")
+        
+        if cleared:
+            logger.info(f"Frontend logs cleared by admin {current_user.username}")
+            return {"success": True, "message": "Frontend logs cleared"}
+        else:
+            return {"success": False, "message": "No frontend log file found"}
+        
+    except Exception as e:
+        logger.error(f"Clear frontend logs failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear frontend logs")
+
+@router.delete("/backend")
+async def clear_backend_logs(
+    current_user: User = Depends(require_admin),
+):
+    """Clear backend log file (admin only)"""
+    try:
+        from utils.file_logger import clear_log_file
+        cleared = clear_log_file("backend")
+        
+        if cleared:
+            logger.info(f"Backend logs cleared by admin {current_user.username}")
+            return {"success": True, "message": "Backend logs cleared"}
+        else:
+            return {"success": False, "message": "No backend log file found"}
+        
+    except Exception as e:
+        logger.error(f"Clear backend logs failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear backend logs")
+
+@router.delete("/all")
+async def clear_all_logs(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Clear all logs (user logs, display logs, frontend logs, backend logs) - admin only"""
+    try:
+        results = {}
+        
+        # Clear user logs from DB
+        user_count = db.query(UserLog).delete()
+        db.commit()
+        results['user_logs'] = user_count
+        
+        # Clear display device logs from DB
+        from models.device_log import DeviceLog
+        display_count = db.query(DeviceLog).delete()
+        db.commit()
+        results['display_logs'] = display_count
+        
+        # Clear file logs
+        from utils.file_logger import clear_log_file
+        results['frontend_cleared'] = clear_log_file("frontend")
+        results['backend_cleared'] = clear_log_file("backend")
+        
+        logger.warning(f"ALL LOGS CLEARED by admin {current_user.username}: {user_count} user logs, {display_count} display logs")
+        
+        return {
+            "success": True,
+            "message": f"Cleared all logs: {user_count} user logs, {display_count} display logs, frontend file, backend file",
+            "details": results
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Clear all logs failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear all logs")
+

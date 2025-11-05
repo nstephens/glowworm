@@ -4,10 +4,14 @@ from typing import Dict, Any, List
 from pydantic import BaseModel
 import json
 import os
+import logging
+import traceback
 from models import get_db, User
 from models.display_device import DisplayDevice
 from utils.middleware import require_auth
 from services.database_config_service import DatabaseConfigService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["settings"])
 
@@ -34,6 +38,8 @@ async def get_settings(
         
         return {"success": True, "settings": all_settings}
     except Exception as e:
+        logger.error(f"❌ Settings API Error: {str(e)}")
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to load settings: {str(e)}")
 
 @router.put("/settings")
@@ -176,7 +182,180 @@ async def get_display_size_suggestions(
         }
         
     except Exception as e:
+        logger.error(f"❌ Display Size Suggestions API Error: {str(e)}")
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to get display size suggestions: {str(e)}")
+
+@router.get("/settings/display-sizes/variant-status")
+async def get_variant_status_by_resolution(
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """Get variant generation status for each configured display size"""
+    try:
+        from pathlib import Path
+        from models.image import Image
+        from models.playlist import Playlist
+        from models.playlist_variant import PlaylistVariant
+        from services.image_storage_service import image_storage_service
+        from config.settings import settings as config_settings
+        
+        # Get configured display sizes
+        display_sizes = image_storage_service._load_display_sizes()
+        
+        # Get total counts
+        total_images = db.query(Image).count()
+        total_playlists = db.query(Playlist).count()
+        
+        status_by_resolution = []
+        
+        for width, height in display_sizes:
+            resolution_str = f"{width}x{height}"
+            
+            # Count images with scaled variants for this resolution
+            images = db.query(Image).all()
+            images_with_variants = 0
+            images_eligible_for_scaling = 0
+            
+            upload_path = Path(config_settings.upload_path)
+            scaled_dir = upload_path / "scaled"
+            
+            for image in images:
+                # Only count images that are large enough to be scaled to this resolution
+                # (matching the logic in regeneration that skips scale-ups)
+                if image.width and image.height and (width > image.width or height > image.height):
+                    # Image is too small for this resolution, skip
+                    continue
+                
+                images_eligible_for_scaling += 1
+                
+                # Check if scaled file exists
+                if image.filename:
+                    stem = Path(image.filename).stem
+                    suffix = Path(image.filename).suffix
+                    # Scaled images are stored as: originalname_1080x1920.jpg in /uploads/scaled/
+                    scaled_filename = f"{stem}_{resolution_str}{suffix}"
+                    scaled_path = scaled_dir / scaled_filename
+                    
+                    if scaled_path.exists():
+                        images_with_variants += 1
+            
+            # Update total to reflect only eligible images for this resolution
+            total_images_for_resolution = images_eligible_for_scaling
+            
+            # Count playlists with variants for this resolution
+            # Use subquery to count distinct playlist_ids
+            from sqlalchemy import func
+            playlists_with_variants = db.query(
+                func.count(func.distinct(PlaylistVariant.playlist_id))
+            ).filter(
+                PlaylistVariant.target_width == width,
+                PlaylistVariant.target_height == height
+            ).scalar() or 0
+            
+            status_by_resolution.append({
+                "resolution": resolution_str,
+                "width": width,
+                "height": height,
+                "images_with_variants": images_with_variants,
+                "total_images": total_images_for_resolution,
+                "playlists_with_variants": playlists_with_variants,
+                "total_playlists": total_playlists,
+                "images_percentage": round((images_with_variants / total_images_for_resolution * 100) if total_images_for_resolution > 0 else 0, 1),
+                "playlists_percentage": round((playlists_with_variants / total_playlists * 100) if total_playlists > 0 else 0, 1)
+            })
+        
+        return {
+            "success": True,
+            "status": status_by_resolution,
+            "total_images": total_images,
+            "total_playlists": total_playlists
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Get variant status error: {e}")
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to get variant status: {str(e)}")
+
+@router.delete("/settings/display-sizes/variants/{resolution}")
+async def delete_variants_for_resolution(
+    resolution: str,
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """Delete all variants (image files and playlist variants) for a specific resolution"""
+    try:
+        from pathlib import Path
+        from models.image import Image
+        from models.playlist_variant import PlaylistVariant
+        from config.settings import settings as config_settings
+        import shutil
+        
+        # Parse resolution (e.g., "1080x1920")
+        try:
+            width, height = map(int, resolution.split('x'))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid resolution format: {resolution}")
+        
+        deleted_counts = {
+            "scaled_images": 0,
+            "playlist_variants": 0,
+            "failed_files": []
+        }
+        
+        # Delete playlist variants from database
+        playlist_variants = db.query(PlaylistVariant).filter(
+            PlaylistVariant.target_width == width,
+            PlaylistVariant.target_height == height
+        ).all()
+        
+        deleted_counts["playlist_variants"] = len(playlist_variants)
+        
+        for variant in playlist_variants:
+            db.delete(variant)
+        
+        db.commit()
+        logger.info(f"🗑️ Deleted {deleted_counts['playlist_variants']} playlist variants for {resolution}")
+        
+        # Delete scaled image files
+        upload_path = Path(config_settings.upload_path)
+        scaled_dir = upload_path / "scaled"
+        images = db.query(Image).all()
+        
+        for image in images:
+            if image.filename:
+                try:
+                    stem = Path(image.filename).stem
+                    suffix = Path(image.filename).suffix
+                    scaled_filename = f"{stem}_{resolution}{suffix}"
+                    scaled_path = scaled_dir / scaled_filename
+                    
+                    if scaled_path.exists():
+                        scaled_path.unlink()
+                        deleted_counts["scaled_images"] += 1
+                        logger.debug(f"Deleted scaled image: {scaled_path}")
+                            
+                except Exception as e:
+                    logger.warning(f"Failed to delete scaled image for {image.filename}: {e}")
+                    deleted_counts["failed_files"].append(str(image.filename))
+        
+        logger.info(f"🧹 Cleanup complete for {resolution}: {deleted_counts['scaled_images']} images, {deleted_counts['playlist_variants']} playlist variants")
+        
+        return {
+            "success": True,
+            "message": f"Deleted variants for {resolution}",
+            "deleted_scaled_images": deleted_counts["scaled_images"],
+            "deleted_playlist_variants": deleted_counts["playlist_variants"],
+            "failed_files": deleted_counts["failed_files"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"❌ Delete variants error: {e}")
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete variants: {str(e)}")
 
 class AddResolutionRequest(BaseModel):
     resolution: str  # e.g., "1080x1920"

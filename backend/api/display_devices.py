@@ -617,6 +617,7 @@ async def get_device_logs(
 ):
     """Get device logs with optional filtering (admin only)"""
     try:
+        print(f"[ADMIN_LOGS] Received request - log_level={log_level}, limit={limit}, offset={offset}")
         # Start with base query
         query = db.query(DeviceLog).join(DisplayDevice)
         
@@ -630,8 +631,10 @@ async def get_device_logs(
         if log_level:
             try:
                 log_level_enum = LogLevel(log_level.upper())
+                print(f"[ADMIN_LOGS] Filtering: '{log_level}' -> {log_level_enum} (value: {log_level_enum.value})")
                 query = query.filter(DeviceLog.log_level == log_level_enum)
-            except ValueError:
+            except ValueError as e:
+                print(f"[ADMIN_LOGS] Invalid log level: '{log_level}' - {e}")
                 raise HTTPException(status_code=400, detail=f"Invalid log level: {log_level}")
         
         # Order by most recent first
@@ -642,11 +645,37 @@ async def get_device_logs(
         
         # Execute query
         logs = query.all()
+        print(f"[ADMIN_LOGS] Query returned {len(logs)} logs")
+        if logs:
+            # Log first few results to verify filtering
+            sample_levels = [str(log.log_level) for log in logs[:3]]
+            print(f"[ADMIN_LOGS] Sample log levels: {sample_levels}")
         
-        return [DeviceLogResponse.from_log(log) for log in logs]
+        result = [DeviceLogResponse.from_log(log) for log in logs]
+        print(f"[ADMIN_LOGS] Returning {len(result)} results")
+        return result
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Get device logs failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to get device logs")
+
+@router.delete("/admin/logs")
+async def clear_device_logs(
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Clear all display device logs from database (admin only)"""
+    try:
+        count = db.query(DeviceLog).delete()
+        db.commit()
+        
+        logger.info(f"Cleared {count} display device log entries by admin {current_user.username}")
+        
+        return {"success": True, "message": f"Cleared {count} display device log entries", "count": count}
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Clear device logs failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear device logs")

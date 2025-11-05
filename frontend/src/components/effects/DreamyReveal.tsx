@@ -27,6 +27,8 @@ export interface DreamyRevealProps {
   children: React.ReactNode;
   /** Class name for the wrapper */
   className?: string;
+  /** If true, don't control opacity (for use with external opacity management) */
+  externalOpacityControl?: boolean;
 }
 
 /**
@@ -49,7 +51,8 @@ export const DreamyReveal: React.FC<DreamyRevealProps> = ({
   includeScale = true,
   onRevealComplete,
   children,
-  className = ''
+  className = '',
+  externalOpacityControl = false
 }) => {
   const [state, setState] = useState<DreamyRevealState>({
     blur: 30,
@@ -59,28 +62,45 @@ export const DreamyReveal: React.FC<DreamyRevealProps> = ({
   });
 
   const revealStartedRef = useRef(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isRevealing) {
-      // Fade out to black smoothly (keep image clear, no blur)
-      setState(prev => ({
-        ...prev,
-        opacity: 0.0,  // Fade out smoothly
-        isRevealing: false
-      }));
-      
-      // After fade-out completes, reset to initial blurred state for next reveal
-      const resetTimer = setTimeout(() => {
-        setState({
+      if (externalOpacityControl) {
+        // For external opacity control, just reset blur/scale without touching opacity
+        setState(prev => ({
+          ...prev,
           blur: 30,
-          opacity: 0.0,
           scale: includeScale ? 1.05 : 1.0,
           isRevealing: false
-        });
-        revealStartedRef.current = false;
-      }, 800);  // Match fade-out duration
-      
-      return () => clearTimeout(resetTimer);
+        }));
+        // Small delay to ensure blurred state is rendered before next reveal
+        const resetTimer = setTimeout(() => {
+          revealStartedRef.current = false;
+        }, 100);
+        return () => clearTimeout(resetTimer);
+      } else {
+        // For internal opacity control, fade out then reset
+        setState(prev => ({
+          ...prev,
+          opacity: 0.0,  // Fade out smoothly
+          isRevealing: false
+        }));
+        
+        // After fade-out completes, reset to initial blurred state for next reveal
+        const resetTimer = setTimeout(() => {
+          setState({
+            blur: 30,
+            opacity: 0.0,
+            scale: includeScale ? 1.05 : 1.0,
+            isRevealing: false
+          });
+          revealStartedRef.current = false;
+        }, 800);  // Match fade-out duration
+        
+        return () => clearTimeout(resetTimer);
+      }
+      return;
     }
 
     if (revealStartedRef.current) {
@@ -89,13 +109,30 @@ export const DreamyReveal: React.FC<DreamyRevealProps> = ({
 
     revealStartedRef.current = true;
 
-    // Small delay to ensure initial blurred state is rendered
-    const startDelay = setTimeout(() => {
+    if (externalOpacityControl) {
+      // Ensure initial blurred state is set
       setState({
-        blur: 0,
+        blur: 30,
         opacity: 1.0,
-        scale: 1.0,
-        isRevealing: true
+        scale: includeScale ? 1.05 : 1.0,
+        isRevealing: false
+      });
+      
+      // Force reflow to ensure blurred state is rendered
+      if (wrapperRef.current) {
+        void wrapperRef.current.offsetHeight;
+      }
+      
+      // Then trigger reveal in next frame (transition is always enabled)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setState({
+            blur: 0,
+            opacity: 1.0,
+            scale: 1.0,
+            isRevealing: true
+          });
+        });
       });
 
       // Notify when reveal completes
@@ -106,25 +143,52 @@ export const DreamyReveal: React.FC<DreamyRevealProps> = ({
 
         return () => clearTimeout(completeTimer);
       }
-    }, 50);
+    } else {
+      // Small delay to ensure initial blurred state is rendered
+      const startDelay = setTimeout(() => {
+        setState({
+          blur: 0,
+          opacity: 1.0,
+          scale: 1.0,
+          isRevealing: true
+        });
 
-    return () => clearTimeout(startDelay);
-  }, [isRevealing, duration, includeScale, onRevealComplete]);
+        // Notify when reveal completes
+        if (onRevealComplete) {
+          const completeTimer = setTimeout(() => {
+            onRevealComplete();
+          }, duration);
 
-  const transitionStyle = {
+          return () => clearTimeout(completeTimer);
+        }
+      }, 50);
+
+      return () => clearTimeout(startDelay);
+    }
+  }, [isRevealing, duration, includeScale, onRevealComplete, externalOpacityControl]);
+
+  const transitionStyle: any = {
     filter: `blur(${state.blur}px)`,
-    opacity: state.opacity,
-    transform: `scale(${state.scale})`,
-    transition: state.isRevealing
-      ? `filter ${duration}ms ease-out, opacity ${duration}ms ease-out, transform ${duration}ms cubic-bezier(0.4, 0.0, 0.2, 1)`
-      : 'none',
-    willChange: 'filter, opacity, transform',
+    transform: `scale(${state.scale}) translateZ(0)`,  // Combine scale with hardware acceleration
+    // Always enable transitions for external opacity control, conditionally for internal
+    transition: externalOpacityControl 
+      ? `filter ${duration}ms ease-out, transform ${duration}ms cubic-bezier(0.4, 0.0, 0.2, 1)`
+      : (state.isRevealing
+          ? `filter ${duration}ms ease-out, opacity ${duration}ms ease-out, transform ${duration}ms cubic-bezier(0.4, 0.0, 0.2, 1)`
+          : 'none'),
+    willChange: externalOpacityControl ? 'filter, transform' : 'filter, opacity, transform',
     backfaceVisibility: 'hidden' as const,
     transformOrigin: 'center center'
   };
+  
+  // Only control opacity if not externally controlled
+  if (!externalOpacityControl) {
+    transitionStyle.opacity = state.opacity;
+  }
 
   return (
     <div 
+      ref={wrapperRef}
       className={`dreamy-reveal-wrapper ${className}`}
       style={{
         position: 'relative',

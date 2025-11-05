@@ -323,12 +323,22 @@ class ApiService {
 
   async createPlaylist(name: string, isDefault = false): Promise<ApiResponse<Playlist>> {
     const response = await this.api.post('/playlists/', { name, is_default: isDefault });
-    return response.data;
+    // Backend returns {success: true, message: "...", playlist: {...}}
+    return {
+      message: response.data.message || "Playlist created successfully",
+      data: response.data.playlist,
+      status_code: 200
+    };
   }
 
   async updatePlaylist(id: number, name?: string, isDefault?: boolean, displayTimeSeconds?: number, displayMode?: string, showImageInfo?: boolean): Promise<ApiResponse<Playlist>> {
     const response = await this.api.put(`/playlists/${id}`, { name, is_default: isDefault, display_time_seconds: displayTimeSeconds, display_mode: displayMode, show_image_info: showImageInfo });
-    return response.data;
+    // Backend returns {success: true, message: "...", playlist: {...}}
+    return {
+      message: response.data.message || "Playlist updated successfully",
+      data: response.data.playlist,
+      status_code: 200
+    };
   }
 
   async deletePlaylist(id: number): Promise<ApiResponse<any>> {
@@ -351,8 +361,11 @@ class ApiService {
     return response.data;
   }
 
-  async randomizePlaylist(playlistId: number): Promise<ApiResponse<any>> {
-    const response = await this.api.post(`/playlists/${playlistId}/randomize`);
+  async randomizePlaylist(playlistId: number, displayOrientation: 'portrait' | 'landscape' = 'portrait', preservePairing: boolean = true): Promise<ApiResponse<any>> {
+    const response = await this.api.post(`/playlists/${playlistId}/randomize`, {
+      display_orientation: displayOrientation,
+      preserve_pairing: preservePairing
+    });
     return response.data;
   }
 
@@ -372,6 +385,15 @@ class ApiService {
     // Use a 60 second timeout instead of the default 10 seconds
     const response = await this.api.post(`/playlists/${playlistId}/generate-variants`, {}, {
       timeout: 60000
+    });
+    return response.data;
+  }
+
+  async generateAllImageVariants(): Promise<ApiResponse<any>> {
+    // Regenerating image resolutions can take several minutes
+    // Use a 5 minute timeout
+    const response = await this.api.post('/images/regenerate-resolutions', {}, {
+      timeout: 300000
     });
     return response.data;
   }
@@ -470,6 +492,16 @@ class ApiService {
 
   async addDisplaySize(resolution: string): Promise<ApiResponse<any>> {
     const response = await this.api.post('/settings/display-sizes/add', { resolution });
+    return response.data;
+  }
+
+  async getVariantStatusByResolution(): Promise<ApiResponse<any>> {
+    const response = await this.api.get('/settings/display-sizes/variant-status');
+    return response.data;
+  }
+
+  async deleteVariantsForResolution(resolution: string): Promise<ApiResponse<any>> {
+    const response = await this.api.delete(`/settings/display-sizes/variants/${resolution}`);
     return response.data;
   }
 

@@ -47,7 +47,7 @@ export interface Album {
   image_count: number;
 }
 
-export type DisplayMode = 'default' | 'auto_sort' | 'movement';
+export type DisplayMode = 'default' | 'auto_sort' | 'ken_burns_plus' | 'soft_glow' | 'ambient_pulse' | 'dreamy_reveal' | 'stacked_reveal';
 
 export interface Playlist {
   id: number;

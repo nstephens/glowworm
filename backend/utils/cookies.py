@@ -184,17 +184,25 @@ class CookieManager:
         if not provided_token:
             provided_token = request.headers.get("X-CSRF-Token")
         
+        logger.info(f"🔑 CSRF Header Token: {provided_token[:20] if provided_token else 'None'}...")
+        
         if not provided_token:
+            logger.warning("❌ No CSRF token in header")
             return False
         
         # Get stored token from cookie
         stored_token = request.cookies.get(CookieManager.CSRF_COOKIE)
         
+        logger.info(f"🍪 CSRF Cookie Token: {stored_token[:20] if stored_token else 'None'}...")
+        
         if not stored_token:
+            logger.warning("❌ No CSRF token in cookie")
             return False
         
         # Compare tokens securely
-        return secrets.compare_digest(provided_token, stored_token)
+        result = secrets.compare_digest(provided_token, stored_token)
+        logger.info(f"🔐 Token comparison result: {result}")
+        return result
     
     @staticmethod
     def set_oauth_cookies(

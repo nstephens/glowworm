@@ -22,7 +22,8 @@ class SystemSettings(Base):
     id = Column(Integer, primary_key=True, index=True)
     setting_key = Column(String(100), unique=True, nullable=False, index=True)
     setting_value = Column(Text, nullable=True)
-    setting_type = Column(Enum(SettingType, values_callable=lambda x: [e.value for e in x]), nullable=False, default=SettingType.STRING)
+    # Use String column and handle enum conversion manually to support both uppercase and lowercase
+    setting_type = Column(String(20), nullable=False, default="string")
     description = Column(Text, nullable=True)
     is_sensitive = Column(Boolean, nullable=False, default=False)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.current_timestamp())
@@ -30,11 +31,13 @@ class SystemSettings(Base):
 
     def to_dict(self) -> dict:
         """Convert model to dictionary"""
+        # Normalize setting_type to lowercase
+        setting_type_value = self.setting_type.lower() if isinstance(self.setting_type, str) else self.setting_type.value
         return {
             "id": self.id,
             "setting_key": self.setting_key,
             "setting_value": self.setting_value,
-            "setting_type": self.setting_type.value,
+            "setting_type": setting_type_value,
             "description": self.description,
             "is_sensitive": self.is_sensitive,
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -45,10 +48,13 @@ class SystemSettings(Base):
         """Get the setting value converted to its proper type"""
         if self.setting_value is None:
             return None
+        
+        # Normalize setting_type to lowercase for comparison (handle both "STRING" and "string")
+        type_str = self.setting_type.lower() if isinstance(self.setting_type, str) else self.setting_type.value
             
-        if self.setting_type == SettingType.STRING:
+        if type_str == "string":
             return self.setting_value
-        elif self.setting_type == SettingType.NUMBER:
+        elif type_str == "number":
             try:
                 # Try integer first, then float
                 if '.' in self.setting_value:
@@ -57,9 +63,9 @@ class SystemSettings(Base):
                     return int(self.setting_value)
             except ValueError:
                 return self.setting_value  # Return as string if conversion fails
-        elif self.setting_type == SettingType.BOOLEAN:
+        elif type_str == "boolean":
             return self.setting_value.lower() in ('true', '1', 'yes', 'on')
-        elif self.setting_type == SettingType.JSON:
+        elif type_str == "json":
             import json
             try:
                 return json.loads(self.setting_value)
@@ -70,13 +76,16 @@ class SystemSettings(Base):
 
     def set_typed_value(self, value):
         """Set the setting value from a typed value"""
-        if self.setting_type == SettingType.STRING:
+        # Normalize setting_type to lowercase for comparison (handle both "STRING" and "string")
+        type_str = self.setting_type.lower() if isinstance(self.setting_type, str) else self.setting_type.value
+        
+        if type_str == "string":
             self.setting_value = str(value) if value is not None else None
-        elif self.setting_type == SettingType.NUMBER:
+        elif type_str == "number":
             self.setting_value = str(value) if value is not None else None
-        elif self.setting_type == SettingType.BOOLEAN:
+        elif type_str == "boolean":
             self.setting_value = str(bool(value)).lower()
-        elif self.setting_type == SettingType.JSON:
+        elif type_str == "json":
             import json
             self.setting_value = json.dumps(value) if value is not None else None
         else:

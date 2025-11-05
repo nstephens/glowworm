@@ -87,8 +87,19 @@ class ImageStorageService:
                     logger.warning(f"Invalid display size format: {size_str}")
                     continue
             
-            logger.info(f"✅ Final display sizes: {parsed_sizes}")
-            return parsed_sizes
+            # Remove duplicates while preserving order
+            unique_sizes = []
+            seen = set()
+            for size in parsed_sizes:
+                if size not in seen:
+                    seen.add(size)
+                    unique_sizes.append(size)
+            
+            if len(unique_sizes) < len(parsed_sizes):
+                logger.info(f"⚠️ Removed {len(parsed_sizes) - len(unique_sizes)} duplicate resolution(s)")
+            
+            logger.info(f"✅ Final display sizes: {unique_sizes}")
+            return unique_sizes
         except Exception as e:
             logger.error(f"❌ Failed to load display sizes: {e}")
             return []

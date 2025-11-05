@@ -158,10 +158,15 @@ class DisplayDeviceService:
         return device
     
     def delete_device(self, device_id: int) -> bool:
-        """Delete a display device"""
+        """Delete a display device and all related logs"""
         device = self.db.query(DisplayDevice).filter(DisplayDevice.id == device_id).first()
         if not device:
             return False
+        
+        # Delete all related device logs first to avoid foreign key constraint error
+        from models.device_log import DeviceLog
+        logs_count = self.db.query(DeviceLog).filter(DeviceLog.device_id == device_id).delete()
+        logger.info(f"Deleted {logs_count} logs for device {device_id}")
         
         self.db.delete(device)
         self.db.commit()
