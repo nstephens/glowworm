@@ -44,40 +44,63 @@ def upgrade():
     # Create playlists table
     op.create_table('playlists',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('name', sa.String(length=100), nullable=False),
+        sa.Column('name', sa.String(length=128), nullable=False),
         sa.Column('slug', sa.String(length=64), nullable=False, unique=True),
-        sa.Column('description', sa.Text(), nullable=True),
         sa.Column('is_default', sa.Boolean(), nullable=True, server_default='0'),
         sa.Column('display_mode', sa.Enum('default', 'ken_burns_plus', 'soft_glow', 'ambient_pulse', 'dreamy_reveal', 'stacked_reveal', name='displaymode'), nullable=False, server_default='default'),
         sa.Column('sequence', sa.JSON(), nullable=True),
         sa.Column('computed_sequence', sa.JSON(), nullable=True),
         sa.Column('display_time_seconds', sa.Integer(), nullable=True),
         sa.Column('show_image_info', sa.Boolean(), nullable=True, server_default='0'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
         sa.PrimaryKeyConstraint('id'),
         mysql_charset='utf8mb4',
         mysql_collate='utf8mb4_unicode_ci'
     )
     op.create_index(op.f('ix_playlists_id'), 'playlists', ['id'], unique=False)
-    op.create_index(op.f('ix_playlists_name'), 'playlists', ['name'], unique=True)
+    op.create_index(op.f('ix_playlists_name'), 'playlists', ['name'], unique=False)
     op.create_index(op.f('ix_playlists_slug'), 'playlists', ['slug'], unique=True)
+    
+    # Create albums table
+    op.create_table('albums',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('name', sa.String(length=128), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
+        sa.PrimaryKeyConstraint('id'),
+        mysql_charset='utf8mb4',
+        mysql_collate='utf8mb4_unicode_ci'
+    )
+    op.create_index(op.f('ix_albums_id'), 'albums', ['id'], unique=False)
+    op.create_index(op.f('ix_albums_name'), 'albums', ['name'], unique=False)
 
     # Create images table
     op.create_table('images',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('filename', sa.String(length=255), nullable=False),
-        sa.Column('filepath', sa.String(length=500), nullable=False),
-        sa.Column('uploaded_by', sa.Integer(), nullable=True),
+        sa.Column('filename', sa.String(length=256), nullable=False),
+        sa.Column('original_filename', sa.String(length=256), nullable=False),
+        sa.Column('album_id', sa.Integer(), nullable=True),
+        sa.Column('width', sa.Integer(), nullable=True),
+        sa.Column('height', sa.Integer(), nullable=True),
+        sa.Column('file_size', sa.Integer(), nullable=True),
+        sa.Column('mime_type', sa.String(length=64), nullable=True),
+        sa.Column('file_hash', sa.String(length=64), nullable=True),
+        sa.Column('exif', sa.JSON(), nullable=True),
+        sa.Column('dominant_colors', sa.JSON(), nullable=True),
+        sa.Column('uploaded_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=True),
         sa.Column('playlist_id', sa.Integer(), nullable=True),
-        sa.Column('uploaded_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+        sa.ForeignKeyConstraint(['album_id'], ['albums.id'], ondelete='CASCADE'),
         sa.ForeignKeyConstraint(['playlist_id'], ['playlists.id'], ondelete='SET NULL'),
-        sa.ForeignKeyConstraint(['uploaded_by'], ['users.id'], ),
         sa.PrimaryKeyConstraint('id'),
         mysql_charset='utf8mb4',
         mysql_collate='utf8mb4_unicode_ci'
     )
     op.create_index(op.f('ix_images_id'), 'images', ['id'], unique=False)
+    op.create_index(op.f('ix_images_filename'), 'images', ['filename'], unique=False)
+    op.create_index(op.f('ix_images_file_hash'), 'images', ['file_hash'], unique=False)
+    op.create_index(op.f('ix_images_album_id'), 'images', ['album_id'], unique=False)
+    op.create_index(op.f('ix_images_playlist_id'), 'images', ['playlist_id'], unique=False)
 
     # Create display_devices table
     op.create_table('display_devices',
@@ -95,6 +118,7 @@ def upgrade():
         sa.Column('screen_width', sa.Integer(), nullable=True),
         sa.Column('screen_height', sa.Integer(), nullable=True),
         sa.Column('device_pixel_ratio', sa.String(length=10), nullable=True),
+        sa.Column('orientation', sa.String(length=20), nullable=False, server_default='portrait'),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
         sa.ForeignKeyConstraint(['playlist_id'], ['playlists.id'], ),
@@ -110,12 +134,20 @@ def downgrade():
     op.drop_index(op.f('ix_display_devices_id'), table_name='display_devices')
     op.drop_index(op.f('ix_display_devices_device_token'), table_name='display_devices')
     op.drop_table('display_devices')
+    op.drop_index(op.f('ix_images_playlist_id'), table_name='images')
+    op.drop_index(op.f('ix_images_album_id'), table_name='images')
+    op.drop_index(op.f('ix_images_file_hash'), table_name='images')
+    op.drop_index(op.f('ix_images_filename'), table_name='images')
     op.drop_index(op.f('ix_images_id'), table_name='images')
     op.drop_table('images')
+    op.drop_index(op.f('ix_albums_name'), table_name='albums')
+    op.drop_index(op.f('ix_albums_id'), table_name='albums')
+    op.drop_table('albums')
     op.drop_index(op.f('ix_playlists_slug'), table_name='playlists')
     op.drop_index(op.f('ix_playlists_name'), table_name='playlists')
     op.drop_index(op.f('ix_playlists_id'), table_name='playlists')
     op.drop_table('playlists')
+    op.drop_index(op.f('ix_users_google_id'), table_name='users')
     op.drop_index(op.f('ix_users_username'), table_name='users')
     op.drop_index(op.f('ix_users_id'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
