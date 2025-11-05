@@ -67,15 +67,10 @@ if [ "$CLEAN_INSTALL" = true ]; then
         echo -e "${GREEN}✅ Containers stopped${NC}"
     fi
     
-    # Delete data directory
+    # Delete data directory (Docker creates files as root, so we need sudo)
     if [ -d data ]; then
-        echo -e "${YELLOW}Deleting data directory...${NC}"
-        if [ -w data ]; then
-            rm -rf data
-        else
-            echo -e "${YELLOW}Need sudo to delete data directory...${NC}"
-            sudo rm -rf data
-        fi
+        echo -e "${YELLOW}Deleting data directory (requires sudo)...${NC}"
+        sudo rm -rf data
         echo -e "${GREEN}✅ Data directory deleted${NC}"
     fi
     
