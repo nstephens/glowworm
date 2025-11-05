@@ -45,9 +45,13 @@ def upgrade():
     op.create_table('playlists',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('name', sa.String(length=100), nullable=False),
+        sa.Column('slug', sa.String(length=64), nullable=False, unique=True),
         sa.Column('description', sa.Text(), nullable=True),
+        sa.Column('is_default', sa.Boolean(), nullable=True, server_default='0'),
         sa.Column('display_mode', sa.Enum('default', 'ken_burns_plus', 'soft_glow', 'ambient_pulse', 'dreamy_reveal', 'stacked_reveal', name='displaymode'), nullable=False, server_default='default'),
         sa.Column('sequence', sa.JSON(), nullable=True),
+        sa.Column('computed_sequence', sa.JSON(), nullable=True),
+        sa.Column('display_time_seconds', sa.Integer(), nullable=True),
         sa.Column('show_image_info', sa.Boolean(), nullable=True, server_default='0'),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
@@ -57,6 +61,7 @@ def upgrade():
     )
     op.create_index(op.f('ix_playlists_id'), 'playlists', ['id'], unique=False)
     op.create_index(op.f('ix_playlists_name'), 'playlists', ['name'], unique=True)
+    op.create_index(op.f('ix_playlists_slug'), 'playlists', ['slug'], unique=True)
 
     # Create images table
     op.create_table('images',
@@ -107,6 +112,7 @@ def downgrade():
     op.drop_table('display_devices')
     op.drop_index(op.f('ix_images_id'), table_name='images')
     op.drop_table('images')
+    op.drop_index(op.f('ix_playlists_slug'), table_name='playlists')
     op.drop_index(op.f('ix_playlists_name'), table_name='playlists')
     op.drop_index(op.f('ix_playlists_id'), table_name='playlists')
     op.drop_table('playlists')
