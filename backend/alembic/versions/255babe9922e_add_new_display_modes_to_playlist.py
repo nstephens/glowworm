@@ -22,23 +22,17 @@ def upgrade() -> None:
     """Upgrade schema."""
     # For MySQL, we need to ALTER the column to add new enum values
     # This replaces the entire enum definition with all values (old + new)
+    # Note: 'movement' removed as legacy mode, 'auto_sort' and unused modes removed
     op.alter_column(
         'playlists',
         'display_mode',
         existing_type=sa.Enum(
             'default',
-            'auto_sort',
-            'movement',
             'ken_burns_plus',
             'soft_glow',
             'ambient_pulse',
             'dreamy_reveal',
             'stacked_reveal',
-            'parallax_depth',
-            'color_harmony',
-            'cinematic_bars',
-            'magic_dust',
-            'liquid_blend',
             name='displaymode'
         ),
         nullable=True
@@ -47,15 +41,13 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
-    # Revert to the original enum values (only default, auto_sort, movement)
+    # Revert to the original enum values (only default)
     # WARNING: This will fail if any playlists are using the new display modes
     op.alter_column(
         'playlists',
         'display_mode',
         existing_type=sa.Enum(
             'default',
-            'auto_sort',
-            'movement',
             name='displaymode'
         ),
         nullable=True
