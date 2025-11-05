@@ -33,7 +33,10 @@ const AdminDashboard: React.FC = () => {
     totalAlbums: 0,
     totalPlaylists: 0,
     totalDisplays: 0,
-    recentUploads: 0
+    recentUploads: 0,
+    totalStorage: 0,
+    imageStorage: 0,
+    videoStorage: 0
   });
   const [loading, setLoading] = useState(true);
   
@@ -76,13 +79,25 @@ const AdminDashboard: React.FC = () => {
 
       // Count active displays (devices with status 'authorized')
       const activeDisplays = devices.filter(device => device.status === 'authorized').length;
+      
+      // Calculate real storage from images
+      const totalStorage = images.reduce((sum, img) => sum + (img.file_size || 0), 0);
+      
+      // Separate images by mime type
+      const imageFiles = images.filter(img => img.mime_type?.startsWith('image/'));
+      const videoFiles = images.filter(img => img.mime_type?.startsWith('video/'));
+      const imageStorage = imageFiles.reduce((sum, img) => sum + (img.file_size || 0), 0);
+      const videoStorage = videoFiles.reduce((sum, img) => sum + (img.file_size || 0), 0);
 
       setStats({
         totalImages: images.length,
         totalAlbums: albums.length,
         totalPlaylists: playlists.length,
         totalDisplays: activeDisplays,
-        recentUploads
+        recentUploads,
+        totalStorage,
+        imageStorage,
+        videoStorage
       });
     } catch (error) {
       console.error('Failed to load stats:', error);
@@ -230,20 +245,18 @@ const AdminDashboard: React.FC = () => {
   const dashboardData = {
     stats: {
       totalFiles: stats.totalImages,
-      totalStorage: 2.4 * 1024 * 1024 * 1024, // Mock storage data
+      totalStorage: stats.totalStorage,
       totalUsers: stats.totalDisplays,
       totalDownloads: stats.recentUploads,
       uploadsToday: Math.floor(stats.recentUploads / 7),
       downloadsToday: Math.floor(stats.recentUploads / 7),
     },
     storage: {
-      used: 1.8 * 1024 * 1024 * 1024,
-      total: 5 * 1024 * 1024 * 1024,
+      used: stats.totalStorage,
+      total: stats.totalStorage * 1.5, // Show some headroom
       breakdown: {
-        images: 1.2 * 1024 * 1024 * 1024,
-        videos: 0.4 * 1024 * 1024 * 1024,
-        documents: 0.15 * 1024 * 1024 * 1024,
-        other: 0.05 * 1024 * 1024 * 1024,
+        images: stats.imageStorage,
+        videos: stats.videoStorage,
       },
     },
     trends: {

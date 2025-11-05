@@ -280,80 +280,39 @@ export const Dashboard: React.FC<DashboardProps> = ({
         />
       </div>
 
-      {/* Main Content Grid - Adjustable width for better balance */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Charts */}
-        <div className="lg:col-span-3 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Upload Trends</CardTitle>
-              <CardDescription>Daily upload activity over the past week</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TrendChart
-                data={dashboardData.trends.uploads}
-                title="Uploads"
-                height={300}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Storage Usage</CardTitle>
-              <CardDescription>Breakdown of your storage usage</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <StorageChart
-                data={dashboardData.storage}
-                height={300}
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Activity Timeline */}
-          <ActivityTimelineCard
-            activities={dashboardData.activities}
-            maxItems={5}
-            loading={loading}
-          />
-
-          {/* Recommendations */}
-          <RecommendationCard
-            recommendations={dashboardData.recommendations}
-            maxItems={3}
-          />
-        </div>
-      </div>
-
-      {/* Quick Actions */}
+      {/* Upload Trends - Full Width */}
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common tasks and shortcuts</CardDescription>
+          <CardTitle>Upload Trends</CardTitle>
+          <CardDescription>Daily upload activity over the past week</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button variant="outline" className="h-20 flex-col gap-2">
-              <Upload className="h-6 w-6" />
-              <span>Upload Files</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex-col gap-2">
-              <Star className="h-6 w-6" />
-              <span>View Favorites</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex-col gap-2">
-              <Share className="h-6 w-6" />
-              <span>Share Album</span>
-            </Button>
-            <Button variant="outline" className="h-20 flex-col gap-2">
-              <Settings className="h-6 w-6" />
-              <span>Settings</span>
-            </Button>
-          </div>
+          <TrendChart
+            data={dashboardData.trends.uploads}
+            title="Uploads"
+            height={300}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Recent Activity - Full Width */}
+      <ActivityTimelineCard
+        activities={dashboardData.activities}
+        maxItems={5}
+        loading={loading}
+      />
+
+      {/* Storage Usage */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Storage Usage</CardTitle>
+          <CardDescription>Breakdown of your storage usage</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <StorageChart
+            data={dashboardData.storage}
+            height={300}
+          />
         </CardContent>
       </Card>
     </motion.div>

@@ -170,8 +170,8 @@ interface StorageChartProps {
     breakdown: {
       images: number;
       videos: number;
-      documents: number;
-      other: number;
+      documents?: number;
+      other?: number;
     };
   };
   className?: string;
@@ -184,20 +184,16 @@ export const StorageChart: React.FC<StorageChartProps> = ({
   const usagePercentage = (data.used / data.total) * 100;
   
   const chartData = {
-    labels: ['Images', 'Videos', 'Documents', 'Other'],
+    labels: ['Images', 'Videos'],
     datasets: [
       {
         data: [
           data.breakdown.images,
           data.breakdown.videos,
-          data.breakdown.documents,
-          data.breakdown.other,
         ],
         backgroundColor: [
           defaultColors.primary,
           defaultColors.secondary,
-          defaultColors.success,
-          defaultColors.muted,
         ],
         borderWidth: 0,
       },
