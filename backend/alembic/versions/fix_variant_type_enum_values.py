@@ -19,6 +19,30 @@ depends_on = None
 def upgrade():
     """Update playlist variant type enum to match Python code format"""
     
+    # Check if table exists first
+    connection = op.get_bind()
+    result = connection.execute(sa.text(
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'playlist_variants'"
+    ))
+    table_exists = result.scalar() > 0
+    
+    if not table_exists:
+        # Table doesn't exist yet, skip this migration
+        # It will be created with correct enum values by the create migration
+        return
+    
+    # Check if there are any rows to migrate
+    result = connection.execute(sa.text("SELECT COUNT(*) FROM playlist_variants"))
+    row_count = result.scalar()
+    
+    if row_count == 0:
+        # No data to migrate, just update the enum definition
+        op.execute("""
+            ALTER TABLE playlist_variants 
+            MODIFY variant_type ENUM('ORIGINAL', 'PORTRAIT_2K', 'PORTRAIT_4K', 'LANDSCAPE_2K', 'LANDSCAPE_4K', 'CUSTOM') NOT NULL
+        """)
+        return
+    
     # Step 1: Change column to VARCHAR to allow any value temporarily
     op.execute("ALTER TABLE playlist_variants MODIFY variant_type VARCHAR(20)")
     
