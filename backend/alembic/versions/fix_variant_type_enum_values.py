@@ -19,54 +19,18 @@ depends_on = None
 def upgrade():
     """Update playlist variant type enum to match Python code format"""
     
-    # First, update existing data to new format
-    op.execute("""
-        UPDATE playlist_variants 
-        SET variant_type = 'ORIGINAL'
-        WHERE variant_type = 'original'
-    """)
-    
-    op.execute("""
-        UPDATE playlist_variants 
-        SET variant_type = 'PORTRAIT_2K'
-        WHERE variant_type = '2k_portrait'
-    """)
-    
-    op.execute("""
-        UPDATE playlist_variants 
-        SET variant_type = 'PORTRAIT_4K'
-        WHERE variant_type = '4k_portrait'
-    """)
-    
-    op.execute("""
-        UPDATE playlist_variants 
-        SET variant_type = 'LANDSCAPE_2K'
-        WHERE variant_type = '2k_landscape'
-    """)
-    
-    op.execute("""
-        UPDATE playlist_variants 
-        SET variant_type = 'LANDSCAPE_4K'
-        WHERE variant_type = '4k_landscape'
-    """)
-    
-    op.execute("""
-        UPDATE playlist_variants 
-        SET variant_type = 'CUSTOM'
-        WHERE variant_type = 'custom'
-    """)
-    
-    # Recreate the enum with new values
-    # MySQL doesn't support ALTER TYPE on enum, so we need to:
-    # 1. Change column to VARCHAR temporarily
-    # 2. Drop old enum type
-    # 3. Create new enum type
-    # 4. Change column back to new enum
-    
+    # Step 1: Change column to VARCHAR to allow any value temporarily
     op.execute("ALTER TABLE playlist_variants MODIFY variant_type VARCHAR(20)")
-    op.execute("DROP TYPE IF EXISTS playlistvarianttype")
     
-    # Note: SQLAlchemy will handle enum creation when we change the column back
+    # Step 2: Update existing data to new format (now that column is VARCHAR)
+    op.execute("UPDATE playlist_variants SET variant_type = 'ORIGINAL' WHERE variant_type = 'original'")
+    op.execute("UPDATE playlist_variants SET variant_type = 'PORTRAIT_2K' WHERE variant_type = '2k_portrait'")
+    op.execute("UPDATE playlist_variants SET variant_type = 'PORTRAIT_4K' WHERE variant_type = '4k_portrait'")
+    op.execute("UPDATE playlist_variants SET variant_type = 'LANDSCAPE_2K' WHERE variant_type = '2k_landscape'")
+    op.execute("UPDATE playlist_variants SET variant_type = 'LANDSCAPE_4K' WHERE variant_type = '4k_landscape'")
+    op.execute("UPDATE playlist_variants SET variant_type = 'CUSTOM' WHERE variant_type = 'custom'")
+    
+    # Step 3: Change column back to ENUM with new values
     op.execute("""
         ALTER TABLE playlist_variants 
         MODIFY variant_type ENUM('ORIGINAL', 'PORTRAIT_2K', 'PORTRAIT_4K', 'LANDSCAPE_2K', 'LANDSCAPE_4K', 'CUSTOM') NOT NULL
