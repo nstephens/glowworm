@@ -67,6 +67,11 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
   const [showOrientationWarning, setShowOrientationWarning] = useState(false);
   const [pendingOrientation, setPendingOrientation] = useState<'portrait' | 'landscape'>('portrait');
   
+  // Variant generation state
+  const [showVariantPrompt, setShowVariantPrompt] = useState(false);
+  const [authorizedDeviceResolution, setAuthorizedDeviceResolution] = useState<string>('');
+  const [isGeneratingVariants, setIsGeneratingVariants] = useState(false);
+  
   // Playlist state
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null);
@@ -165,6 +170,15 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
           displayLogger.info('No default playlist found or failed to assign default playlist');
         }
         
+        // Check if we should prompt for variant generation
+        const resolution = `${deviceToAuthorize.screen_width}x${deviceToAuthorize.screen_height}`;
+        const needsVariants = determineIfVariantsNeeded(deviceToAuthorize.screen_width, deviceToAuthorize.screen_height);
+        
+        if (needsVariants) {
+          setAuthorizedDeviceResolution(resolution);
+          setShowVariantPrompt(true);
+        }
+        
         await fetchDevices(); // Refresh the list
         setShowAuthorizeModal(false);
         setDeviceToAuthorize(null);
@@ -176,6 +190,50 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
     } catch (err) {
       displayLogger.error('Failed to authorize device:', err);
       setError('Failed to authorize device');
+    }
+  };
+  
+  const determineIfVariantsNeeded = (width?: number, height?: number): boolean => {
+    if (!width || !height) return false;
+    
+    // Standard resolutions that benefit from variants
+    const standardResolutions = [
+      { w: 1080, h: 1920 },
+      { w: 2160, h: 3840 },
+      { w: 1920, h: 1080 },
+      { w: 3840, h: 2160 },
+    ];
+    
+    // Check if device resolution matches a standard resolution
+    return standardResolutions.some(res => 
+      (res.w === width && res.h === height) || 
+      (res.w === height && res.h === width)
+    );
+  };
+  
+  const handleGenerateVariants = async () => {
+    try {
+      setIsGeneratingVariants(true);
+      const response = await fetch(urlResolver.getApiUrl('/playlists/generate-all-variants'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        displayLogger.info('Variants generated:', result);
+        setShowVariantPrompt(false);
+      } else {
+        throw new Error('Failed to generate variants');
+      }
+    } catch (err) {
+      displayLogger.error('Failed to generate variants:', err);
+      setError('Failed to generate variants');
+    } finally {
+      setIsGeneratingVariants(false);
     }
   };
 
@@ -748,6 +806,28 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                   placeholder="Enter device identifier"
                 />
               </div>
+              
+              {/* Device Info */}
+              {deviceToAuthorize && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <p className="text-xs font-medium text-gray-700 mb-2">Device Information:</p>
+                  <div className="space-y-1 text-xs text-gray-600">
+                    {deviceToAuthorize.screen_width && deviceToAuthorize.screen_height && (
+                      <p>
+                        <strong>Resolution:</strong> {deviceToAuthorize.screen_width}x{deviceToAuthorize.screen_height}
+                        {determineIfVariantsNeeded(deviceToAuthorize.screen_width, deviceToAuthorize.screen_height) && (
+                          <Badge variant="secondary" className="ml-2 text-xs">Standard</Badge>
+                        )}
+                      </p>
+                    )}
+                    {deviceToAuthorize.orientation && (
+                      <p><strong>Orientation:</strong> {deviceToAuthorize.orientation}</p>
+                    )}
+                    <p><strong>Last Seen:</strong> {new Date(deviceToAuthorize.last_seen).toLocaleString()}</p>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => {
@@ -1055,6 +1135,67 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
         confirmText="Change Orientation"
         variant="warning"
       />
+      
+      {/* Variant Generation Prompt Modal */}
+      {showVariantPrompt && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Generate Playlist Variants?</h3>
+              <button
+                onClick={() => setShowVariantPrompt(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                disabled={isGeneratingVariants}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-gray-700 mb-2">
+                  <strong>Display Resolution Detected:</strong> {authorizedDeviceResolution}
+                </p>
+                <p className="text-sm text-gray-600">
+                  This device uses a standard resolution. Generating optimized playlist variants will:
+                </p>
+                <ul className="text-sm text-gray-600 list-disc list-inside mt-2 space-y-1">
+                  <li>Filter images that match this resolution</li>
+                  <li>Create scaled versions for optimal performance</li>
+                  <li>Improve display quality and loading speed</li>
+                </ul>
+              </div>
+              
+              <p className="text-xs text-gray-500">
+                ℹ️ This process may take a few moments depending on your image library size. You can continue working while it runs in the background.
+              </p>
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowVariantPrompt(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                  disabled={isGeneratingVariants}
+                >
+                  Skip for Now
+                </button>
+                <button
+                  onClick={handleGenerateVariants}
+                  disabled={isGeneratingVariants}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {isGeneratingVariants ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 inline mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    'Generate Variants'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
