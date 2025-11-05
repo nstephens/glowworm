@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { urlResolver } from '../services/urlResolver';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Badge } from '../components/ui/badge';
 import { Camera, Sparkles, CheckCircle, AlertCircle } from 'lucide-react';
 
 /**
@@ -19,6 +20,39 @@ const AdminSetup: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchVersion();
+  }, []);
+
+  const fetchVersion = async () => {
+    try {
+      // Try to get version from Docker Hub
+      const response = await fetch('https://registry.hub.docker.com/v2/repositories/nickstephens/glowworm-frontend/tags/?page_size=10');
+      if (response.ok) {
+        const data = await response.json();
+        const versionTags = data.results
+          ?.filter((tag: any) => /^\d+\.\d+\.\d+$/.test(tag.name))
+          ?.sort((a: any, b: any) => {
+            const aParts = a.name.split('.').map(Number);
+            const bParts = b.name.split('.').map(Number);
+            for (let i = 0; i < 3; i++) {
+              if (aParts[i] !== bParts[i]) {
+                return bParts[i] - aParts[i];
+              }
+            }
+            return 0;
+          });
+        
+        if (versionTags && versionTags.length > 0) {
+          setVersion(versionTags[0].name);
+        }
+      }
+    } catch (error) {
+      console.log('Could not fetch version:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,10 +202,18 @@ const AdminSetup: React.FC = () => {
               {isSubmitting ? 'Creating Admin Account...' : 'Create Admin Account'}
             </Button>
 
-            <div className="text-center">
+            <div className="text-center space-y-2">
               <p className="text-xs text-muted-foreground">
                 Database is already configured via Docker
               </p>
+              {version && (
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-xs text-muted-foreground">Version:</span>
+                  <Badge variant="outline" className="text-xs">
+                    {version}
+                  </Badge>
+                </div>
+              )}
             </div>
           </form>
         </CardContent>
