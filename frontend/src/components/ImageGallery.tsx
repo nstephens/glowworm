@@ -86,6 +86,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const [fullSizeImage, setFullSizeImage] = useState<Image | null>(null);
   const [resolutionData, setResolutionData] = useState<any>(null);
   const [loadingResolutions, setLoadingResolutions] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadToast, setDownloadToast] = useState<{ show: boolean; message: string; type: 'info' | 'success' | 'error' }>({ 
+    show: false, 
+    message: '', 
+    type: 'info' 
+  });
 
   // Helper function to get file extension
   const getFileExtension = (filename: string) => {
@@ -204,7 +210,17 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   };
   
   const handleBulkDownload = async () => {
-    if (selectedImages.size === 0) return;
+    if (selectedImages.size === 0 || isDownloading) return;
+    
+    const imageCount = selectedImages.size;
+    setIsDownloading(true);
+    
+    // Show immediate feedback
+    setDownloadToast({
+      show: true,
+      message: `Preparing ${imageCount} image${imageCount !== 1 ? 's' : ''} for download...`,
+      type: 'info'
+    });
     
     try {
       const imageIds = Array.from(selectedImages);
@@ -223,6 +239,13 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
         throw new Error('Failed to create download');
       }
       
+      // Show success message while download is processing
+      setDownloadToast({
+        show: true,
+        message: `Download starting... (${imageCount} image${imageCount !== 1 ? 's' : ''})`,
+        type: 'success'
+      });
+      
       // Get the blob and trigger download
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -234,11 +257,29 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
-      // Clear selection after download
+      // Clear selection after download starts
+      // The browser will continue the download even if user navigates away
       setSelectedImages(new Set());
+      
+      // Hide toast after a delay
+      setTimeout(() => {
+        setDownloadToast({ show: false, message: '', type: 'info' });
+      }, 3000);
+      
     } catch (error) {
       console.error('Failed to download images:', error);
-      alert('Failed to download images. Please try again.');
+      setDownloadToast({
+        show: true,
+        message: 'Failed to download images. Please try again.',
+        type: 'error'
+      });
+      
+      // Hide error toast after a delay
+      setTimeout(() => {
+        setDownloadToast({ show: false, message: '', type: 'info' });
+      }, 5000);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -743,11 +784,21 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 <span>Move</span>
               </button>
               <button 
-                className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex-1 sm:flex-none justify-center"
+                className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex-1 sm:flex-none justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleBulkDownload}
+                disabled={isDownloading}
               >
-                <Download className="w-4 h-4" />
-                <span>Download</span>
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Preparing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>Download</span>
+                  </>
+                )}
               </button>
               <button 
                 className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex-1 sm:flex-none justify-center"
@@ -925,6 +976,29 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Download Toast Notification */}
+      {downloadToast.show && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-in">
+          <div className={`
+            flex items-center space-x-3 px-4 py-3 rounded-lg shadow-lg backdrop-blur-sm border
+            ${downloadToast.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : ''}
+            ${downloadToast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : ''}
+            ${downloadToast.type === 'info' ? 'bg-blue-50 border-blue-200 text-blue-800' : ''}
+          `}>
+            {downloadToast.type === 'info' && <Loader2 className="w-5 h-5 animate-spin" />}
+            {downloadToast.type === 'success' && <Download className="w-5 h-5" />}
+            {downloadToast.type === 'error' && <X className="w-5 h-5" />}
+            <span className="font-medium">{downloadToast.message}</span>
+            <button
+              onClick={() => setDownloadToast({ show: false, message: '', type: 'info' })}
+              className="ml-2 hover:opacity-70 transition-opacity"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}

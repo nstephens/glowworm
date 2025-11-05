@@ -1175,7 +1175,9 @@ async def download_images_as_zip(
         # Create zip file in memory
         zip_buffer = io.BytesIO()
         
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # Use ZIP_STORED (no compression) for images since they're already compressed
+        # This significantly speeds up zip creation for large image sets
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_STORED) as zip_file:
             for image in images:
                 try:
                     # Get the image file path
@@ -1184,7 +1186,7 @@ async def download_images_as_zip(
                     if image_path and os.path.exists(image_path):
                         # Add file to zip with its original filename
                         zip_file.write(image_path, image.original_filename)
-                        logger.info(f"Added {image.original_filename} to zip")
+                        logger.debug(f"Added {image.original_filename} to zip")
                     else:
                         logger.warning(f"Image file not found: {image.filename}")
                 except Exception as e:
