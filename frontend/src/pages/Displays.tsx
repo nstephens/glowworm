@@ -30,7 +30,11 @@ interface DisplayDevice {
   orientation: string;
 }
 
-const Displays: React.FC = () => {
+interface DisplaysProps {
+  onDisplaysLoad?: (active: number, pending: number) => void;
+}
+
+const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
   const navigate = useNavigate();
   const { isMobile } = useResponsiveLayout();
   const [devices, setDevices] = useState<DisplayDevice[]>([]);
@@ -79,10 +83,18 @@ const Displays: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setDevices(data);
-        setActiveDevices(data.filter((device: DisplayDevice) => device.status === 'authorized'));
-        setPendingDevices(data.filter((device: DisplayDevice) => device.status === 'pending'));
-        setRejectedDevices(data.filter((device: DisplayDevice) => device.status === 'rejected'));
+        const active = data.filter((device: DisplayDevice) => device.status === 'authorized');
+        const pending = data.filter((device: DisplayDevice) => device.status === 'pending');
+        const rejected = data.filter((device: DisplayDevice) => device.status === 'rejected');
+        setActiveDevices(active);
+        setPendingDevices(pending);
+        setRejectedDevices(rejected);
         setError(null);
+        
+        // Notify parent component of display counts
+        if (onDisplaysLoad) {
+          onDisplaysLoad(active.length, pending.length);
+        }
       } else {
         throw new Error('Failed to fetch devices');
       }
@@ -562,9 +574,12 @@ const Displays: React.FC = () => {
                             {device.device_name || `Device ${device.id}`}
                           </h3>
                           <div className="space-y-1">
-                            <p className="text-sm text-gray-500">
-                              Token: {device.device_token.substring(0, 12)}...
-                            </p>
+                            {/* Only show token for pending devices during authorization */}
+                            {device.status === 'pending' && (
+                              <p className="text-sm text-gray-500">
+                                Token: {device.device_token.substring(0, 12)}...
+                              </p>
+                            )}
                             {device.device_identifier && (
                               <p className="text-sm text-gray-500">
                                 ID: {device.device_identifier}
