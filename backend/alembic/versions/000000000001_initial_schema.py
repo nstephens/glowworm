@@ -46,7 +46,7 @@ def upgrade():
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('name', sa.String(length=100), nullable=False),
         sa.Column('description', sa.Text(), nullable=True),
-        sa.Column('display_mode', sa.Enum('sequential', 'random', name='displaymode'), nullable=False, server_default='sequential'),
+        sa.Column('display_mode', sa.Enum('default', 'ken_burns_plus', 'soft_glow', 'ambient_pulse', 'dreamy_reveal', 'stacked_reveal', name='displaymode'), nullable=False, server_default='default'),
         sa.Column('sequence', sa.JSON(), nullable=True),
         sa.Column('show_image_info', sa.Boolean(), nullable=True, server_default='0'),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
