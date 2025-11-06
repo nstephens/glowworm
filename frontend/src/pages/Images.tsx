@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Label } from '../components/ui/label';
 import { Separator } from '../components/ui/separator';
-import { Upload, Folder, Plus, Settings, ImageIcon, FolderOpen, MoreHorizontal, Calendar, HardDrive } from 'lucide-react';
+import { Upload, Folder, Plus, Settings, ImageIcon, FolderOpen, MoreHorizontal, Calendar, HardDrive, Edit, Trash2 } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import ImageGallery from '../components/ImageGallery';
 import AlbumManager from '../components/AlbumManager';
@@ -48,6 +48,14 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
   // Album creation modal state
   const [showAlbumModal, setShowAlbumModal] = useState(false);
   const [newAlbumName, setNewAlbumName] = useState('');
+  
+  // Album edit/delete modal state
+  const [showEditAlbumModal, setShowEditAlbumModal] = useState(false);
+  const [albumToEdit, setAlbumToEdit] = useState<Album | null>(null);
+  const [editAlbumName, setEditAlbumName] = useState('');
+  const [showDeleteAlbumModal, setShowDeleteAlbumModal] = useState(false);
+  const [albumToDelete, setAlbumToDelete] = useState<Album | null>(null);
+  const [deleteAlbumAction, setDeleteAlbumAction] = useState<'delete-images' | 'move-to-unsorted'>('move-to-unsorted');
 
   // Load data on component mount
   useEffect(() => {
@@ -201,6 +209,45 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
     }
   };
 
+  const openEditAlbumModal = (album: Album, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+    setAlbumToEdit(album);
+    setEditAlbumName(album.name);
+    setShowEditAlbumModal(true);
+  };
+
+  const handleEditAlbumSubmit = async () => {
+    if (!albumToEdit || !editAlbumName.trim()) return;
+    
+    try {
+      await handleUpdateAlbum(albumToEdit.id, editAlbumName.trim());
+      setShowEditAlbumModal(false);
+      setAlbumToEdit(null);
+      setEditAlbumName('');
+    } catch (err) {
+      // Error already handled in handleUpdateAlbum
+    }
+  };
+
+  const openDeleteAlbumModal = (album: Album, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+    setAlbumToDelete(album);
+    setShowDeleteAlbumModal(true);
+  };
+
+  const handleDeleteAlbumSubmit = async () => {
+    if (!albumToDelete) return;
+    
+    try {
+      await handleDeleteAlbum(albumToDelete.id, deleteAlbumAction);
+      setShowDeleteAlbumModal(false);
+      setAlbumToDelete(null);
+      setDeleteAlbumAction('move-to-unsorted');
+    } catch (err) {
+      // Error already handled in handleDeleteAlbum
+    }
+  };
+
   const handleImageSelect = (image: Image) => {
     console.log('Selected image:', image);
     // TODO: Implement image preview/modal
@@ -341,7 +388,7 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
           {albums.map((album) => (
             <Card 
               key={album.id} 
-              className="gallery-item border-0 shadow-lg bg-card/50 backdrop-blur-sm cursor-pointer"
+              className="gallery-item border-0 shadow-lg bg-card/50 backdrop-blur-sm cursor-pointer group relative"
               onClick={() => setSelectedAlbum(album)}
             >
               <CardContent className="p-2 md:p-4">
@@ -352,6 +399,23 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
                   <div className="flex-1">
                     <h3 className="font-semibold text-sm md:text-base">{album.name}</h3>
                     <p className="text-xs md:text-sm text-muted-foreground">{images.filter(img => img.album_id === album.id).length} images</p>
+                  </div>
+                  {/* Action Buttons - Show on Hover */}
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                    <button
+                      onClick={(e) => openEditAlbumModal(album, e)}
+                      className="p-1.5 bg-white/90 hover:bg-white rounded-md shadow-md text-gray-600 hover:text-blue-600 transition-colors"
+                      title="Rename album"
+                    >
+                      <Edit className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => openDeleteAlbumModal(album, e)}
+                      className="p-1.5 bg-white/90 hover:bg-white rounded-md shadow-md text-gray-600 hover:text-red-600 transition-colors"
+                      title="Delete album"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                    </button>
                   </div>
                 </div>
               </CardContent>
@@ -529,6 +593,165 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
                 >
                   <Folder className="w-4 h-4 mr-2" />
                   Create Album
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Album Modal */}
+      {showEditAlbumModal && albumToEdit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4 border-0 shadow-2xl">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl">Rename Album</CardTitle>
+                  <CardDescription>Change the name of "{albumToEdit.name}"</CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowEditAlbumModal(false);
+                    setAlbumToEdit(null);
+                    setEditAlbumName('');
+                  }}
+                  className="h-8 w-8 p-0"
+                >
+                  <Plus className="w-4 h-4 rotate-45" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-album-name">Album Name</Label>
+                <Input
+                  id="edit-album-name"
+                  placeholder="Enter new album name..."
+                  value={editAlbumName}
+                  onChange={(e) => setEditAlbumName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleEditAlbumSubmit();
+                    }
+                    if (e.key === 'Escape') {
+                      setShowEditAlbumModal(false);
+                      setAlbumToEdit(null);
+                      setEditAlbumName('');
+                    }
+                  }}
+                  autoFocus
+                  className="bg-background/50 border-border/50"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditAlbumModal(false);
+                    setAlbumToEdit(null);
+                    setEditAlbumName('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleEditAlbumSubmit}
+                  disabled={!editAlbumName.trim() || editAlbumName.trim() === albumToEdit.name}
+                  className="shadow-lg"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Rename Album
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Delete Album Modal */}
+      {showDeleteAlbumModal && albumToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4 border-0 shadow-2xl">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl">Delete Album</CardTitle>
+                  <CardDescription>What should happen to the images in "{albumToDelete.name}"?</CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowDeleteAlbumModal(false);
+                    setAlbumToDelete(null);
+                    setDeleteAlbumAction('move-to-unsorted');
+                  }}
+                  className="h-8 w-8 p-0"
+                >
+                  <Plus className="w-4 h-4 rotate-45" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-sm text-gray-700">
+                  This album contains <strong>{images.filter(img => img.album_id === albumToDelete.id).length} images</strong>
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="delete-action"
+                    value="move-to-unsorted"
+                    checked={deleteAlbumAction === 'move-to-unsorted'}
+                    onChange={(e) => setDeleteAlbumAction(e.target.value as 'delete-images' | 'move-to-unsorted')}
+                    className="mt-0.5 w-4 h-4 text-blue-600"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-gray-900">Keep images (recommended)</span>
+                    <p className="text-xs text-gray-500 mt-0.5">Delete album but move images to "All Images"</p>
+                  </div>
+                </label>
+                
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="delete-action"
+                    value="delete-images"
+                    checked={deleteAlbumAction === 'delete-images'}
+                    onChange={(e) => setDeleteAlbumAction(e.target.value as 'delete-images' | 'move-to-unsorted')}
+                    className="mt-0.5 w-4 h-4 text-red-600"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-red-900">Delete images too</span>
+                    <p className="text-xs text-red-600 mt-0.5">Permanently delete the album AND all its images</p>
+                  </div>
+                </label>
+              </div>
+              
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowDeleteAlbumModal(false);
+                    setAlbumToDelete(null);
+                    setDeleteAlbumAction('move-to-unsorted');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleDeleteAlbumSubmit}
+                  variant="destructive"
+                  className="shadow-lg"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  {deleteAlbumAction === 'delete-images' ? 'Delete Album & Images' : 'Delete Album'}
                 </Button>
               </div>
             </CardContent>
