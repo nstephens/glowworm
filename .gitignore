@@ -94,11 +94,11 @@ dev-debug.log
 # tasks/ 
 
 .mcp.json
-CLAUDE.md
-FRONTEND_UX_REDESIGN_PRD.md
-GEMINI.MD
-HARDCODED_VALUES_AUDIT.md
 cleanup_for_publish.sh
 .claude/
 .cursor/
 .gemini/
+
+# Working notes and PRDs (internal documentation)
+docs/notes/
+docs/prd/
