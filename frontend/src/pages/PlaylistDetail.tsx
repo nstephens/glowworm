@@ -181,7 +181,6 @@ const PlaylistDetail: React.FC = () => {
   const [editDisplayMode, setEditDisplayMode] = useState<DisplayMode>('default');
   const [editDisplayTime, setEditDisplayTime] = useState(30);
   const [editIsDefault, setEditIsDefault] = useState(false);
-  const [editShowImageInfo, setEditShowImageInfo] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showDragWarning, setShowDragWarning] = useState(false);
   const [dragValidationResult, setDragValidationResult] = useState<{warning?: string; pairLoss?: number} | null>(null);
@@ -223,11 +222,10 @@ const PlaylistDetail: React.FC = () => {
       const displayModeChanged = editDisplayMode !== (playlist.display_mode || 'default');
       const displayTimeChanged = editDisplayTime !== (playlist.display_time_seconds || 30);
       const isDefaultChanged = editIsDefault !== playlist.is_default;
-      const showImageInfoChanged = editShowImageInfo !== (playlist.show_image_info || false);
       
-      setHasChanges(nameChanged || displayModeChanged || displayTimeChanged || isDefaultChanged || showImageInfoChanged);
+      setHasChanges(nameChanged || displayModeChanged || displayTimeChanged || isDefaultChanged);
     }
-  }, [editName, editDisplayMode, editDisplayTime, editIsDefault, editShowImageInfo, playlist]);
+  }, [editName, editDisplayMode, editDisplayTime, editIsDefault, playlist]);
 
   const loadPlaylist = async () => {
     if (!slug) return;
@@ -250,7 +248,6 @@ const PlaylistDetail: React.FC = () => {
       setEditDisplayMode(playlistData.display_mode || 'default');
       setEditDisplayTime(playlistData.display_time_seconds || 30);
       setEditIsDefault(playlistData.is_default || false);
-      setEditShowImageInfo(playlistData.show_image_info || false);
       
       // Load playlist images
       const imagesResponse = await apiService.getPlaylistImages(playlistData.id);
@@ -302,8 +299,7 @@ const PlaylistDetail: React.FC = () => {
         name: editName.trim(),
         display_mode: editDisplayMode,
         display_time_seconds: editDisplayTime,
-        is_default: editIsDefault,
-        show_image_info: editShowImageInfo
+        is_default: editIsDefault
       };
       
       await apiService.updatePlaylist(
@@ -311,8 +307,7 @@ const PlaylistDetail: React.FC = () => {
         updateData.name,
         updateData.is_default,
         updateData.display_time_seconds,
-        updateData.display_mode,
-        updateData.show_image_info
+        updateData.display_mode
       );
       
       // If image order changed, save it too
@@ -342,7 +337,6 @@ const PlaylistDetail: React.FC = () => {
       setEditDisplayMode(playlist.display_mode || 'default');
       setEditDisplayTime(playlist.display_time_seconds || 30);
       setEditIsDefault(playlist.is_default || false);
-      setEditShowImageInfo(playlist.show_image_info || false);
       
       // Reload playlist to revert any unsaved image order changes
       if (hasChanges) {
@@ -727,27 +721,6 @@ const PlaylistDetail: React.FC = () => {
                         Default Playlist
                       </span>
                     </div>
-                  </div>
-
-                  {/* Show Image Info */}
-                  <div className="space-y-3">
-                    <label className={cn("font-medium text-gray-700", isMobile ? "text-base" : "text-sm")}>
-                      Display Options
-                    </label>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={editShowImageInfo}
-                        onChange={(e) => setEditShowImageInfo(e.target.checked)}
-                        className={cn("text-blue-600 rounded focus:ring-blue-500", isMobile ? "w-5 h-5" : "w-4 h-4")}
-                      />
-                      <span className={cn("text-gray-600", isMobile ? "text-base" : "text-sm")}>
-                        Show Image Info
-                      </span>
-                    </div>
-                    <p className={cn("text-gray-500", isMobile ? "text-sm" : "text-xs")}>
-                      Display image name, resolution, and date on screen
-                    </p>
                   </div>
                 </div>
               </div>

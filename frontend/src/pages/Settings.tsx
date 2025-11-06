@@ -61,6 +61,9 @@ interface SystemSettings {
   // OAuth settings
   google_client_id: string;
   google_client_secret: string;
+  
+  // Debugging settings
+  show_image_info?: boolean;
 }
 
 interface DisplaySize {
@@ -1198,6 +1201,46 @@ const Settings: React.FC = () => {
         <div>
           <h3 className="text-lg font-medium">Utilities & Jobs</h3>
           <p className="text-sm text-gray-500">Background tasks and maintenance operations</p>
+        </div>
+      </div>
+
+      {/* Debugging Section */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+          <Info className="w-4 h-4" />
+          Debugging
+        </h4>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-700">Image Debugging</label>
+              <p className="text-xs text-gray-500 mt-1">
+                Display informational overlays on playlist images showing filename, resolution, and date
+              </p>
+            </div>
+            <div className="flex items-center space-x-3 ml-4">
+              <button
+                onClick={() => setSettings(prev => ({ ...prev, show_image_info: false }))}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  settings.show_image_info === false
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                Off
+              </button>
+              <button
+                onClick={() => setSettings(prev => ({ ...prev, show_image_info: true }))}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  settings.show_image_info === true
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                On
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
