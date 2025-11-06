@@ -108,7 +108,7 @@ const DraggableImageItem: React.FC<{
         isDragging ? 'opacity-50 scale-95 ring-2 ring-blue-500' : 'hover:scale-105'
       } ${isOver && isEditing ? 'ring-2 ring-green-500' : ''} ${
         isEditing ? 'cursor-move' : 'cursor-default'
-      } ${pairInfo?.isPaired ? `ring-[6px] ${borderColor}` : ''} focus:outline-none focus:ring-2 focus:ring-blue-400`}
+      } ${pairInfo?.isPaired ? `ring-8 ${borderColor} shadow-lg` : 'ring-1 ring-gray-200'} focus:outline-none focus:ring-2 focus:ring-blue-400`}
       tabIndex={isEditing ? 0 : -1}
       onKeyDown={handleKeyDown}
       data-image-id={image.id}
