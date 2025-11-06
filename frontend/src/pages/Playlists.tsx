@@ -112,6 +112,9 @@ export const Playlists: React.FC<PlaylistsProps> = ({
       
       // Load thumbnail for the new playlist (will be empty initially)
       loadPlaylistThumbnails([response.data]);
+      
+      // Navigate to the new playlist's detail page for easy image addition
+      navigate(`/admin/playlists/${response.data.slug}`);
     } catch (err: any) {
       alert('Failed to create playlist: ' + (err.message || 'Unknown error'));
     } finally {
@@ -141,6 +144,9 @@ export const Playlists: React.FC<PlaylistsProps> = ({
       
       // Load thumbnail for the new playlist (will be empty initially)
       loadPlaylistThumbnails([response.data]);
+      
+      // Navigate to the new playlist's detail page for easy image addition
+      navigate(`/admin/playlists/${response.data.slug}`);
     } catch (err: any) {
       alert('Failed to create playlist: ' + (err.message || 'Unknown error'));
     } finally {
