@@ -64,8 +64,20 @@ async def upload_image(
             user_id=current_user.id
         )
         
-        # Create database record
+        # Check for duplicates before creating database record
         image_service = ImageService(db)
+        existing_image = image_service.get_image_by_hash(image_metadata['file_hash'])
+        
+        if existing_image:
+            logger.info(f"Duplicate image detected: {file.filename} matches existing image ID {existing_image.id}")
+            return {
+                "message": "Duplicate image - already exists in library",
+                "data": existing_image.to_dict(),
+                "status_code": 200,
+                "is_duplicate": True
+            }
+        
+        # Create database record only if not duplicate
         image = image_service.create_image(
             filename=image_metadata['filename'],
             original_filename=image_metadata['original_filename'],
