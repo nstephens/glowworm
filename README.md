@@ -4,7 +4,11 @@ A modern web-based digital photo display system for creating beautiful fullscree
 
 GlowWorm transforms any display into an elegant photo frame with powerful features for managing, organizing, and presenting your photo collection. Built for home users, artists, businesses, and anyone wanting to display photos beautifully.
 
-<p align="center">[![Display Demo](https://img.youtube.com/vi/REHHyqISQyo/0.jpg)](https://youtube.com/shorts/REHHyqISQyo)</p>
+<p align="center">
+  <a href="https://youtube.com/shorts/REHHyqISQyo">
+    <img src="https://img.youtube.com/vi/REHHyqISQyo/0.jpg" alt="Display Demo">
+  </a>
+</p>
 
 ## Features
 
