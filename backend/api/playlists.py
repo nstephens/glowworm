@@ -822,6 +822,11 @@ async def get_playlist_smart(
     """Get playlist optimized for device resolution (public endpoint for display devices)"""
     try:
         from models.playlist_variant import PlaylistVariant
+        from services.database_config_service import DatabaseConfigService
+        
+        # Get global show_image_info setting
+        config_service = DatabaseConfigService(db)
+        show_image_info = config_service.get_setting("show_image_info", False)
         
         # Get device token from cookie
         cookie_manager = CookieManager()
@@ -877,9 +882,13 @@ async def get_playlist_smart(
             
             logger.warning(f"No variant found for {device_width}x{device_height}, using original")
             
+            # Add global show_image_info setting to playlist
+            playlist_dict = playlist.to_dict()
+            playlist_dict["show_image_info"] = show_image_info
+            
             return {
                 "message": "Using original playlist (no variants available)",
-                "playlist": playlist.to_dict(),
+                "playlist": playlist_dict,
                 "variant_type": "original",
                 "device_resolution": f"{device_width}x{device_height}",
                 "effective_resolution": f"{int(device_width * device_pixel_ratio)}x{int(device_height * device_pixel_ratio)}",
@@ -893,6 +902,7 @@ async def get_playlist_smart(
         optimized_playlist = playlist.to_dict()
         optimized_playlist["sequence"] = best_variant.optimized_sequence
         optimized_playlist["image_count"] = best_variant.image_count
+        optimized_playlist["show_image_info"] = show_image_info  # Add global setting
         
         logger.info(f"Selected variant: {best_variant.variant_type.value} ({best_variant.target_width}x{best_variant.target_height})")
         
