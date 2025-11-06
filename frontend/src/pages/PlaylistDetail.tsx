@@ -108,7 +108,7 @@ const DraggableImageItem: React.FC<{
         isDragging ? 'opacity-50 scale-95 ring-2 ring-blue-500' : 'hover:scale-105'
       } ${isOver && isEditing ? 'ring-2 ring-green-500' : ''} ${
         isEditing ? 'cursor-move' : 'cursor-default'
-      } ${pairInfo?.isPaired ? `ring-4 ${borderColor}` : ''} focus:outline-none focus:ring-2 focus:ring-blue-400`}
+      } ${pairInfo?.isPaired ? `ring-[6px] ${borderColor}` : ''} focus:outline-none focus:ring-2 focus:ring-blue-400`}
       tabIndex={isEditing ? 0 : -1}
       onKeyDown={handleKeyDown}
       data-image-id={image.id}
@@ -121,19 +121,6 @@ const DraggableImageItem: React.FC<{
         alt={image.filename}
         className="w-full h-full object-cover aspect-square"
       />
-      
-      {/* Pairing indicator badges */}
-      {pairInfo?.isPaired && pairInfo.pairNumber !== undefined && (
-        <div className="absolute top-2 left-2 flex items-center space-x-1">
-          <div className={`${borderColor.replace('ring-', 'bg-')} text-white text-xs px-2 py-1 rounded-full shadow-lg flex items-center space-x-1 font-semibold`}>
-            <span>👥</span>
-            <span>Pair {pairInfo.pairNumber}</span>
-            {pairInfo.positionInPair && (
-              <span className="opacity-75">• {pairInfo.positionInPair === 1 ? '1st' : '2nd'}</span>
-            )}
-          </div>
-        </div>
-      )}
       
       {/* Overlay with actions */}
       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 flex items-center justify-center">
