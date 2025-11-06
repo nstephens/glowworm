@@ -57,11 +57,15 @@ GlowWorm transforms any display into an elegant photo frame with powerful featur
 
 | Dashboard | Images |
 |-----------|---------|
-| ![Glowworm Dashboard](https://manipulate.org/glowworm/glowworm_dashboard.png) | ![Glowworm Images](https://manipulate.org/glowworm/glowworm_images.png) |
+| ![Glowworm Dashboard](docs/screenshots/1.%20dashboard.png) | ![Glowworm Images](docs/screenshots/2.%20images.png) |
 
 | Playlists | Displays |
 |-----------|----------|
-| ![Glowworm Playlists](https://manipulate.org/glowworm/glowworm_playlists.png) | ![Glowworm Displays](https://manipulate.org/glowworm/glowworm_displays.png) |
+| ![Glowworm Playlists](docs/screenshots/3.%20playlists.png) | ![Glowworm Displays](docs/screenshots/4.displays.png) |
+
+| Settings |
+|----------|
+| ![Glowworm Settings](docs/screenshots/5.%20settings.png) |
 
 ### Display Example
 https://github.com/user-attachments/assets/f90c830d-4503-4673-8615-15d6d51d0e52
