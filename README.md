@@ -88,47 +88,37 @@ chmod +x quick-start.sh && ./quick-start.sh
 The script will:
 1. Download required Docker files
 2. Generate secure passwords automatically
-3. Configure your server settings
-4. Start all services (frontend, backend, database)
+3. Detect your network interfaces
+4. **Prompt you to edit the `.env` file** (configure network interface)
+5. Start all services (frontend, backend, database)
+
+**Interactive Configuration:**
+
+The script pauses and prompts you to configure the network interface:
+
+```bash
+DISPLAY_NETWORK_INTERFACE=10.10.10.2  # Set to your server's IP
+```
+
+**Why this matters:**
+- Controls which IP address Docker binds to for port 3003
+- Required for display devices to connect from your network
+- Prevents binding to localhost-only interfaces
+- Ensures frontend is accessible across your network
+
+The script will:
+- Show your available network interfaces
+- Open the `.env` file in your default editor
+- Wait for you to save and close
+- Validate the configuration
+- Start the containers with correct settings
 
 **Optional flags:**
 - `--clean` - Delete existing data and .env for fresh install
 - `--help` - Show all available options
 
-**Important: Configure Network Interface**
-
-After running the script, you must configure which network interface Docker should use:
-
-1. **Find your network interfaces:**
-   ```bash
-   ip addr show
-   ```
-   Look for your primary network interface (e.g., `eth0`, `ens18`, `wlan0`)
-
-2. **Edit the generated `.env` file:**
-   ```bash
-   nano .env
-   ```
-
-3. **Set DISPLAY_NETWORK_INTERFACE:**
-   ```bash
-   DISPLAY_NETWORK_INTERFACE=10.10.10.2  # Replace with your server's IP
-   ```
-   This controls which IP address Docker binds to for port 3003.
-
-4. **Restart containers:**
-   ```bash
-   docker compose down && docker compose up -d
-   ```
-
-**Why this matters:**
-- Ensures the frontend is accessible from your network
-- Binds Docker port to the correct interface
-- Required for display devices to connect
-- Prevents binding to localhost-only interfaces
-
 **Access your installation:**
-- Open browser: `http://YOUR_SERVER_IP:3003` (use the IP you set above)
+- Open browser: `http://YOUR_SERVER_IP:3003` (use the IP you configured)
 - Complete the setup wizard (set admin password)
 - Start uploading photos
 
