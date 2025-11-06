@@ -397,7 +397,6 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold text-sm md:text-base">All Images</h3>
-                  <p className="text-xs md:text-sm text-muted-foreground">{images.length} images</p>
                 </div>
               </div>
             </CardContent>
