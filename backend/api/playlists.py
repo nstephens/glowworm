@@ -28,6 +28,7 @@ class PlaylistUpdateRequest(BaseModel):
     display_time_seconds: Optional[int] = None
     display_mode: Optional[str] = None
     show_image_info: Optional[bool] = None
+    show_exif_date: Optional[bool] = None
 
 class PlaylistReorderRequest(BaseModel):
     image_ids: List[int]
@@ -254,7 +255,8 @@ async def update_playlist(
             is_default=update_data.is_default, 
             display_time_seconds=update_data.display_time_seconds,
             display_mode=update_data.display_mode,
-            show_image_info=update_data.show_image_info
+            show_image_info=update_data.show_image_info,
+            show_exif_date=update_data.show_exif_date
         )
         
         # Send WebSocket notification to all connected devices

@@ -331,8 +331,8 @@ class ApiService {
     };
   }
 
-  async updatePlaylist(id: number, name?: string, isDefault?: boolean, displayTimeSeconds?: number, displayMode?: string, showImageInfo?: boolean): Promise<ApiResponse<Playlist>> {
-    const response = await this.api.put(`/playlists/${id}`, { name, is_default: isDefault, display_time_seconds: displayTimeSeconds, display_mode: displayMode, show_image_info: showImageInfo });
+  async updatePlaylist(id: number, name?: string, isDefault?: boolean, displayTimeSeconds?: number, displayMode?: string, showImageInfo?: boolean, showExifDate?: boolean): Promise<ApiResponse<Playlist>> {
+    const response = await this.api.put(`/playlists/${id}`, { name, is_default: isDefault, display_time_seconds: displayTimeSeconds, display_mode: displayMode, show_image_info: showImageInfo, show_exif_date: showExifDate });
     // Backend returns {success: true, message: "...", playlist: {...}}
     return {
       message: response.data.message || "Playlist updated successfully",

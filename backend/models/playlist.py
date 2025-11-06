@@ -26,6 +26,7 @@ class Playlist(Base):
     display_time_seconds = Column(Integer, nullable=True)  # Time to display each image in seconds
     display_mode = Column(Enum(DisplayMode, values_callable=lambda x: [e.value for e in x]), default=DisplayMode.DEFAULT, nullable=True)  # Display mode for the playlist
     show_image_info = Column(Boolean, default=False, nullable=True)  # Show image info overlay on display
+    show_exif_date = Column(Boolean, default=False, nullable=True)  # Show EXIF date in lower right corner
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=True)
     
@@ -66,6 +67,7 @@ class Playlist(Base):
                 "display_time_seconds": self.display_time_seconds,
                 "display_mode": display_mode_value,
                 "show_image_info": self.show_image_info or False,
+                "show_exif_date": self.show_exif_date or False,
                 "created_at": self.created_at.isoformat() if self.created_at else None,
                 "updated_at": self.updated_at.isoformat() if self.updated_at else None,
                 "image_count": len(self.images) if self.images else 0
@@ -84,6 +86,7 @@ class Playlist(Base):
                 "display_time_seconds": self.display_time_seconds or self._get_default_display_time(),
                 "display_mode": DisplayMode.DEFAULT.value,
                 "show_image_info": getattr(self, 'show_image_info', False) or False,
+                "show_exif_date": getattr(self, 'show_exif_date', False) or False,
                 "created_at": None,
                 "updated_at": None,
                 "image_count": 0

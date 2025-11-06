@@ -58,6 +58,7 @@ export interface Playlist {
   display_time_seconds: number;
   display_mode: DisplayMode;
   show_image_info?: boolean;
+  show_exif_date?: boolean;
   created_at: string;
   updated_at: string;
   image_count: number;

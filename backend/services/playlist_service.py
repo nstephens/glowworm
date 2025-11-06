@@ -92,7 +92,8 @@ class PlaylistService:
     
     def update_playlist(self, playlist_id: int, name: Optional[str] = None, 
                        is_default: Optional[bool] = None, display_time_seconds: Optional[int] = None, 
-                       display_mode: Optional[str] = None, show_image_info: Optional[bool] = None) -> Optional[Playlist]:
+                       display_mode: Optional[str] = None, show_image_info: Optional[bool] = None,
+                       show_exif_date: Optional[bool] = None) -> Optional[Playlist]:
         """Update playlist"""
         try:
             playlist = self.get_playlist_by_id(playlist_id)
@@ -141,6 +142,10 @@ class PlaylistService:
             # Update show_image_info if provided
             if show_image_info is not None:
                 playlist.show_image_info = show_image_info
+            
+            # Update show_exif_date if provided
+            if show_exif_date is not None:
+                playlist.show_exif_date = show_exif_date
             
             self.db.commit()
             self.db.refresh(playlist)

@@ -34,6 +34,30 @@ const defaultSettings: SlideshowSettings = {
   volume: 0.5,
 };
 
+// Helper function to format EXIF date to readable format
+const formatExifDate = (exifData: any): string | null => {
+  const dateStr = exifData?.DateTimeOriginal || exifData?.DateTime;
+  if (!dateStr) return null;
+  
+  try {
+    // EXIF DateTime uses "YYYY:MM:DD HH:MM:SS" format
+    const parsed = dateStr.includes(':') && dateStr.match(/^\d{4}:\d{2}:\d{2}/)
+      ? new Date(dateStr.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3'))
+      : new Date(dateStr);
+    
+    if (isNaN(parsed.getTime())) return null;
+    
+    // Format as "August 3, 2021"
+    return parsed.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  } catch (e) {
+    return null;
+  }
+};
+
 export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = ({
   images,
   playlist,
@@ -1704,6 +1728,47 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
               })()}
             </div>
           </div>
+        </>
+      )}
+
+      {/* EXIF Date Overlay - Lower Right Corner (Subtle) */}
+      {playlist?.show_exif_date && !shouldShowSplitScreen && currentImage && (() => {
+        const formattedDate = formatExifDate(currentImage.exif);
+        if (!formattedDate) return null;
+        
+        return (
+          <div className="absolute bottom-4 right-4 bg-black bg-opacity-40 text-white px-3 py-1.5 rounded-md text-sm">
+            {formattedDate}
+          </div>
+        );
+      })()}
+
+      {/* EXIF Date Overlays - Split Screen Mode */}
+      {playlist?.show_exif_date && shouldShowSplitScreen && nextImageData && (
+        <>
+          {/* Top Image EXIF Date */}
+          {(() => {
+            const formattedDate = formatExifDate(currentImage?.exif);
+            if (!formattedDate) return null;
+            
+            return (
+              <div className="absolute top-4 right-4 bg-black bg-opacity-40 text-white px-3 py-1.5 rounded-md text-sm" style={{ marginTop: '56px' }}>
+                {formattedDate}
+              </div>
+            );
+          })()}
+          
+          {/* Bottom Image EXIF Date */}
+          {(() => {
+            const formattedDate = formatExifDate(nextImageData.exif);
+            if (!formattedDate) return null;
+            
+            return (
+              <div className="absolute bottom-4 right-4 bg-black bg-opacity-40 text-white px-3 py-1.5 rounded-md text-sm">
+                {formattedDate}
+              </div>
+            );
+          })()}
         </>
       )}
 
