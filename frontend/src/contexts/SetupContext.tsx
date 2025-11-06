@@ -40,15 +40,32 @@ export const SetupProvider: React.FC<SetupProviderProps> = ({ children }) => {
       setIsConfigured(status.is_configured);
       setNeedsBootstrap(status.needs_bootstrap || false);
       setNeedsAdmin(status.needs_admin || false);
+      
+      // Remember successful setup in localStorage
+      if (status.is_configured) {
+        localStorage.setItem('glowworm_setup_complete', 'true');
+      }
     } catch (error) {
       console.error('❌ Failed to check setup status:', error);
       console.error('  This is likely a CORS or network error.');
       console.error('  If you just reset the database, restart the backend server.');
-      // On error, assume setup is needed to be safe
-      // This ensures setup wizard appears if backend is unreachable
-      setIsConfigured(false);
-      setNeedsBootstrap(true);
-      setNeedsAdmin(false);
+      
+      // Check if setup was previously completed
+      const wasSetupComplete = localStorage.getItem('glowworm_setup_complete') === 'true';
+      
+      if (wasSetupComplete) {
+        // Don't redirect to setup if it was previously complete
+        // This prevents temporary connection issues from breaking the UI
+        console.warn('⚠️ Backend unreachable, but setup was previously complete. Maintaining configured state.');
+        setIsConfigured(true);
+        setNeedsBootstrap(false);
+        setNeedsAdmin(false);
+      } else {
+        // First-time setup or setup never completed
+        setIsConfigured(false);
+        setNeedsBootstrap(true);
+        setNeedsAdmin(false);
+      }
     } finally {
       setIsLoading(false);
     }

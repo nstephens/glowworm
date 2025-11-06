@@ -116,17 +116,22 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
         `${newImages.length} image${newImages.length !== 1 ? 's' : ''} uploaded successfully`
       );
       
-      // Trigger background variant generation for newly uploaded images
-      try {
-        await apiService.regenerateImageResolutions();
-        info(
-          'Generating Variants',
-          'Optimized image variants are being generated in the background'
-        );
-      } catch (err) {
-        // Non-critical - variants can be generated manually later
-        console.log('Variant generation will occur on next scheduled run');
-      }
+      // Trigger background variant generation for newly uploaded images (fire and forget)
+      // Don't await - let it run in the background without blocking UI
+      apiService.regenerateImageResolutions()
+        .then(() => {
+          console.log('✅ Background variant generation completed');
+        })
+        .catch((err) => {
+          // Non-critical - variants can be generated manually later
+          console.log('⚠️ Variant generation will occur on next scheduled run:', err);
+        });
+      
+      // Show info immediately without waiting
+      info(
+        'Generating Variants',
+        'Optimized image variants are being generated in the background'
+      );
     }
   };
 
