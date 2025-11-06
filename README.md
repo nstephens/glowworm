@@ -7,7 +7,7 @@ GlowWorm transforms any display into an elegant photo frame with powerful featur
 <p align="center">
   <a href="https://youtube.com/shorts/REHHyqISQyo">
     <img src="https://img.youtube.com/vi/REHHyqISQyo/0.jpg" alt="Display Demo">
-  </a>
+  </a><br>
   [Youtube demo of display device playing a slideshow]
 </p>
 
