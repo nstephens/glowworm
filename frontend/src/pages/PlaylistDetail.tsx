@@ -955,10 +955,14 @@ const PlaylistDetail: React.FC = () => {
                   console.log('Playlist computed_sequence:', playlist?.computed_sequence);
                   if (playlist?.computed_sequence) {
                     const pairEntries = playlist.computed_sequence.filter((e: any) => e.type === 'pair');
-                    console.log(`Found ${pairEntries.length} pair entries out of ${playlist.computed_sequence.length} total`);
+                    const singleEntries = playlist.computed_sequence.filter((e: any) => e.type === 'single');
+                    console.log(`Found ${pairEntries.length} pair entries and ${singleEntries.length} single entries out of ${playlist.computed_sequence.length} total`);
+                    console.log('First 3 entries (any type):', playlist.computed_sequence.slice(0, 3));
                     if (pairEntries.length > 0) {
                       console.log('First 3 pairs:', pairEntries.slice(0, 3));
                     }
+                    // Check first few images for dimensions
+                    console.log('First 3 images dimensions:', playlistImages.slice(0, 3).map(img => ({ id: img.id, width: img.width, height: img.height, isLandscape: img.width > img.height })));
                   }
                   return null;
                 })()}
