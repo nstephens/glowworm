@@ -1222,7 +1222,7 @@ const Settings: React.FC = () => {
               <button
                 onClick={() => setSettings(prev => ({ ...prev, show_image_info: false }))}
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  settings.show_image_info === false
+                  !settings.show_image_info
                     ? 'bg-gray-900 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
