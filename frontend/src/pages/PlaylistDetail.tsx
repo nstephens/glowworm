@@ -953,6 +953,13 @@ const PlaylistDetail: React.FC = () => {
                 {(() => {
                   // Debug: Check computed_sequence
                   console.log('Playlist computed_sequence:', playlist?.computed_sequence);
+                  if (playlist?.computed_sequence) {
+                    const pairEntries = playlist.computed_sequence.filter((e: any) => e.type === 'pair');
+                    console.log(`Found ${pairEntries.length} pair entries out of ${playlist.computed_sequence.length} total`);
+                    if (pairEntries.length > 0) {
+                      console.log('First 3 pairs:', pairEntries.slice(0, 3));
+                    }
+                  }
                   return null;
                 })()}
                 {playlistImages.map((image, index) => {
