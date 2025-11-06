@@ -68,6 +68,40 @@ https://github.com/user-attachments/assets/f90c830d-4503-4673-8615-15d6d51d0e52
 
 ---
 
+## Compatibility
+
+### Tested Environments
+
+**Server Deployment (Docker):**
+- Ubuntu Server 20.04+ - Fully tested and working
+- Linux distributions with Docker support - Expected to work
+
+**Display Devices:**
+- Raspberry Pi with FullPageOS - Fully tested and working
+- Firefox browser (desktop) - Fully tested and working
+- Chrome browser (desktop) - Fully tested and working
+- Chromium-based browsers - Expected to work
+- WebKit-based browsers - Expected to work
+
+### Untested Environments
+
+**Server Deployment:**
+- Windows (Docker Desktop) - May require adjustments
+- macOS (Docker Desktop) - May require adjustments
+- Non-Ubuntu Linux distributions - Should work but not verified
+
+**Note on Windows/macOS:**
+The Docker deployment is designed for Linux servers and may need modifications for Windows or macOS environments. Key areas that might need adjustment:
+- File path handling in docker-compose.yml
+- Network interface binding
+- Volume mount permissions
+- Script compatibility (quick-start.sh is bash-specific)
+
+**Community Contributions Welcome:**
+If you successfully deploy on Windows, macOS, or other platforms, please share your configuration via GitHub issues or pull requests. We will incorporate platform-specific instructions based on community testing.
+
+---
+
 ## Quick Start
 
 ### Docker Deployment (Recommended)
