@@ -950,6 +950,11 @@ const PlaylistDetail: React.FC = () => {
           ) : (
             <DndProvider backend={HTML5Backend}>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {(() => {
+                  // Debug: Check computed_sequence
+                  console.log('Playlist computed_sequence:', playlist?.computed_sequence);
+                  return null;
+                })()}
                 {playlistImages.map((image, index) => {
                   // Compute pairing info with colors and positions
                   let pairInfo: { isPaired: boolean; pairNumber?: number; positionInPair?: number; pairColor?: string } = { isPaired: false };
@@ -983,6 +988,11 @@ const PlaylistDetail: React.FC = () => {
                         }
                       }
                     }
+                  }
+                  
+                  // Debug logging for first few images
+                  if (index < 3) {
+                    console.log(`Image ${index}: ${image.id}, isPaired: ${pairInfo.isPaired}, color: ${pairInfo.pairColor || 'none'}`);
                   }
                   
                   return (
