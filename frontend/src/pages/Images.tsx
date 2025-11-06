@@ -105,7 +105,7 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
     }
   };
 
-  const handleUploadComplete = (newImages: Image[]) => {
+  const handleUploadComplete = async (newImages: Image[]) => {
     setImages(prev => [...prev, ...newImages]);
     // Refresh albums to update image counts
     loadAlbums();
@@ -115,6 +115,18 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
         'Images Uploaded Successfully',
         `${newImages.length} image${newImages.length !== 1 ? 's' : ''} uploaded successfully`
       );
+      
+      // Trigger background variant generation for newly uploaded images
+      try {
+        await apiService.regenerateImageResolutions();
+        info(
+          'Generating Variants',
+          'Optimized image variants are being generated in the background'
+        );
+      } catch (err) {
+        // Non-critical - variants can be generated manually later
+        console.log('Variant generation will occur on next scheduled run');
+      }
     }
   };
 
