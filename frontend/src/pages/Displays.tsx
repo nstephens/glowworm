@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { ArrowLeft, X, RotateCcw, Monitor, Wifi, WifiOff, CheckCircle, Clock, AlertTriangle, FileText } from 'lucide-react';
+import { ArrowLeft, X, Monitor, Wifi, WifiOff, CheckCircle, Clock, AlertTriangle, FileText, RefreshCw } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { apiService } from '../services/api';
 import { urlResolver } from '../services/urlResolver';
@@ -59,8 +59,6 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [showRejectFromEditModal, setShowRejectFromEditModal] = useState(false);
   const [deviceToRejectFromEdit, setDeviceToRejectFromEdit] = useState<DisplayDevice | null>(null);
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [deviceToReset, setDeviceToReset] = useState<DisplayDevice | null>(null);
   const [deviceName, setDeviceName] = useState('');
   const [deviceIdentifier, setDeviceIdentifier] = useState('');
   const [deviceOrientation, setDeviceOrientation] = useState<'portrait' | 'landscape'>('portrait');
@@ -465,25 +463,6 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
     }
   };
 
-  const handleResetDevice = async () => {
-    if (!deviceToReset) return;
-    
-    try {
-      const response = await apiService.resetDisplayDevice(deviceToReset.id);
-      if (response.success) {
-        displayLogger.info(`Device ${deviceToReset.device_name || deviceToReset.id} reset successfully`);
-        setShowResetModal(false);
-        setDeviceToReset(null);
-        fetchDevices(); // Refresh the device list
-      } else {
-        throw new Error(response.message || 'Failed to reset device');
-      }
-    } catch (err) {
-      displayLogger.error('Failed to reset device:', err);
-      setError('Failed to reset device');
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     const baseClasses = "px-2 py-1 rounded-full text-xs font-medium";
     switch (status) {
@@ -700,17 +679,6 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                           className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
                         >
                           Edit
-                        </button>
-                        <button
-                          onClick={() => {
-                            setDeviceToReset(device);
-                            setShowResetModal(true);
-                          }}
-                          className="bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-orange-700 transition-colors"
-                          title="Reset Device (forces re-registration)"
-                        >
-                          <RotateCcw className="w-4 h-4 inline mr-1" />
-                          Reset
                         </button>
                       </>
                     )}
@@ -1102,20 +1070,6 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
         title="Reject Device"
         message={deviceToRejectFromEdit ? `Are you sure you want to reject this device? It will be moved to the rejected devices list.` : ''}
         confirmText="Reject"
-        variant="warning"
-      />
-
-      {/* Reset Device Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showResetModal}
-        onClose={() => {
-          setShowResetModal(false);
-          setDeviceToReset(null);
-        }}
-        onConfirm={handleResetDevice}
-        title="Reset Device"
-        message={deviceToReset ? `Are you sure you want to reset device "${deviceToReset.device_name || deviceToReset.device_token}"? This will invalidate its authentication and force it to re-register. The device will need to generate a new registration code.` : ''}
-        confirmText="Reset Device"
         variant="warning"
       />
       
