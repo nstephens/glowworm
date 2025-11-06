@@ -47,8 +47,9 @@ const formatExifDate = (exifData: any): string | null => {
     
     if (isNaN(parsed.getTime())) return null;
     
-    // Format as "August 3, 2021"
+    // Format as "Sunday February 21, 2022"
     return parsed.toLocaleDateString('en-US', { 
+      weekday: 'long',
       year: 'numeric', 
       month: 'long', 
       day: 'numeric' 
@@ -1737,7 +1738,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
         if (!formattedDate) return null;
         
         return (
-          <div className="absolute bottom-4 right-4 bg-black bg-opacity-40 text-white px-3 py-1.5 rounded-md text-sm">
+          <div className="absolute bottom-4 right-4 bg-black bg-opacity-40 text-gray-200 px-3 py-1.5 rounded-md text-xs">
             {formattedDate}
           </div>
         );
@@ -1752,7 +1753,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
             if (!formattedDate) return null;
             
             return (
-              <div className="absolute left-4 bg-black bg-opacity-40 text-white px-3 py-1.5 rounded-md text-sm" style={{ top: 'calc(50% - 3rem)' }}>
+              <div className="absolute left-4 bg-black bg-opacity-40 text-gray-200 px-3 py-1.5 rounded-md text-xs" style={{ top: 'calc(50% - 3rem)' }}>
                 {formattedDate}
               </div>
             );
@@ -1764,7 +1765,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
             if (!formattedDate) return null;
             
             return (
-              <div className="absolute right-4 bg-black bg-opacity-40 text-white px-3 py-1.5 rounded-md text-sm" style={{ top: 'calc(50% + 1rem)' }}>
+              <div className="absolute right-4 bg-black bg-opacity-40 text-gray-200 px-3 py-1.5 rounded-md text-xs" style={{ top: 'calc(50% + 1rem)' }}>
                 {formattedDate}
               </div>
             );
