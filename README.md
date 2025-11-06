@@ -67,8 +67,11 @@ GlowWorm transforms any display into an elegant photo frame with powerful featur
 |----------|
 | ![Glowworm Settings](docs/screenshots/5.%20settings.png) |
 
-### Display Example
-https://github.com/user-attachments/assets/f90c830d-4503-4673-8615-15d6d51d0e52
+### End to End Installation and Usage Example
+
+[![GlowWorm Installation and Usage Demo](https://img.youtube.com/vi/euAhnJv0RoE/0.jpg)](https://www.youtube.com/watch?v=euAhnJv0RoE)
+
+Watch the complete walkthrough: [GlowWorm Installation and Usage on YouTube](https://www.youtube.com/watch?v=euAhnJv0RoE)
 
 ---
 
