@@ -404,6 +404,200 @@ async def check_duplicates_batch(
             detail="Batch duplicate check failed"
         )
 
+@router.get("/{image_id}/processing-status")
+async def get_processing_status(
+    image_id: int,
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the current background processing status for an image.
+    
+    Returns detailed information about thumbnail generation, variant creation,
+    and overall processing status including error messages and attempt counts.
+    """
+    try:
+        image_service = ImageService(db)
+        image = image_service.get_image_by_id(image_id)
+        
+        if not image:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Image not found"
+            )
+        
+        return {
+            "image_id": image.id,
+            "processing_status": image.processing_status,
+            "thumbnail_status": image.thumbnail_status,
+            "variant_status": image.variant_status,
+            "processing_error": image.processing_error,
+            "processing_attempts": image.processing_attempts,
+            "last_processing_attempt": image.last_processing_attempt.isoformat() if image.last_processing_attempt else None,
+            "processing_completed_at": image.processing_completed_at.isoformat() if image.processing_completed_at else None,
+            "uploaded_at": image.uploaded_at.isoformat() if image.uploaded_at else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Processing status error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve processing status"
+        )
+
+@router.post("/{image_id}/retry-processing")
+async def retry_processing(
+    request: Request,
+    image_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually retry failed image processing.
+    
+    Resets processing status and queues thumbnail/variant generation again.
+    Also resets the circuit breaker for this image.
+    """
+    try:
+        # CSRF protection
+        csrf_protection.require_csrf_token(request)
+        
+        image_service = ImageService(db)
+        image = image_service.get_image_by_id(image_id)
+        
+        if not image:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Image not found"
+            )
+        
+        # Reset circuit breaker to allow retry
+        image_processing_circuit_breaker.reset(image_id)
+        logger.info(f"Circuit breaker reset for image {image_id}")
+        
+        # Reset processing status fields
+        image.processing_status = 'pending'
+        image.thumbnail_status = 'pending'
+        image.variant_status = 'pending'
+        image.processing_error = None
+        db.commit()
+        
+        # Queue background processing
+        background_tasks.add_task(
+            process_image_background,
+            image.id,
+            image.filename,
+            current_user.id
+        )
+        
+        logger.info(f"Manual retry queued for image {image_id}")
+        
+        return {
+            "message": "Processing retry queued successfully",
+            "image_id": image_id,
+            "status": "pending"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Retry processing error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retry processing"
+        )
+
+@router.get("/admin/processing-queue")
+async def get_processing_queue_status(
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """
+    Admin endpoint for monitoring the background processing queue.
+    
+    Returns statistics about pending, processing, and failed images,
+    along with a list of recent jobs for detailed monitoring.
+    """
+    try:
+        # Check if user is admin (optional - can add role check here)
+        # For now, any authenticated user can access
+        
+        # Get processing statistics
+        pending_count = db.query(Image).filter(Image.processing_status == 'pending').count()
+        processing_count = db.query(Image).filter(Image.processing_status == 'processing').count()
+        failed_count = db.query(Image).filter(Image.processing_status == 'failed').count()
+        complete_count = db.query(Image).filter(Image.processing_status == 'complete').count()
+        
+        # Get counts by individual status types
+        thumbnail_pending = db.query(Image).filter(Image.thumbnail_status == 'pending').count()
+        thumbnail_processing = db.query(Image).filter(Image.thumbnail_status == 'processing').count()
+        thumbnail_failed = db.query(Image).filter(Image.thumbnail_status == 'failed').count()
+        
+        variant_pending = db.query(Image).filter(Image.variant_status == 'pending').count()
+        variant_processing = db.query(Image).filter(Image.variant_status == 'processing').count()
+        variant_failed = db.query(Image).filter(Image.variant_status == 'failed').count()
+        
+        # Get recent jobs (last 20 non-complete jobs)
+        recent_jobs = db.query(Image)\
+            .filter(Image.processing_status.in_(['pending', 'processing', 'failed']))\
+            .order_by(Image.last_processing_attempt.desc().nulls_last())\
+            .limit(20)\
+            .all()
+        
+        # Calculate oldest pending job age
+        oldest_pending = db.query(Image)\
+            .filter(Image.processing_status == 'pending')\
+            .order_by(Image.uploaded_at.asc())\
+            .first()
+        
+        oldest_job_age_seconds = None
+        if oldest_pending and oldest_pending.uploaded_at:
+            age = datetime.now() - oldest_pending.uploaded_at.replace(tzinfo=None)
+            oldest_job_age_seconds = int(age.total_seconds())
+        
+        return {
+            "queue_size": pending_count,
+            "processing_count": processing_count,
+            "failed_count": failed_count,
+            "complete_count": complete_count,
+            "oldest_job_age_seconds": oldest_job_age_seconds,
+            "thumbnail_stats": {
+                "pending": thumbnail_pending,
+                "processing": thumbnail_processing,
+                "failed": thumbnail_failed
+            },
+            "variant_stats": {
+                "pending": variant_pending,
+                "processing": variant_processing,
+                "failed": variant_failed
+            },
+            "jobs": [
+                {
+                    "id": job.id,
+                    "filename": job.original_filename,
+                    "processing_status": job.processing_status,
+                    "thumbnail_status": job.thumbnail_status,
+                    "variant_status": job.variant_status,
+                    "attempts": job.processing_attempts,
+                    "error": job.processing_error,
+                    "uploaded_at": job.uploaded_at.isoformat() if job.uploaded_at else None,
+                    "last_attempt": job.last_processing_attempt.isoformat() if job.last_processing_attempt else None,
+                    "completed_at": job.processing_completed_at.isoformat() if job.processing_completed_at else None
+                }
+                for job in recent_jobs
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"Processing queue status error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve queue status"
+        )
+
 # Public endpoint for display devices (must be before / route)
 @router.get("/public")
 async def get_images_public(
