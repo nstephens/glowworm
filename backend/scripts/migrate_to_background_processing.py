@@ -22,10 +22,12 @@ import logging
 import argparse
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+script_dir = os.path.dirname(os.path.abspath(__file__))
+backend_dir = os.path.dirname(script_dir)
+sys.path.insert(0, backend_dir)
 
 from models import SessionLocal, Image
 from services.image_storage_service import image_storage_service

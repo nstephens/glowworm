@@ -160,6 +160,41 @@ except Exception as e:
     sys.exit(1)
 "
 
+# Auto-migrate existing images to background processing (ONE TIME ONLY)
+echo ""
+echo "🔍 Checking if background processing migration is needed..."
+MIGRATION_FLAG="/app/.migration_background_processing_done"
+
+if [ ! -f "$MIGRATION_FLAG" ]; then
+    echo "🔄 First startup after background processing upgrade detected"
+    echo "   Running one-time migration for existing images..."
+    echo "   This will:"
+    echo "   - Check existing images for thumbnails and variants"
+    echo "   - Update processing status accordingly"
+    echo "   - Only runs once (creates flag file when complete)"
+    echo ""
+    
+    # Run migration script in background processing mode
+    python scripts/migrate_to_background_processing.py --force --batch-size 200
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ Background processing migration completed successfully"
+        echo "   Creating flag file to prevent future runs..."
+        touch "$MIGRATION_FLAG"
+        echo "   Flag created: $MIGRATION_FLAG"
+    else
+        echo "⚠️  Background processing migration failed"
+        echo "   Will retry on next container restart"
+        echo "   You can also run manually:"
+        echo "   docker compose exec glowworm-backend python scripts/migrate_to_background_processing.py"
+    fi
+else
+    echo "✅ Background processing migration already complete (flag exists)"
+    echo "   If you need to re-run, delete: $MIGRATION_FLAG"
+fi
+
+echo ""
+
 # Start the backend server
 echo "🚀 Starting backend server..."
 exec python -m uvicorn main:app --host 0.0.0.0 --port 8001
