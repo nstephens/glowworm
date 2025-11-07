@@ -10,6 +10,7 @@ import io
 import logging
 from datetime import datetime
 from config.settings import settings
+from utils.retry import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -532,6 +533,7 @@ class ImageStorageService:
             'variant_status': 'pending'
         }
     
+    @retry_with_backoff(max_attempts=3, base_delay=2.0)
     def process_thumbnails(
         self,
         filename: str,
@@ -540,6 +542,7 @@ class ImageStorageService:
         """
         Generate all thumbnail sizes for an image.
         This function is designed to run in the background after upload.
+        Includes automatic retry with exponential backoff on failures.
         
         Args:
             filename: The stored filename of the original image
@@ -547,6 +550,10 @@ class ImageStorageService:
             
         Returns:
             Dict mapping size names to thumbnail file paths
+            
+        Raises:
+            FileNotFoundError: If original image not found
+            Exception: If thumbnail generation fails after all retries
         """
         # Get the original image path
         storage_path = self._get_storage_path(filename, user_id)
@@ -576,6 +583,7 @@ class ImageStorageService:
         
         return thumbnail_paths
     
+    @retry_with_backoff(max_attempts=3, base_delay=2.0)
     def process_variants(
         self,
         filename: str,
@@ -584,6 +592,7 @@ class ImageStorageService:
         """
         Generate all scaled variants for an image based on display sizes.
         This function is designed to run in the background after thumbnails.
+        Includes automatic retry with exponential backoff on failures.
         
         Args:
             filename: The stored filename of the original image
@@ -591,6 +600,10 @@ class ImageStorageService:
             
         Returns:
             Dict mapping size strings (e.g. "1920x1080") to scaled file paths
+            
+        Raises:
+            FileNotFoundError: If original image not found
+            Exception: If variant generation fails after all retries
         """
         # Get the original image path
         storage_path = self._get_storage_path(filename, user_id)

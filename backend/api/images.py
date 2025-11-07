@@ -19,6 +19,7 @@ from services.image_storage_service import image_storage_service
 from services.display_device_service import DisplayDeviceService
 from utils.csrf import csrf_protection
 from utils.cookies import CookieManager
+from utils.retry import image_processing_circuit_breaker
 
 logger = logging.getLogger(__name__)
 
@@ -32,12 +33,42 @@ def process_image_background(image_id: int, filename: str, user_id: int):
     This function runs asynchronously after the upload response is returned.
     It updates the database status as processing progresses.
     
+    Includes:
+    - Circuit breaker pattern to prevent repeated failures
+    - Automatic retry with exponential backoff (via decorated functions)
+    - Comprehensive error handling and status tracking
+    
     Args:
         image_id: Database ID of the image
         filename: Stored filename of the image
         user_id: User ID for storage path resolution
     """
     from models import SessionLocal
+    
+    # Check circuit breaker before processing
+    if image_processing_circuit_breaker.is_open(image_id):
+        logger.error(
+            f"⛔ Circuit breaker OPEN for image {image_id}. "
+            f"Too many failures ({image_processing_circuit_breaker.get_failure_count(image_id)}). "
+            "Skipping processing. Use manual retry to reset."
+        )
+        
+        # Update database to reflect permanent failure
+        db = SessionLocal()
+        try:
+            image = db.query(Image).filter(Image.id == image_id).first()
+            if image:
+                image.processing_status = 'failed'
+                image.thumbnail_status = 'failed'
+                image.variant_status = 'failed'
+                image.processing_error = (
+                    "Processing blocked by circuit breaker due to repeated failures. "
+                    "Use manual retry endpoint to reset."
+                )
+                db.commit()
+        finally:
+            db.close()
+        return
     
     db = SessionLocal()
     try:
@@ -105,19 +136,27 @@ def process_image_background(image_id: int, filename: str, user_id: int):
             image.processing_status = 'complete'
             image.processing_completed_at = datetime.now()
             logger.info(f"🎉 All processing complete for image {image_id}")
+            # Record success in circuit breaker
+            image_processing_circuit_breaker.record_success(image_id)
         elif image.thumbnail_status == 'failed' or image.variant_status == 'failed':
             image.processing_status = 'failed'
             logger.error(f"⚠️  Processing failed for image {image_id}")
+            # Record failure in circuit breaker
+            image_processing_circuit_breaker.record_failure(image_id)
         else:
             image.processing_status = 'complete'  # Partial success
             image.processing_completed_at = datetime.now()
             logger.warning(f"⚠️  Processing partially complete for image {image_id}")
+            # Partial success - clear circuit breaker
+            image_processing_circuit_breaker.record_success(image_id)
         
         db.commit()
         logger.info(f"✅ Background processing finished for image {image_id}")
         
     except Exception as e:
         logger.error(f"❌ Background processing error for image {image_id}: {e}", exc_info=True)
+        # Record failure in circuit breaker
+        image_processing_circuit_breaker.record_failure(image_id)
         try:
             image = db.query(Image).filter(Image.id == image_id).first()
             if image:
