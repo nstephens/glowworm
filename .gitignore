@@ -13,6 +13,7 @@ backend/config/settings.json.local
 
 # Sensitive configuration files
 backend/config/settings.json
+config/settings.json
 
 # Development artifacts
 backend/venv/
@@ -73,6 +74,11 @@ docker-publish/
 # Test files
 test_*.py
 *_test.py
+
+# Test results and reports
+*test_results*.json
+*_test_results.json
+test_results/
 
 # Logs
 logs
