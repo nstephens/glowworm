@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { UploadFile } from '@/components/upload/UploadProgress';
+import { useToast } from './use-toast';
 
 export interface UploadRequest {
   file: File;
@@ -25,6 +26,12 @@ export interface UploadResponse {
     format: string;
     createdAt: string;
   };
+  // Background processing status fields
+  processing_status?: 'pending' | 'processing' | 'complete' | 'failed';
+  thumbnail_status?: 'pending' | 'processing' | 'complete' | 'failed';
+  variant_status?: 'pending' | 'processing' | 'complete' | 'failed';
+  processing_error?: string | null;
+  background_processing?: boolean;
 }
 
 export interface UploadError {
@@ -45,6 +52,7 @@ export interface UploadError {
  */
 export const useUploadMutation = () => {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async ({
@@ -144,6 +152,21 @@ export const useUploadMutation = () => {
           }),
         };
       });
+      
+      // Show toast notification based on processing status
+      if (data.background_processing) {
+        toast({
+          title: "Upload complete!",
+          description: "Processing thumbnails and variants in background. You can continue working.",
+          duration: 5000,
+        });
+      } else {
+        toast({
+          title: "Upload complete!",
+          description: "Image ready to use.",
+          duration: 3000,
+        });
+      }
     },
     onError: (error, variables) => {
       console.error('Upload failed:', error);
