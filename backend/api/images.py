@@ -20,6 +20,14 @@ from services.display_device_service import DisplayDeviceService
 from utils.csrf import csrf_protection
 from utils.cookies import CookieManager
 from utils.retry import image_processing_circuit_breaker
+from websocket.processing_notifier import (
+    notify_thumbnail_complete,
+    notify_thumbnail_failed,
+    notify_variant_complete,
+    notify_variant_failed,
+    notify_processing_complete,
+    notify_processing_failed
+)
 
 logger = logging.getLogger(__name__)
 
@@ -101,11 +109,17 @@ def process_image_background(image_id: int, filename: str, user_id: int):
             db.commit()
             logger.info(f"✅ Thumbnails complete for image {image_id}: {len(thumbnail_paths)} sizes")
             
+            # Notify via WebSocket
+            notify_thumbnail_complete(image_id, len(thumbnail_paths))
+            
         except Exception as e:
             logger.error(f"❌ Thumbnail generation failed for image {image_id}: {e}", exc_info=True)
             image.thumbnail_status = 'failed'
             image.processing_error = f"Thumbnail generation failed: {str(e)}"
             db.commit()
+            
+            # Notify failure via WebSocket
+            notify_thumbnail_failed(image_id, str(e))
         
         # Step 2: Generate display variants
         try:
@@ -122,6 +136,9 @@ def process_image_background(image_id: int, filename: str, user_id: int):
             db.commit()
             logger.info(f"✅ Variants complete for image {image_id}: {len(variant_paths)} sizes")
             
+            # Notify via WebSocket
+            notify_variant_complete(image_id, len(variant_paths))
+            
         except Exception as e:
             logger.error(f"❌ Variant generation failed for image {image_id}: {e}", exc_info=True)
             image.variant_status = 'failed'
@@ -130,6 +147,9 @@ def process_image_background(image_id: int, filename: str, user_id: int):
             else:
                 image.processing_error = f"Variant generation failed: {str(e)}"
             db.commit()
+            
+            # Notify failure via WebSocket
+            notify_variant_failed(image_id, str(e))
         
         # Update overall processing status
         if image.thumbnail_status == 'complete' and image.variant_status == 'complete':
@@ -138,17 +158,23 @@ def process_image_background(image_id: int, filename: str, user_id: int):
             logger.info(f"🎉 All processing complete for image {image_id}")
             # Record success in circuit breaker
             image_processing_circuit_breaker.record_success(image_id)
+            # Notify complete via WebSocket
+            notify_processing_complete(image_id)
         elif image.thumbnail_status == 'failed' or image.variant_status == 'failed':
             image.processing_status = 'failed'
             logger.error(f"⚠️  Processing failed for image {image_id}")
             # Record failure in circuit breaker
             image_processing_circuit_breaker.record_failure(image_id)
+            # Notify failure via WebSocket
+            notify_processing_failed(image_id, image.processing_error or "Processing failed")
         else:
             image.processing_status = 'complete'  # Partial success
             image.processing_completed_at = datetime.now()
             logger.warning(f"⚠️  Processing partially complete for image {image_id}")
             # Partial success - clear circuit breaker
             image_processing_circuit_breaker.record_success(image_id)
+            # Notify complete via WebSocket
+            notify_processing_complete(image_id)
         
         db.commit()
         logger.info(f"✅ Background processing finished for image {image_id}")
@@ -165,6 +191,13 @@ def process_image_background(image_id: int, filename: str, user_id: int):
                 image.variant_status = 'failed'
                 image.processing_error = f"Background processing error: {str(e)}"
                 db.commit()
+                
+                # Notify failure via WebSocket (with error handling)
+                try:
+                    notify_processing_failed(image_id, str(e), stage="background_task")
+                except Exception as ws_error:
+                    logger.warning(f"Failed to send WebSocket notification: {ws_error}")
+                    
         except Exception as commit_error:
             logger.error(f"Failed to update error status: {commit_error}")
     finally:

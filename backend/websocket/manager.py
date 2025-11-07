@@ -171,6 +171,18 @@ class ConnectionManager:
         }
         await self.send_to_all_devices(message)
     
+    async def broadcast_image_processing_update(self, event_payload: dict):
+        """
+        Broadcast image processing status update to all admin connections.
+        
+        Used for notifying clients about background image processing events
+        like thumbnail generation, variant creation, completion, or failures.
+        
+        Args:
+            event_payload: Event dict from websocket.events module
+        """
+        await self.send_to_all_admins(event_payload)
+    
     async def send_device_command(self, device_token: str, command: str, data: dict = None):
         """Send a command to a specific device"""
         message = {
