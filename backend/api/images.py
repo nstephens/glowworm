@@ -51,7 +51,10 @@ def process_image_background(image_id: int, filename: str, user_id: int):
         filename: Stored filename of the image
         user_id: User ID for storage path resolution
     """
-    from models import SessionLocal
+    from models import database as db_module
+    
+    # Ensure database is initialized
+    db_module.ensure_database_initialized()
     
     # Check circuit breaker before processing
     if image_processing_circuit_breaker.is_open(image_id):
@@ -62,7 +65,7 @@ def process_image_background(image_id: int, filename: str, user_id: int):
         )
         
         # Update database to reflect permanent failure
-        db = SessionLocal()
+        db = db_module.SessionLocal()
         try:
             image = db.query(Image).filter(Image.id == image_id).first()
             if image:
@@ -78,7 +81,7 @@ def process_image_background(image_id: int, filename: str, user_id: int):
             db.close()
         return
     
-    db = SessionLocal()
+    db = db_module.SessionLocal()
     try:
         logger.info(f"🎬 Starting background processing for image {image_id}")
         
