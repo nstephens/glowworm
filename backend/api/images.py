@@ -510,6 +510,71 @@ async def retry_processing(
             detail="Failed to retry processing"
         )
 
+@router.post("/admin/retry-all-failed")
+async def retry_all_failed_processing(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """
+    Admin endpoint to retry all failed image processing jobs.
+    
+    Resets all failed images to 'pending' status and queues them for
+    background processing. Also resets the circuit breaker for each image.
+    """
+    try:
+        # CSRF protection
+        csrf_protection.require_csrf_token(request)
+        
+        # Get all failed images
+        failed_images = db.query(Image).filter(Image.processing_status == 'failed').all()
+        
+        if not failed_images:
+            return {
+                "message": "No failed jobs to retry",
+                "retry_count": 0
+            }
+        
+        retry_count = 0
+        for image in failed_images:
+            # Reset circuit breaker
+            image_processing_circuit_breaker.reset(image.id)
+            
+            # Reset processing status
+            image.processing_status = 'pending'
+            image.thumbnail_status = 'pending'
+            image.variant_status = 'pending'
+            image.processing_error = None
+            
+            # Queue background processing
+            background_tasks.add_task(
+                process_image_background,
+                image.id,
+                image.filename,
+                current_user.id
+            )
+            
+            retry_count += 1
+        
+        db.commit()
+        
+        logger.info(f"Batch retry: queued {retry_count} failed images for processing")
+        
+        return {
+            "message": f"Successfully queued {retry_count} failed jobs for retry",
+            "retry_count": retry_count
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Batch retry error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retry batch processing"
+        )
+
 @router.get("/admin/processing-queue")
 async def get_processing_queue_status(
     current_user: User = Depends(require_auth),
