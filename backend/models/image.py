@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, Enum, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .database import Base
@@ -18,6 +18,31 @@ class Image(Base):
     exif = Column(JSON, nullable=True)
     dominant_colors = Column(JSON, nullable=True)  # Array of hex color strings ["#FF5733", "#33FF57", "#3357FF"]
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+    
+    # Background processing status fields
+    processing_status = Column(
+        Enum('pending', 'processing', 'complete', 'failed', name='processing_status_enum'),
+        default='pending',
+        nullable=False,
+        index=True
+    )
+    thumbnail_status = Column(
+        Enum('pending', 'processing', 'complete', 'failed', name='thumbnail_status_enum'),
+        default='pending',
+        nullable=False,
+        index=True
+    )
+    variant_status = Column(
+        Enum('pending', 'processing', 'complete', 'failed', name='variant_status_enum'),
+        default='pending',
+        nullable=False,
+        index=True
+    )
+    processing_error = Column(Text, nullable=True)
+    processing_attempts = Column(Integer, default=0, nullable=False)
+    last_processing_attempt = Column(DateTime(timezone=True), nullable=True)
+    processing_completed_at = Column(DateTime(timezone=True), nullable=True)
+    
     playlist_id = Column(Integer, ForeignKey("playlists.id"), nullable=True, index=True)
     
     # Relationships
@@ -55,7 +80,15 @@ class Image(Base):
             "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
             "playlist_id": self.playlist_id,
             "url": f"/api/images/{self.id}/file",
-            "thumbnail_url": f"/api/images/{self.id}/file?size=medium&v={self.id}_{self.album_id or 0}"
+            "thumbnail_url": f"/api/images/{self.id}/file?size=medium&v={self.id}_{self.album_id or 0}",
+            # Processing status fields
+            "processing_status": self.processing_status,
+            "thumbnail_status": self.thumbnail_status,
+            "variant_status": self.variant_status,
+            "processing_error": self.processing_error,
+            "processing_attempts": self.processing_attempts,
+            "last_processing_attempt": self.last_processing_attempt.isoformat() if self.last_processing_attempt else None,
+            "processing_completed_at": self.processing_completed_at.isoformat() if self.processing_completed_at else None
         }
 
     @property
