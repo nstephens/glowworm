@@ -29,7 +29,8 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.dirname(script_dir)
 sys.path.insert(0, backend_dir)
 
-from models import SessionLocal, Image
+from models import Image
+from models import database as db_module
 from services.image_storage_service import image_storage_service
 from config.settings import settings
 
@@ -319,8 +320,11 @@ def main():
             logger.info("Migration cancelled by user")
             return
     
+    # Initialize database
+    db_module.ensure_database_initialized()
+    
     # Run migration
-    db = SessionLocal()
+    db = db_module.SessionLocal()
     try:
         stats = migrate_existing_images(
             db,
