@@ -394,13 +394,257 @@ class ImageStorageService:
         except Exception as e:
             return False, f"Invalid image: {str(e)}"
     
+    def validate_and_store_original(
+        self,
+        file_bytes: bytes,
+        original_filename: str,
+        user_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Validate image, extract metadata, apply orientation correction, and store original file.
+        This function handles only the fast operations needed before background processing.
+        
+        Returns dict with image metadata and processing status set to 'pending'.
+        """
+        # Validate image
+        is_valid, message = self.validate_image(file_bytes, original_filename)
+        if not is_valid:
+            raise ValueError(message)
+        
+        # Calculate file hash for duplicate detection
+        file_hash = self._calculate_file_hash(file_bytes)
+        
+        # Generate unique filename
+        filename = self._generate_unique_filename(original_filename)
+        
+        # Get storage paths
+        storage_path = self._get_storage_path(filename, user_id)
+        
+        # Process image
+        original_file_bytes = file_bytes  # Keep original for fallback
+        processed_image = None
+        
+        try:
+            with PILImage.open(io.BytesIO(file_bytes)) as img:
+                # Extract EXIF data BEFORE applying orientation (need original orientation tag)
+                exif_data = self._extract_exif_data(img)
+                
+                # Apply EXIF orientation correction for mobile photos
+                try:
+                    processed_image = img.copy()
+                except Exception as e:
+                    logger.warning(f"Failed to copy image, processing in-place: {e}")
+                    processed_image = img
+                
+                # Apply orientation to the copy
+                processed_image = self._apply_exif_orientation(processed_image)
+                
+                # Get image metadata AFTER orientation correction
+                width, height = processed_image.size
+                format_name = processed_image.format
+                mode = processed_image.mode
+        except Exception as e:
+            logger.error(f"Failed to open/process image: {e}")
+            # Fallback: process without EXIF orientation
+            logger.info("Falling back to processing without EXIF orientation")
+            with PILImage.open(io.BytesIO(original_file_bytes)) as img:
+                exif_data = self._extract_exif_data(img)
+                processed_image = img.copy()
+                width, height = processed_image.size
+                format_name = processed_image.format
+                mode = processed_image.mode
+        
+        # Process the image object (outside the context manager)
+        try:
+            img = processed_image
+            
+            # Normalize MPO to JPEG for broad client compatibility (serve first frame)
+            if format_name and format_name.upper() == 'MPO':
+                try:
+                    img.seek(0)  # ensure first frame
+                except Exception:
+                    pass
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    img = img.convert('RGB')
+                format_name = 'JPEG'
+                # Ensure stored filename uses .jpg extension
+                try:
+                    filename = Path(filename).with_suffix('.jpg').name
+                    storage_path = self._get_storage_path(filename, user_id)
+                except Exception:
+                    pass
+                mode = 'RGB' if img.mode != 'RGB' else img.mode
+            
+            # Convert to RGB for consistent storage
+            if img.mode in ('RGBA', 'LA', 'P'):
+                try:
+                    img = img.convert('RGB')
+                    format_name = 'JPEG'
+                except Exception as e:
+                    logger.warning(f"Failed to convert image to RGB: {e}, keeping original mode")
+            
+            # Save corrected image with orientation applied and EXIF orientation tag removed
+            output = io.BytesIO()
+            save_kwargs = {'format': format_name, 'optimize': True}
+            if format_name == 'JPEG':
+                save_kwargs['quality'] = 90
+            
+            try:
+                img.save(output, **save_kwargs)
+                file_bytes = output.getvalue()
+            except Exception as e:
+                logger.error(f"Failed to save processed image: {e}")
+                logger.info("Falling back to original image bytes")
+                file_bytes = original_file_bytes
+                with PILImage.open(io.BytesIO(original_file_bytes)) as fallback_img:
+                    width, height = fallback_img.size
+                    format_name = fallback_img.format or 'JPEG'
+                    mode = fallback_img.mode
+        except Exception as e:
+            logger.error(f"Failed to process image after EXIF orientation: {e}")
+            logger.info("Falling back to original image bytes completely")
+            file_bytes = original_file_bytes
+            with PILImage.open(io.BytesIO(original_file_bytes)) as fallback_img:
+                width, height = fallback_img.size
+                format_name = fallback_img.format or 'JPEG'
+                mode = fallback_img.mode
+        
+        # Save corrected image
+        with open(storage_path, 'wb') as f:
+            f.write(file_bytes)
+        
+        # Return metadata - thumbnails and variants will be generated in background
+        return {
+            'filename': filename,
+            'original_filename': original_filename,
+            'storage_path': str(storage_path),
+            'width': width,
+            'height': height,
+            'file_size': len(file_bytes),
+            'mime_type': f"image/{format_name.lower()}",
+            'file_hash': file_hash,
+            'exif': exif_data,
+            'format': format_name,
+            'mode': mode,
+            # Processing status - these will be handled by background tasks
+            'processing_status': 'pending',
+            'thumbnail_status': 'pending',
+            'variant_status': 'pending'
+        }
+    
+    def process_thumbnails(
+        self,
+        filename: str,
+        user_id: Optional[int] = None
+    ) -> Dict[str, str]:
+        """
+        Generate all thumbnail sizes for an image.
+        This function is designed to run in the background after upload.
+        
+        Args:
+            filename: The stored filename of the original image
+            user_id: Optional user ID for storage path resolution
+            
+        Returns:
+            Dict mapping size names to thumbnail file paths
+        """
+        # Get the original image path
+        storage_path = self._get_storage_path(filename, user_id)
+        
+        if not storage_path.exists():
+            raise FileNotFoundError(f"Original image not found: {storage_path}")
+        
+        # Read the original image
+        with open(storage_path, 'rb') as f:
+            file_bytes = f.read()
+        
+        # Generate thumbnails for all sizes
+        thumbnail_paths = {}
+        for size_name in self.THUMBNAIL_SIZES.keys():
+            try:
+                thumbnail_bytes = self._generate_thumbnail(file_bytes, size_name)
+                thumbnail_path = self._get_thumbnail_path(filename, size_name)
+                
+                with open(thumbnail_path, 'wb') as f:
+                    f.write(thumbnail_bytes)
+                
+                thumbnail_paths[size_name] = str(thumbnail_path)
+                logger.info(f"✅ Generated {size_name} thumbnail for {filename}")
+            except Exception as e:
+                logger.error(f"❌ Failed to generate {size_name} thumbnail for {filename}: {e}")
+                # Continue with other sizes even if one fails
+        
+        return thumbnail_paths
+    
+    def process_variants(
+        self,
+        filename: str,
+        user_id: Optional[int] = None
+    ) -> Dict[str, str]:
+        """
+        Generate all scaled variants for an image based on display sizes.
+        This function is designed to run in the background after thumbnails.
+        
+        Args:
+            filename: The stored filename of the original image
+            user_id: Optional user ID for storage path resolution
+            
+        Returns:
+            Dict mapping size strings (e.g. "1920x1080") to scaled file paths
+        """
+        # Get the original image path
+        storage_path = self._get_storage_path(filename, user_id)
+        
+        if not storage_path.exists():
+            raise FileNotFoundError(f"Original image not found: {storage_path}")
+        
+        # Read the original image
+        with open(storage_path, 'rb') as f:
+            file_bytes = f.read()
+        
+        # Load display sizes from configuration
+        display_sizes = self._load_display_sizes()
+        logger.info(f"Generating scaled variants for display sizes: {display_sizes}")
+        
+        # Generate scaled versions for each display size
+        scaled_paths = {}
+        for target_width, target_height in display_sizes:
+            try:
+                logger.info(f"Generating scaled image: {target_width}x{target_height} for {filename}")
+                scaled_bytes = self._generate_scaled_image(file_bytes, target_width, target_height)
+                scaled_filename = f"{Path(filename).stem}_{target_width}x{target_height}{Path(filename).suffix}"
+                scaled_path = self._get_storage_path(scaled_filename, user_id)
+                
+                with open(scaled_path, 'wb') as f:
+                    f.write(scaled_bytes)
+                
+                scaled_paths[f"{target_width}x{target_height}"] = str(scaled_path)
+                logger.info(f"✅ Successfully created scaled image: {scaled_filename}")
+            except Exception as e:
+                logger.error(f"❌ Failed to generate scaled image {target_width}x{target_height} for {filename}: {e}")
+                # Continue with other sizes even if one fails
+        
+        return scaled_paths
+    
     def process_and_store_image(
         self, 
         file_bytes: bytes, 
         original_filename: str,
         user_id: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Process and store image with metadata extraction and thumbnail generation"""
+        """
+        DEPRECATED: Process and store image with metadata extraction and thumbnail generation.
+        
+        This function is kept for backward compatibility but performs synchronous processing.
+        New code should use validate_and_store_original() followed by background processing
+        with process_thumbnails() and process_variants().
+        
+        Will be removed in a future version.
+        """
+        logger.warning(
+            "process_and_store_image() is deprecated. "
+            "Use validate_and_store_original() + background processing instead."
+        )
         
         # Validate image
         is_valid, message = self.validate_image(file_bytes, original_filename)
