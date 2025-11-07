@@ -24,16 +24,138 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/images", tags=["images"])
 
+
+def process_image_background(image_id: int, filename: str, user_id: int):
+    """
+    Background task for processing image thumbnails and variants.
+    
+    This function runs asynchronously after the upload response is returned.
+    It updates the database status as processing progresses.
+    
+    Args:
+        image_id: Database ID of the image
+        filename: Stored filename of the image
+        user_id: User ID for storage path resolution
+    """
+    from models import SessionLocal
+    
+    db = SessionLocal()
+    try:
+        logger.info(f"🎬 Starting background processing for image {image_id}")
+        
+        # Get the image record
+        image = db.query(Image).filter(Image.id == image_id).first()
+        if not image:
+            logger.error(f"Image {image_id} not found for background processing")
+            return
+        
+        # Update status to 'processing'
+        image.processing_status = 'processing'
+        image.processing_attempts += 1
+        image.last_processing_attempt = datetime.now()
+        db.commit()
+        
+        # Step 1: Generate thumbnails (priority)
+        try:
+            logger.info(f"📸 Generating thumbnails for image {image_id}")
+            image.thumbnail_status = 'processing'
+            db.commit()
+            
+            thumbnail_paths = image_storage_service.process_thumbnails(
+                filename,
+                user_id=user_id
+            )
+            
+            image.thumbnail_status = 'complete'
+            db.commit()
+            logger.info(f"✅ Thumbnails complete for image {image_id}: {len(thumbnail_paths)} sizes")
+            
+        except Exception as e:
+            logger.error(f"❌ Thumbnail generation failed for image {image_id}: {e}", exc_info=True)
+            image.thumbnail_status = 'failed'
+            image.processing_error = f"Thumbnail generation failed: {str(e)}"
+            db.commit()
+        
+        # Step 2: Generate display variants
+        try:
+            logger.info(f"🖼️  Generating variants for image {image_id}")
+            image.variant_status = 'processing'
+            db.commit()
+            
+            variant_paths = image_storage_service.process_variants(
+                filename,
+                user_id=user_id
+            )
+            
+            image.variant_status = 'complete'
+            db.commit()
+            logger.info(f"✅ Variants complete for image {image_id}: {len(variant_paths)} sizes")
+            
+        except Exception as e:
+            logger.error(f"❌ Variant generation failed for image {image_id}: {e}", exc_info=True)
+            image.variant_status = 'failed'
+            if image.processing_error:
+                image.processing_error += f"; Variant generation failed: {str(e)}"
+            else:
+                image.processing_error = f"Variant generation failed: {str(e)}"
+            db.commit()
+        
+        # Update overall processing status
+        if image.thumbnail_status == 'complete' and image.variant_status == 'complete':
+            image.processing_status = 'complete'
+            image.processing_completed_at = datetime.now()
+            logger.info(f"🎉 All processing complete for image {image_id}")
+        elif image.thumbnail_status == 'failed' or image.variant_status == 'failed':
+            image.processing_status = 'failed'
+            logger.error(f"⚠️  Processing failed for image {image_id}")
+        else:
+            image.processing_status = 'complete'  # Partial success
+            image.processing_completed_at = datetime.now()
+            logger.warning(f"⚠️  Processing partially complete for image {image_id}")
+        
+        db.commit()
+        logger.info(f"✅ Background processing finished for image {image_id}")
+        
+    except Exception as e:
+        logger.error(f"❌ Background processing error for image {image_id}: {e}", exc_info=True)
+        try:
+            image = db.query(Image).filter(Image.id == image_id).first()
+            if image:
+                image.processing_status = 'failed'
+                image.thumbnail_status = 'failed'
+                image.variant_status = 'failed'
+                image.processing_error = f"Background processing error: {str(e)}"
+                db.commit()
+        except Exception as commit_error:
+            logger.error(f"Failed to update error status: {commit_error}")
+    finally:
+        db.close()
+
+
 @router.post("/upload")
 async def upload_image(
     request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     album_id: Optional[int] = Form(None),
     playlist_id: Optional[int] = Form(None),
     current_user: User = Depends(require_auth),
     db: Session = Depends(get_db)
 ):
-    """Upload and process an image"""
+    """
+    Upload and process an image with background processing.
+    
+    Fast path (<500ms):
+    - Validates image
+    - Extracts EXIF metadata
+    - Saves original file
+    - Creates database record with processing_status='pending'
+    
+    Background processing (async):
+    - Generates thumbnails (3 sizes)
+    - Generates display variants
+    - Updates processing status in database
+    """
     try:
         # Debug CSRF token
         csrf_header = request.headers.get("X-CSRF-Token")
@@ -57,8 +179,8 @@ async def upload_image(
         # Read file content
         file_content = await file.read()
         
-        # Process and store image
-        image_metadata = image_storage_service.process_and_store_image(
+        # FAST PATH: Validate and store original only (no thumbnail/variant generation)
+        image_metadata = image_storage_service.validate_and_store_original(
             file_content, 
             file.filename,
             user_id=current_user.id
@@ -70,6 +192,14 @@ async def upload_image(
         
         if existing_image:
             logger.info(f"Duplicate image detected: {file.filename} matches existing image ID {existing_image.id}")
+            # Clean up the uploaded original since it's a duplicate
+            try:
+                import os
+                os.remove(image_metadata['storage_path'])
+                logger.info(f"Cleaned up duplicate file: {image_metadata['storage_path']}")
+            except Exception as e:
+                logger.warning(f"Failed to clean up duplicate file: {e}")
+            
             return {
                 "message": "Duplicate image - already exists in library",
                 "data": existing_image.to_dict(),
@@ -77,7 +207,7 @@ async def upload_image(
                 "is_duplicate": True
             }
         
-        # Create database record only if not duplicate
+        # Create database record with processing_status='pending'
         image = image_service.create_image(
             filename=image_metadata['filename'],
             original_filename=image_metadata['original_filename'],
@@ -91,10 +221,22 @@ async def upload_image(
             playlist_id=playlist_id
         )
         
+        # BACKGROUND PROCESSING: Queue thumbnail and variant generation
+        # This happens asynchronously after the response is returned
+        background_tasks.add_task(
+            process_image_background,
+            image.id,
+            image.filename,
+            current_user.id
+        )
+        
+        logger.info(f"Image {image.id} uploaded successfully, queued for background processing")
+        
         return {
             "message": "Image uploaded successfully",
             "data": image.to_dict(),
-            "status_code": 200
+            "status_code": 200,
+            "background_processing": True
         }
         
     except ValueError as e:
