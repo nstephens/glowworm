@@ -617,19 +617,21 @@ class ApiService {
     const queryString = params.toString();
     const url = queryString ? `/scheduler/schedules?${queryString}` : '/scheduler/schedules';
     const response = await this.api.get(url);
+    // Backend returns {status_code, data: [...]}
     return {
       message: "Schedules retrieved successfully",
-      data: response.data,
-      status_code: 200
+      data: response.data.data || response.data || [],
+      status_code: response.data.status_code || 200
     };
   }
 
   async getSchedule(id: number): Promise<ApiResponse<ScheduledPlaylist>> {
     const response = await this.api.get(`/scheduler/schedules/${id}`);
+    // Backend returns {status_code, data: {...}}
     return {
       message: "Schedule retrieved successfully",
-      data: response.data,
-      status_code: 200
+      data: response.data.data || response.data,
+      status_code: response.data.status_code || 200
     };
   }
 
@@ -662,10 +664,11 @@ class ApiService {
 
   async getDeviceSchedules(deviceId: number): Promise<ApiResponse<ScheduledPlaylist[]>> {
     const response = await this.api.get(`/scheduler/devices/${deviceId}/schedules`);
+    // Backend returns {status_code, data: [...]}
     return {
       message: "Device schedules retrieved successfully",
-      data: response.data,
-      status_code: 200
+      data: response.data.data || response.data || [],
+      status_code: response.data.status_code || 200
     };
   }
 
