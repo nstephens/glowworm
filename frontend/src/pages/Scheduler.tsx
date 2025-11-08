@@ -6,6 +6,7 @@ import { Plus, RefreshCw } from 'lucide-react';
 import apiService from '../services/api';
 import { ScheduleForm } from '../components/scheduler/ScheduleForm';
 import { ScheduleList } from '../components/scheduler/ScheduleList';
+import { SchedulePreview } from '../components/scheduler/SchedulePreview';
 import type { ScheduledPlaylist, Device, Playlist, ScheduleFormData } from '../types';
 
 interface SchedulerPageProps {}
@@ -228,6 +229,9 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Schedule Preview */}
+      <SchedulePreview devices={devices} />
 
       {/* Schedules List by Device */}
       <ScheduleList
