@@ -37,6 +37,13 @@ export interface Image {
     height: number;
     filename: string;
   }>;
+  processing_status?: 'pending' | 'processing' | 'complete' | 'failed';
+  thumbnail_status?: 'pending' | 'processing' | 'complete' | 'failed';
+  variant_status?: 'pending' | 'processing' | 'complete' | 'failed';
+  processing_error?: string | null;
+  processing_attempts?: number;
+  last_processing_attempt?: string | null;
+  processing_completed_at?: string | null;
 }
 
 export interface Album {

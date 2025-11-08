@@ -62,6 +62,14 @@ async def lifespan(app: FastAPI):
     import asyncio
     heartbeat_task = asyncio.create_task(connection_manager.start_heartbeat_cleanup())
     
+    # Start Redis subscriber for cross-process WebSocket notifications
+    redis_subscriber_task = None
+    try:
+        from websocket.redis_subscriber import start_redis_subscriber, stop_redis_subscriber
+        redis_subscriber_task = await start_redis_subscriber()
+    except Exception as e:
+        logger.error(f"Failed to start Redis subscriber: {e}", exc_info=True)
+    
     yield
     
     # Shutdown
@@ -73,6 +81,13 @@ async def lifespan(app: FastAPI):
         await heartbeat_task
     except asyncio.CancelledError:
         pass
+    
+    # Stop Redis subscriber
+    try:
+        if redis_subscriber_task:
+            await stop_redis_subscriber()
+    except Exception as e:
+        logger.error(f"Error stopping Redis subscriber: {e}")
 
 app = FastAPI(
     title="GlowWorm API",

@@ -58,8 +58,8 @@ export const ProcessingQueueDashboard: React.FC = () => {
   const { data: queueData, isLoading, error, refetch } = useQuery<QueueStats>({
     queryKey: ['processing-queue'],
     queryFn: async () => {
-      const response = await apiService.get('/api/admin/processing-queue');
-      return response.data;
+      const data = await apiService.get('/images/admin/processing-queue');
+      return data;
     },
     refetchInterval: 10000, // Auto-refresh every 10 seconds
   });
@@ -67,8 +67,8 @@ export const ProcessingQueueDashboard: React.FC = () => {
   // Batch retry mutation
   const batchRetryMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiService.post('/api/admin/retry-all-failed');
-      return response.data;
+      const data = await apiService.post('/images/admin/retry-all-failed');
+      return data;
     },
     onSuccess: (data) => {
       toast({
@@ -91,19 +91,22 @@ export const ProcessingQueueDashboard: React.FC = () => {
   
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-        <span className="ml-2">Loading queue data...</span>
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto" />
+          <p className="mt-4 text-gray-600">Loading queue data...</p>
+        </div>
       </div>
     );
   }
   
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-red-500">
-        <AlertCircle className="w-12 h-12 mb-4" />
-        <p>Failed to load processing queue data</p>
-        <Button onClick={() => refetch()} className="mt-4">
+      <div className="flex flex-col items-center justify-center h-96">
+        <AlertCircle className="w-12 h-12 mb-4 text-red-500" />
+        <p className="text-gray-900 font-medium">Failed to load processing queue data</p>
+        <p className="text-sm text-gray-500 mt-1">Check backend logs for details</p>
+        <Button onClick={() => refetch()} className="mt-4" variant="outline">
           <RefreshCw className="w-4 h-4 mr-2" />
           Retry
         </Button>
@@ -139,74 +142,72 @@ export const ProcessingQueueDashboard: React.FC = () => {
   };
   
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Processing Queue Dashboard</h1>
-          <p className="text-gray-600 mt-1">Monitor background image processing status</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={() => refetch()} variant="outline" size="sm">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+    <div className="space-y-6">
+      {/* Action Buttons */}
+      <div className="flex justify-end gap-2">
+        <Button onClick={() => refetch()} variant="outline" size="sm">
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh
+        </Button>
+        {queueData && queueData.failed_count > 0 && (
+          <Button 
+            onClick={() => batchRetryMutation.mutate()}
+            disabled={batchRetryMutation.isPending}
+            variant="default"
+            size="sm"
+          >
+            {batchRetryMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Retry All Failed ({queueData.failed_count})
           </Button>
-          {queueData && queueData.failed_count > 0 && (
-            <Button 
-              onClick={() => batchRetryMutation.mutate()}
-              disabled={batchRetryMutation.isPending}
-              variant="default"
-              size="sm"
-            >
-              {batchRetryMutation.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4 mr-2" />
-              )}
-              Retry All Failed ({queueData.failed_count})
-            </Button>
-          )}
-        </div>
+        )}
       </div>
       
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600">Pending</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-yellow-600">{queueData?.queue_size || 0}</div>
-            <p className="text-xs text-gray-500 mt-1">Waiting for processing</p>
+          <CardContent className="pt-0">
+            <div className="text-2xl font-bold text-yellow-600">{queueData?.queue_size || 0}</div>
+            <p className="text-xs text-gray-500 mt-1">
+              {queueData?.thumbnail_stats.pending === 0 
+                ? 'Waiting for variants' 
+                : 'Waiting for processing'}
+            </p>
           </CardContent>
         </Card>
         
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600">Processing</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-600">{queueData?.processing_count || 0}</div>
+          <CardContent className="pt-0">
+            <div className="text-2xl font-bold text-blue-600">{queueData?.processing_count || 0}</div>
             <p className="text-xs text-gray-500 mt-1">Currently processing</p>
           </CardContent>
         </Card>
         
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600">Failed</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-red-600">{queueData?.failed_count || 0}</div>
+          <CardContent className="pt-0">
+            <div className="text-2xl font-bold text-red-600">{queueData?.failed_count || 0}</div>
             <p className="text-xs text-gray-500 mt-1">Require attention</p>
           </CardContent>
         </Card>
         
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600">Oldest Job</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-gray-700">
+          <CardContent className="pt-0">
+            <div className="text-2xl font-bold text-gray-700">
               {formatAge(queueData?.oldest_job_age_seconds || null)}
             </div>
             <p className="text-xs text-gray-500 mt-1">Age of oldest pending</p>
@@ -215,7 +216,7 @@ export const ProcessingQueueDashboard: React.FC = () => {
       </div>
       
       {/* Detailed Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Thumbnail Generation</CardTitle>

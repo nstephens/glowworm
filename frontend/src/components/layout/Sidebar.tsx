@@ -18,6 +18,7 @@ import {
   User,
   Key,
   Wrench,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiService } from '@/services/api';
@@ -111,6 +112,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         href: '/admin/logs',
         icon: FileText,
         description: 'View system logs and activity',
+      },
+      {
+        name: 'Processing Queue',
+        href: '/admin/processing-queue',
+        icon: RefreshCw,
+        description: 'Monitor image processing status',
       },
       {
         name: 'General',

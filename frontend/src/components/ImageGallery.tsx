@@ -25,6 +25,8 @@ import { urlResolver } from '../services/urlResolver';
 import { MobileMasonryGallery } from './gallery/MobileMasonryGallery';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { ImageGallerySkeleton } from './gallery/ImageGallerySkeleton';
+import { ImageProcessingStatus } from './ImageProcessingStatus';
+import { useProcessingUpdates } from '../hooks/useProcessingUpdates';
 
 interface ImageGalleryProps {
   images: Image[];
@@ -64,6 +66,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   loading = false
 }) => {
   const { isMobile } = useResponsiveLayout();
+  
+  // Enable real-time WebSocket processing updates
+  useProcessingUpdates();
+  
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
@@ -670,13 +676,25 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             >
               {/* Image Container */}
               <div className={viewMode === 'grid' ? 'aspect-square relative' : 'w-20 h-20 flex-shrink-0 relative'}>
-                <img
-                  src={image.thumbnail_url}
-                  alt={image.original_filename}
-                  className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-                  loading="lazy"
-                  key={`thumb-${image.id}-${image.album_id}`}
-                />
+                {image.thumbnail_status === 'complete' ? (
+                  <img
+                    src={image.thumbnail_url}
+                    alt={image.original_filename}
+                    className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    loading="lazy"
+                    key={`thumb-${image.id}-${image.album_id}`}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+                    <div className="text-center px-4">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-2" />
+                      <p className="text-xs text-gray-600 font-medium">
+                        {image.thumbnail_status === 'processing' ? 'Generating...' : 
+                         image.thumbnail_status === 'failed' ? 'Failed' : 'Queued'}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 
                 {/* Selection Overlay - Colored highlight when selected */}
                 {selectedImages.has(image.id) && (
@@ -733,6 +751,17 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                     </span>
                   </div>
                 )}
+
+                {/* Processing Status Badge */}
+                <div className="absolute top-3 right-3">
+                  <ImageProcessingStatus
+                    isProcessing={image.processing_status === 'processing'}
+                    thumbnailReady={image.thumbnail_status === 'complete'}
+                    variantsReady={image.variant_status === 'complete'}
+                    processingError={image.processing_error || null}
+                    imageId={image.id}
+                  />
+                </div>
               </div>
 
               {/* Image Info */}

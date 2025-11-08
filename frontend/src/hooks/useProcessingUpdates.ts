@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from './use-toast';
 
@@ -16,7 +16,10 @@ import { useToast } from './use-toast';
  */
 export const useProcessingUpdates = () => {
   const queryClient = useQueryClient();
-  const { toast } = useToast();
+  
+  // Track processed images count for logging
+  const processedCountRef = useRef(0);
+  const failedCountRef = useRef(0);
 
   useEffect(() => {
     // Get the WebSocket client (assuming it's a global or context-provided)
@@ -155,13 +158,10 @@ export const useProcessingUpdates = () => {
         };
       });
       
-      toast({
-        title: "Processing complete!",
-        description: "Image thumbnails and variants are ready.",
-        duration: 3000,
-      });
+      // Increment counter silently (no toast)
+      processedCountRef.current += 1;
       
-      console.log(`🎉 All processing complete for image ${data.image_id}`);
+      console.log(`🎉 All processing complete for image ${data.image_id} (total: ${processedCountRef.current})`);
     };
     
     const handleProcessingFailed = (data: any) => {
@@ -185,12 +185,8 @@ export const useProcessingUpdates = () => {
         };
       });
       
-      toast({
-        title: "Processing failed",
-        description: data.error || "Image processing encountered an error.",
-        variant: "destructive",
-        duration: 5000,
-      });
+      // Increment failure counter silently (badge will show failure)
+      failedCountRef.current += 1;
       
       console.error(`❌ Processing failed for image ${data.image_id}:`, data.error);
     };
@@ -205,6 +201,6 @@ export const useProcessingUpdates = () => {
         ws = null;
       }
     };
-  }, [queryClient, toast]);
+  }, [queryClient]);
 };
 

@@ -10,10 +10,10 @@ import ImageUpload from '../components/ImageUpload';
 import ImageGallery from '../components/ImageGallery';
 import AlbumManager from '../components/AlbumManager';
 import { ConfirmationModal } from '../components/ConfirmationModal';
-import AlertContainer from '../components/AlertContainer';
-import { useAlert } from '../hooks/useAlert';
+import { useToast } from '../hooks/use-toast';
 import { apiService } from '../services/api';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { useProcessingUpdatesState } from '../hooks/useProcessingUpdatesState';
 import { MobileUploadFlow } from '../components/upload/MobileUploadFlow';
 import { cn } from '../lib/utils';
 import type { Image, Album } from '../types';
@@ -29,7 +29,7 @@ interface ImagesProps {
 
 export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, showUploadModal: propShowUploadModal, setShowUploadModal: propSetShowUploadModal }) => {
   const navigate = useNavigate();
-  const { alerts, removeAlert, success, error: showError, warning, info } = useAlert();
+  const { toast } = useToast();
   const { isMobile } = useResponsiveLayout();
   const [images, setImages] = useState<Image[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -56,6 +56,9 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
   const [showDeleteAlbumModal, setShowDeleteAlbumModal] = useState(false);
   const [albumToDelete, setAlbumToDelete] = useState<Album | null>(null);
   const [deleteAlbumAction, setDeleteAlbumAction] = useState<'delete-images' | 'move-to-unsorted'>('move-to-unsorted');
+
+  // Listen for real-time processing updates via WebSocket
+  useProcessingUpdatesState(images, setImages);
 
   // Load data on component mount
   useEffect(() => {
@@ -111,27 +114,14 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
     loadAlbums();
     
     if (newImages.length > 0) {
-      success(
-        'Images Uploaded Successfully',
-        `${newImages.length} image${newImages.length !== 1 ? 's' : ''} uploaded successfully`
-      );
+      toast({
+        title: "Upload Complete",
+        description: `${newImages.length} image${newImages.length !== 1 ? 's' : ''} uploaded successfully. Processing in background...`,
+        duration: 5000,
+      });
       
-      // Trigger background variant generation for newly uploaded images (fire and forget)
-      // Don't await - let it run in the background without blocking UI
-      apiService.regenerateImageResolutions()
-        .then(() => {
-          console.log('✅ Background variant generation completed');
-        })
-        .catch((err) => {
-          // Non-critical - variants can be generated manually later
-          console.log('⚠️ Variant generation will occur on next scheduled run:', err);
-        });
-      
-      // Show info immediately without waiting
-      info(
-        'Generating Variants',
-        'Optimized image variants are being generated in the background'
-      );
+      // Background processing (thumbnails + variants) is automatically handled by the upload endpoint
+      // No need to manually trigger regeneration here
     }
   };
 
@@ -148,17 +138,28 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
     try {
       const response = await apiService.createAlbum(name);
       setAlbums(prev => [...prev, response.data]);
-      success('Album Created', `"${name}" album has been created successfully`);
+      toast({
+        title: 'Album Created',
+        description: `"${name}" album has been created successfully`,
+      });
       return response.data; // Return the album object
     } catch (err: any) {
-      showError('Create Album Failed', err.message || 'Failed to create album');
+      toast({
+        title: 'Create Album Failed',
+        description: err.message || 'Failed to create album',
+        variant: 'destructive',
+      });
       throw new Error(err.message || 'Failed to create album');
     }
   };
 
   const handleCreateAlbumFromModal = async () => {
     if (!newAlbumName.trim()) {
-      showError('Invalid Album Name', 'Please enter a valid album name');
+      toast({
+        title: 'Invalid Album Name',
+        description: 'Please enter a valid album name',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -177,9 +178,16 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
       setAlbums(prev => prev.map(album => 
         album.id === id ? response.data : album
       ));
-      success('Album Updated', `Album has been renamed to "${name}"`);
+      toast({
+        title: 'Album Updated',
+        description: `Album has been renamed to "${name}"`,
+      });
     } catch (err: any) {
-      showError('Update Album Failed', err.message || 'Failed to update album');
+      toast({
+        title: 'Update Album Failed',
+        description: err.message || 'Failed to update album',
+        variant: 'destructive',
+      });
       throw new Error(err.message || 'Failed to update album');
     }
   };
@@ -199,7 +207,10 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
         }
         // Update local state to remove deleted images
         setImages(prev => prev.filter(img => img.album_id !== id));
-        success('Album & Images Deleted', `"${albumName}" album and ${imagesInAlbum.length} images have been deleted`);
+        toast({
+          title: 'Album & Images Deleted',
+          description: `"${albumName}" album and ${imagesInAlbum.length} images have been deleted`,
+        });
       } else {
         // Move images to unsorted (album_id = null)
         for (const image of imagesInAlbum) {
@@ -209,7 +220,10 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
         setImages(prev => prev.map(img => 
           img.album_id === id ? { ...img, album_id: null } : img
         ));
-        success('Album Deleted', `"${albumName}" album has been deleted and ${imagesInAlbum.length} images moved to unsorted`);
+        toast({
+          title: 'Album Deleted',
+          description: `"${albumName}" album has been deleted and ${imagesInAlbum.length} images moved to unsorted`,
+        });
       }
 
       // Delete the album
@@ -221,7 +235,11 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
         setSelectedAlbum(null);
       }
     } catch (err: any) {
-      showError('Delete Album Failed', err.message || 'Failed to delete album');
+      toast({
+        title: 'Delete Album Failed',
+        description: err.message || 'Failed to delete album',
+        variant: 'destructive',
+      });
       throw new Error(err.message || 'Failed to delete album');
     }
   };
@@ -285,10 +303,17 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
       await apiService.deleteImage(imageToDelete.id);
       setImages(prev => prev.filter(img => img.id !== imageToDelete.id));
       console.log('Image deleted successfully');
-      success('Image Deleted', `"${imageToDelete.original_filename}" has been deleted successfully`);
+      toast({
+        title: 'Image Deleted',
+        description: `"${imageToDelete.original_filename}" has been deleted successfully`,
+      });
     } catch (err: any) {
       console.error('Failed to delete image:', err);
-      showError('Delete Failed', `Failed to delete "${imageToDelete.original_filename}": ${err.message || 'Unknown error'}`);
+      toast({
+        title: 'Delete Failed',
+        description: `Failed to delete "${imageToDelete.original_filename}": ${err.message || 'Unknown error'}`,
+        variant: 'destructive',
+      });
     } finally {
       setShowDeleteModal(false);
       setImageToDelete(null);
@@ -774,9 +799,6 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
           </Card>
         </div>
       )}
-
-      {/* Alerts */}
-      <AlertContainer alerts={alerts} onRemove={removeAlert} />
 
       {/* Mobile Upload Flow */}
       {isMobile && (

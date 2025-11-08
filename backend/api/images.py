@@ -232,48 +232,24 @@ async def upload_image(
     - Updates processing status in database
     """
     try:
-        # Debug CSRF token
-        csrf_header = request.headers.get("X-CSRF-Token")
-        csrf_cookie = request.cookies.get("glowworm_csrf")
-        logger.info(f"Upload request - CSRF header: {csrf_header}, CSRF cookie: {csrf_cookie}")
-        
-        # CSRF protection
         csrf_protection.require_csrf_token(request)
         
-        # Debug request data
-        logger.info(f"Upload request - album_id: {album_id}, playlist_id: {playlist_id}")
-        logger.info(f"Upload request - file: {file.filename}, content_type: {file.content_type}")
-        
-        # Validate file
-        if not file.filename:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No file selected"
-            )
-        
-        # Read file content
         file_content = await file.read()
         
-        # FAST PATH: Validate and store original only (no thumbnail/variant generation)
         image_metadata = image_storage_service.validate_and_store_original(
             file_content, 
             file.filename,
             user_id=current_user.id
         )
         
-        # Check for duplicates before creating database record
         image_service = ImageService(db)
         existing_image = image_service.get_image_by_hash(image_metadata['file_hash'])
         
         if existing_image:
-            logger.info(f"Duplicate image detected: {file.filename} matches existing image ID {existing_image.id}")
-            # Clean up the uploaded original since it's a duplicate
             try:
-                import os
                 os.remove(image_metadata['storage_path'])
-                logger.info(f"Cleaned up duplicate file: {image_metadata['storage_path']}")
             except Exception as e:
-                logger.warning(f"Failed to clean up duplicate file: {e}")
+                pass
             
             return {
                 "message": "Duplicate image - already exists in library",
@@ -282,7 +258,6 @@ async def upload_image(
                 "is_duplicate": True
             }
         
-        # Create database record with processing_status='pending'
         image = image_service.create_image(
             filename=image_metadata['filename'],
             original_filename=image_metadata['original_filename'],
@@ -296,16 +271,35 @@ async def upload_image(
             playlist_id=playlist_id
         )
         
-        # BACKGROUND PROCESSING: Queue thumbnail and variant generation
-        # This happens asynchronously after the response is returned
-        background_tasks.add_task(
-            process_image_background,
-            image.id,
-            image.filename,
-            current_user.id
-        )
+        # Queue background processing via Celery
+        use_celery = os.getenv('USE_CELERY', 'true').lower() == 'true'
         
-        logger.info(f"Image {image.id} uploaded successfully, queued for background processing")
+        if use_celery:
+            try:
+                # Use Celery for parallel distributed processing
+                from tasks.image_processing import process_full_image
+                result = process_full_image.delay(image.id, image.filename, current_user.id)
+                logger.info(f"Image {image.id} uploaded successfully, queued in Celery: {result.id}")
+            except Exception as celery_error:
+                logger.warning(f"⚠️ Celery unavailable for image {image.id}, falling back to BackgroundTasks: {celery_error}", exc_info=True)
+                # Fallback to BackgroundTasks if Celery fails
+                background_tasks.add_task(
+                    process_image_background,
+                    image.id,
+                    image.filename,
+                    current_user.id
+                )
+                logger.info(f"Image {image.id} uploaded successfully, queued in BackgroundTasks (fallback)")
+        else:
+            # Use FastAPI BackgroundTasks (slower, sequential)
+            logger.info(f"📋 Queuing BackgroundTask for image {image.id}")
+            background_tasks.add_task(
+                process_image_background,
+                image.id,
+                image.filename,
+                current_user.id
+            )
+            logger.info(f"Image {image.id} uploaded successfully, queued in BackgroundTasks")
         
         return {
             "message": "Image uploaded successfully",
@@ -590,14 +584,18 @@ async def get_processing_queue_status(
     along with a list of recent jobs for detailed monitoring.
     """
     try:
+        logger.info("📊 Processing queue status requested")
+        
         # Check if user is admin (optional - can add role check here)
         # For now, any authenticated user can access
         
         # Get processing statistics
+        logger.debug("Counting processing statuses...")
         pending_count = db.query(Image).filter(Image.processing_status == 'pending').count()
         processing_count = db.query(Image).filter(Image.processing_status == 'processing').count()
         failed_count = db.query(Image).filter(Image.processing_status == 'failed').count()
         complete_count = db.query(Image).filter(Image.processing_status == 'complete').count()
+        logger.debug(f"Counts: pending={pending_count}, processing={processing_count}, failed={failed_count}, complete={complete_count}")
         
         # Get counts by individual status types
         thumbnail_pending = db.query(Image).filter(Image.thumbnail_status == 'pending').count()
@@ -609,9 +607,17 @@ async def get_processing_queue_status(
         variant_failed = db.query(Image).filter(Image.variant_status == 'failed').count()
         
         # Get recent jobs (last 20 non-complete jobs)
+        # Note: MySQL doesn't support NULLS LAST, so we use COALESCE to handle nulls
+        from sqlalchemy import func, case
         recent_jobs = db.query(Image)\
             .filter(Image.processing_status.in_(['pending', 'processing', 'failed']))\
-            .order_by(Image.last_processing_attempt.desc().nulls_last())\
+            .order_by(
+                case(
+                    (Image.last_processing_attempt.is_(None), 1),
+                    else_=0
+                ),
+                Image.last_processing_attempt.desc()
+            )\
             .limit(20)\
             .all()
         
@@ -623,7 +629,13 @@ async def get_processing_queue_status(
         
         oldest_job_age_seconds = None
         if oldest_pending and oldest_pending.uploaded_at:
-            age = datetime.now() - oldest_pending.uploaded_at.replace(tzinfo=None)
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
+            uploaded = oldest_pending.uploaded_at
+            # Handle both timezone-aware and naive datetimes
+            if uploaded.tzinfo is None:
+                uploaded = uploaded.replace(tzinfo=timezone.utc)
+            age = now - uploaded
             oldest_job_age_seconds = int(age.total_seconds())
         
         return {
@@ -837,62 +849,144 @@ async def regenerate_image_resolutions(
     current_user: User = Depends(require_auth),
     db: Session = Depends(get_db)
 ):
-    """Start background regeneration of resolution variants for all images"""
+    """Queue all images for variant regeneration using Celery or BackgroundTasks"""
+    logger.info("📥 Regenerate-resolutions endpoint called")
     try:
-        logger.info("🔄 Starting background image resolution regeneration...")
+        logger.info("🔄 Queueing images for variant regeneration...")
         
-        # Get all images count for estimation
+        # Get all images that need variant processing
         image_service = ImageService(db)
         images = image_service.get_all_images(limit=10000)
         
         if not images:
             return {
                 "message": "No images found to regenerate",
-                "data": {"total_images": 0, "status": "completed", "task_id": None},
+                "data": {"total_images": 0, "queued": 0},
                 "status_code": 200
             }
         
-        # Get current display sizes
-        display_sizes = image_storage_service._load_display_sizes()
-        display_size_strings = [f"{w}x{h}" for w, h in display_sizes]
-        logger.info(f"🔍 Display sizes loaded: {display_sizes}")
-        logger.info(f"🔍 Display size strings: {display_size_strings}")
+        use_celery = os.getenv('USE_CELERY', 'true').lower() == 'true'
         
-        # Generate unique task ID
-        import uuid
-        task_id = str(uuid.uuid4())
+        # Reset variant status for all images
+        for image in images:
+            image.variant_status = 'pending'
+            image.processing_status = 'pending'
+            image.processing_error = None
+            image.processing_attempts = 0
+            image.last_processing_attempt = None
         
-        # Start progress tracking
-        from services.regeneration_progress_service import regeneration_progress_service
-        regeneration_progress_service.start_task(task_id, len(images), display_size_strings)
+        db.commit()
         
-        # Clean up existing scaled images first
-        logger.info(f"🧹 Cleaning up existing scaled images...")
-        _cleanup_scaled_images()
-        
-        # Start background task
-        logger.info(f"🚀 About to start background task for {len(images)} images with task ID: {task_id}")
-        background_tasks.add_task(_regenerate_resolutions_background, task_id, images, display_sizes)
-        
-        logger.info(f"🚀 Background regeneration started for {len(images)} images with task ID: {task_id}")
+        # Queue tasks using Celery or fallback
+        queued_count = 0
+        if use_celery:
+            try:
+                from tasks.image_processing import process_variants
+                for image in images:
+                    process_variants.apply_async(
+                        args=[image.id, image.filename, 1],
+                        queue='low_priority'  # Bulk regeneration is low priority
+                    )
+                    queued_count += 1
+                logger.info(f"✅ Queued {queued_count} images in Celery (low priority queue)")
+            except Exception as celery_error:
+                logger.warning(f"Celery unavailable, falling back to BackgroundTasks: {celery_error}")
+                # Fallback to old method
+                for image in images:
+                    background_tasks.add_task(_process_variants_for_image, image.id, image.filename, 1)
+                    queued_count += 1
+                logger.info(f"✅ Queued {queued_count} images in BackgroundTasks (fallback)")
+        else:
+            for image in images:
+                background_tasks.add_task(_process_variants_for_image, image.id, image.filename, 1)
+                queued_count += 1
+            logger.info(f"✅ Queued {queued_count} images in BackgroundTasks")
         
         return {
-            "message": "Resolution regeneration started in background",
+            "message": f"Queued {queued_count} images for variant regeneration",
             "data": {
-                "task_id": task_id,
                 "total_images": len(images),
-                "display_sizes": [f"{w}x{h}" for w, h in display_sizes],
-                "status": "started"
+                "queued": queued_count,
+                "status": "queued",
+                "using_celery": use_celery
             },
             "status_code": 200
         }
         
     except Exception as e:
-        logger.error(f"❌ Failed to start resolution regeneration: {e}")
+        logger.error(f"❌ Failed to queue variant regeneration: {e}")
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start resolution regeneration: {str(e)}"
+            detail=f"Failed to queue variant regeneration: {str(e)}"
         )
+
+def _process_variants_for_image(image_id: int, filename: str, user_id: int):
+    """
+    Process display variants for a single image using the queue system.
+    Called by variant regeneration to use the same pipeline as uploads.
+    """
+    from models import database as db_module
+    db_module.ensure_database_initialized()
+    db = db_module.SessionLocal()
+    
+    try:
+        logger.info(f"🔄 Processing variants for image {image_id}: {filename}")
+        
+        # Update status to processing
+        image = db.query(Image).filter(Image.id == image_id).first()
+        if not image:
+            logger.error(f"Image {image_id} not found")
+            return
+        
+        image.variant_status = 'processing'
+        image.processing_status = 'processing'
+        image.processing_attempts += 1
+        image.last_processing_attempt = datetime.now()
+        db.commit()
+        
+        # Check circuit breaker
+        if image_processing_circuit_breaker.is_open(image_id):
+            logger.warning(f"⚠️ Circuit breaker OPEN for image {image_id} - skipping")
+            image.variant_status = 'failed'
+            image.processing_status = 'failed'
+            image.processing_error = f"Circuit breaker open after {image_processing_circuit_breaker.get_failure_count(image_id)} failures"
+            db.commit()
+            return
+        
+        try:
+            # Process variants using the storage service
+            image_storage_service.process_variants(filename, user_id)
+            
+            # Update status to complete
+            image.variant_status = 'complete'
+            # If thumbnails are also complete, mark overall as complete
+            if image.thumbnail_status == 'complete':
+                image.processing_status = 'complete'
+                image.processing_completed_at = datetime.now()
+            image.processing_error = None
+            db.commit()
+            
+            # Reset circuit breaker on success
+            image_processing_circuit_breaker.record_success(image_id)
+            
+            logger.info(f"✅ Variants complete for image {image_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ Variant processing failed for image {image_id}: {e}")
+            image.variant_status = 'failed'
+            image.processing_status = 'failed'
+            image.processing_error = str(e)
+            db.commit()
+            
+            # Record failure in circuit breaker
+            image_processing_circuit_breaker.record_failure(image_id)
+            
+    except Exception as e:
+        logger.error(f"❌ Error in variant processing for image {image_id}: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 def _cleanup_scaled_images():
     """Clean up existing scaled images directory"""
@@ -925,93 +1019,148 @@ def _cleanup_scaled_images():
     except Exception as e:
         logger.error(f"❌ Failed to cleanup scaled images: {e}")
 
-def _regenerate_resolutions_background(task_id: str, images, display_sizes):
-    """Background task to regenerate image resolutions with progress tracking"""
-    from services.regeneration_progress_service import regeneration_progress_service
-    
+@router.post("/regenerate-thumbnails")
+async def regenerate_thumbnails(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """Queue all images for thumbnail regeneration using Celery or BackgroundTasks"""
     try:
-        logger.info(f"🔄 Background task {task_id}: Processing {len(images)} images...")
-        logger.info(f"🔍 Display sizes: {display_sizes}")
-        logger.info(f"🔍 First image: {images[0].filename if images else 'No images'}")
+        logger.info("🔄 Queueing images for thumbnail regeneration...")
         
-        processed_count = 0
-        error_count = 0
+        # Get all images
+        image_service = ImageService(db)
+        images = image_service.get_all_images(limit=10000)
         
-        for i, image in enumerate(images):
+        if not images:
+            return {
+                "message": "No images found to regenerate thumbnails",
+                "data": {"total_images": 0, "queued": 0},
+                "status_code": 200
+            }
+        
+        use_celery = os.getenv('USE_CELERY', 'true').lower() == 'true'
+        
+        # Reset thumbnail status for all images
+        for image in images:
+            image.thumbnail_status = 'pending'
+            image.processing_status = 'pending'
+            image.processing_error = None
+            image.processing_attempts = 0
+            image.last_processing_attempt = None
+        
+        db.commit()
+        
+        # Queue tasks using Celery or fallback
+        queued_count = 0
+        if use_celery:
             try:
-                # Update progress (sync version - no WebSocket broadcast)
-                regeneration_progress_service.update_progress_sync(
-                    task_id, 
-                    processed_count, 
-                    error_count, 
-                    image.filename
-                )
-                
-                logger.info(f"🖼️ Processing image {i+1}/{len(images)}: {image.filename}")
-                
-                # Get original image file
-                image_path = image_storage_service.get_image_path(image.filename)
-                if not image_path or not image_path.exists():
-                    logger.warning(f"⚠️ Original image file not found: {image.filename}")
-                    error_count += 1
-                    continue
-                
-                # Read original image bytes
-                with open(image_path, 'rb') as f:
-                    original_bytes = f.read()
-                
-                # Generate new scaled versions (only scale down, never up)
-                for target_width, target_height in display_sizes:
-                    try:
-                        # Skip if target resolution is larger than original (scale up)
-                        if target_width > image.width or target_height > image.height:
-                            logger.info(f"⏭️ Skipping {target_width}x{target_height} for {image.filename} (would scale up from {image.width}x{image.height})")
-                            continue
-                        
-                        # Generate scaled image (only scale down)
-                        scaled_bytes = image_storage_service._generate_scaled_image(
-                            original_bytes, target_width, target_height
-                        )
-                        
-                        # Save scaled version to scaled subdirectory
-                        scaled_filename = f"{Path(image.filename).stem}_{target_width}x{target_height}{Path(image.filename).suffix}"
-                        scaled_dir = image_storage_service.upload_path / "scaled"
-                        scaled_dir.mkdir(parents=True, exist_ok=True)
-                        scaled_path = scaled_dir / scaled_filename
-                        
-                        with open(scaled_path, 'wb') as f:
-                            f.write(scaled_bytes)
-                        
-                        logger.info(f"✅ Created {target_width}x{target_height} variant for {image.filename} at {scaled_path}")
-                        
-                    except Exception as e:
-                        logger.error(f"❌ Failed to generate {target_width}x{target_height} for {image.filename}: {e}")
-                        error_count += 1
-                
-                processed_count += 1
-                
-            except Exception as e:
-                logger.error(f"❌ Failed to process image {image.id}: {e}")
-                error_count += 1
+                from tasks.image_processing import process_thumbnails
+                for image in images:
+                    process_thumbnails.apply_async(
+                        args=[image.id, image.filename, 1],
+                        queue='low_priority'  # Bulk regeneration is low priority
+                    )
+                    queued_count += 1
+                logger.info(f"✅ Queued {queued_count} images in Celery (low priority queue)")
+            except Exception as celery_error:
+                logger.warning(f"Celery unavailable, falling back to BackgroundTasks: {celery_error}")
+                for image in images:
+                    background_tasks.add_task(_process_thumbnails_for_image, image.id, image.filename, 1)
+                    queued_count += 1
+                logger.info(f"✅ Queued {queued_count} images in BackgroundTasks (fallback)")
+        else:
+            for image in images:
+                background_tasks.add_task(_process_thumbnails_for_image, image.id, image.filename, 1)
+                queued_count += 1
+            logger.info(f"✅ Queued {queued_count} images in BackgroundTasks")
         
-        # Final progress update
-        regeneration_progress_service.update_progress_sync(
-            task_id, 
-            processed_count, 
-            error_count, 
-            "Completed"
-        )
-        
-        # Mark task as completed (sync version)
-        regeneration_progress_service.complete_task_sync(task_id, success=True)
-        
-        logger.info(f"🎉 Background regeneration {task_id} complete! Processed: {processed_count}, Errors: {error_count}")
+        return {
+            "message": f"Queued {queued_count} images for thumbnail regeneration",
+            "data": {
+                "total_images": len(images),
+                "queued": queued_count,
+                "status": "queued",
+                "using_celery": use_celery
+            },
+            "status_code": 200
+        }
         
     except Exception as e:
-        logger.error(f"❌ Background regeneration {task_id} failed: {e}")
-        import traceback
-        logger.error(f"❌ Background regeneration {task_id} traceback: {traceback.format_exc()}")
-        regeneration_progress_service.complete_task_sync(task_id, success=False, error_message=str(e))
+        logger.error(f"❌ Failed to queue thumbnail regeneration: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue thumbnail regeneration: {str(e)}"
+        )
+
+def _process_thumbnails_for_image(image_id: int, filename: str, user_id: int):
+    """
+    Process thumbnails for a single image using the queue system.
+    Called by thumbnail regeneration to use the same pipeline as uploads.
+    """
+    from models import database as db_module
+    db_module.ensure_database_initialized()
+    db = db_module.SessionLocal()
+    
+    try:
+        logger.info(f"🔄 Processing thumbnails for image {image_id}: {filename}")
+        
+        # Update status to processing
+        image = db.query(Image).filter(Image.id == image_id).first()
+        if not image:
+            logger.error(f"Image {image_id} not found")
+            return
+        
+        image.thumbnail_status = 'processing'
+        image.processing_status = 'processing'
+        image.processing_attempts += 1
+        image.last_processing_attempt = datetime.now()
+        db.commit()
+        
+        # Check circuit breaker
+        if image_processing_circuit_breaker.is_open(image_id):
+            logger.warning(f"⚠️ Circuit breaker OPEN for image {image_id} - skipping")
+            image.thumbnail_status = 'failed'
+            image.processing_status = 'failed'
+            image.processing_error = f"Circuit breaker open after {image_processing_circuit_breaker.get_failure_count(image_id)} failures"
+            db.commit()
+            return
+        
+        try:
+            # Process thumbnails using the storage service
+            image_storage_service.process_thumbnails(filename, user_id)
+            
+            # Update status to complete
+            image.thumbnail_status = 'complete'
+            # If variants are also complete, mark overall as complete
+            if image.variant_status == 'complete':
+                image.processing_status = 'complete'
+                image.processing_completed_at = datetime.now()
+            image.processing_error = None
+            db.commit()
+            
+            # Reset circuit breaker on success
+            image_processing_circuit_breaker.record_success(image_id)
+            
+            logger.info(f"✅ Thumbnails complete for image {image_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ Thumbnail processing failed for image {image_id}: {e}")
+            image.thumbnail_status = 'failed'
+            image.processing_status = 'failed'
+            image.processing_error = str(e)
+            db.commit()
+            
+            # Record failure in circuit breaker
+            image_processing_circuit_breaker.record_failure(image_id)
+            
+    except Exception as e:
+        logger.error(f"❌ Error in thumbnail processing for image {image_id}: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 @router.get("/{image_id}/scaled-versions")
 async def get_scaled_versions(
@@ -1700,4 +1849,252 @@ async def download_images_as_zip(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create download: {str(e)}"
+        )
+
+
+@router.post("/admin/optimize-database")
+async def optimize_database(
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """
+    Optimize database by cleaning up orphaned records, stale statuses, and resetting errors.
+    
+    This endpoint performs comprehensive database maintenance:
+    - Removes image records without files on disk
+    - Identifies files without database records
+    - Resets stuck processing statuses
+    - Clears circuit breakers for failed images
+    - Provides detailed statistics
+    """
+    try:
+        logger.info("🧹 Starting database optimization...")
+        
+        results = {
+            "orphaned_records_removed": 0,
+            "orphaned_files_found": 0,
+            "orphaned_file_list": [],
+            "stale_processing_reset": 0,
+            "circuit_breakers_reset": 0,
+            "errors_cleared": 0,
+            "before_stats": {},
+            "after_stats": {}
+        }
+        
+        # Get before statistics
+        total_images = db.query(Image).count()
+        pending_count = db.query(Image).filter(Image.processing_status == 'pending').count()
+        processing_count = db.query(Image).filter(Image.processing_status == 'processing').count()
+        complete_count = db.query(Image).filter(Image.processing_status == 'complete').count()
+        failed_count = db.query(Image).filter(Image.processing_status == 'failed').count()
+        
+        results["before_stats"] = {
+            "total_images": total_images,
+            "pending": pending_count,
+            "processing": processing_count,
+            "complete": complete_count,
+            "failed": failed_count
+        }
+        
+        # 1. Find and remove orphaned image records (DB records without files)
+        logger.info("🔍 Checking for orphaned image records...")
+        all_images = db.query(Image).all()
+        orphaned_records = []
+        
+        for image in all_images:
+            image_path = image_storage_service.get_image_path(image.filename)
+            if not image_path or not image_path.exists():
+                orphaned_records.append(image)
+        
+        if orphaned_records:
+            logger.info(f"📤 Found {len(orphaned_records)} orphaned records, removing...")
+            for image in orphaned_records:
+                db.delete(image)
+                results["orphaned_records_removed"] += 1
+            db.commit()
+        
+        # 2. Find orphaned files (files without DB records)
+        logger.info("🔍 Checking for orphaned files...")
+        upload_path = Path(image_storage_service.upload_path)
+        all_filenames_in_db = {img.filename for img in db.query(Image.filename).all()}
+        orphaned_files = []
+        
+        # Scan upload directory for image files
+        for year_dir in upload_path.iterdir():
+            if year_dir.is_dir() and year_dir.name.isdigit():
+                for month_dir in year_dir.iterdir():
+                    if month_dir.is_dir():
+                        for user_dir in month_dir.iterdir():
+                            if user_dir.is_dir():
+                                for file_path in user_dir.iterdir():
+                                    if file_path.is_file() and file_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+                                        if file_path.name not in all_filenames_in_db:
+                                            orphaned_files.append(str(file_path.relative_to(upload_path)))
+        
+        results["orphaned_files_found"] = len(orphaned_files)
+        results["orphaned_file_list"] = orphaned_files[:50]  # Limit to first 50 for display
+        
+        # 3. Reset stale processing statuses (stuck in "processing" for >1 hour)
+        logger.info("🔄 Resetting stale processing statuses...")
+        stale_threshold = datetime.now() - timedelta(hours=1)
+        stale_images = db.query(Image).filter(
+            Image.processing_status == 'processing',
+            Image.last_processing_attempt < stale_threshold
+        ).all()
+        
+        for image in stale_images:
+            image.processing_status = 'pending'
+            image.processing_error = None
+            results["stale_processing_reset"] += 1
+        
+        if stale_images:
+            db.commit()
+        
+        # 4. Reset circuit breakers for all failed images
+        logger.info("🔌 Resetting circuit breakers...")
+        failed_images = db.query(Image).filter(Image.processing_status == 'failed').all()
+        for image in failed_images:
+            image_processing_circuit_breaker.reset(image.id)
+            results["circuit_breakers_reset"] += 1
+        
+        # 5. Clear processing errors for completed images
+        logger.info("🧼 Clearing old errors from completed images...")
+        completed_with_errors = db.query(Image).filter(
+            Image.processing_status == 'complete',
+            Image.processing_error.isnot(None)
+        ).all()
+        
+        for image in completed_with_errors:
+            image.processing_error = None
+            results["errors_cleared"] += 1
+        
+        if completed_with_errors:
+            db.commit()
+        
+        # Get after statistics
+        total_images_after = db.query(Image).count()
+        pending_count_after = db.query(Image).filter(Image.processing_status == 'pending').count()
+        processing_count_after = db.query(Image).filter(Image.processing_status == 'processing').count()
+        complete_count_after = db.query(Image).filter(Image.processing_status == 'complete').count()
+        failed_count_after = db.query(Image).filter(Image.processing_status == 'failed').count()
+        
+        results["after_stats"] = {
+            "total_images": total_images_after,
+            "pending": pending_count_after,
+            "processing": processing_count_after,
+            "complete": complete_count_after,
+            "failed": failed_count_after
+        }
+        
+        logger.info(f"✅ Database optimization complete!")
+        logger.info(f"   - Orphaned records removed: {results['orphaned_records_removed']}")
+        logger.info(f"   - Orphaned files found: {results['orphaned_files_found']}")
+        logger.info(f"   - Stale processing reset: {results['stale_processing_reset']}")
+        logger.info(f"   - Circuit breakers reset: {results['circuit_breakers_reset']}")
+        logger.info(f"   - Errors cleared: {results['errors_cleared']}")
+        
+        return {
+            "message": "Database optimization completed successfully",
+            "data": results,
+            "status_code": 200
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error during database optimization: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database optimization failed: {str(e)}"
+        )
+
+@router.get("/admin/system-health")
+async def check_system_health(
+    current_user: User = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
+    """
+    Check system health for database inconsistencies and processing issues.
+    
+    Returns warnings/issues that can be resolved by database optimization or other actions.
+    """
+    try:
+        issues = []
+        warnings = []
+        
+        # Check 1: Images stuck with thumbnails complete but variants pending
+        stuck_variants = db.query(Image).filter(
+            Image.processing_status == 'processing',
+            Image.thumbnail_status == 'complete',
+            Image.variant_status == 'pending'
+        ).count()
+        
+        if stuck_variants > 0:
+            issues.append({
+                "type": "stuck_variants",
+                "severity": "warning",
+                "count": stuck_variants,
+                "message": f"{stuck_variants} images have thumbnails but are waiting for variants",
+                "action": "generate_variants",
+                "action_label": "Generate Image Variants"
+            })
+        
+        # Check 2: Stale processing (stuck for >1 hour)
+        stale_threshold = datetime.now() - timedelta(hours=1)
+        stale_processing = db.query(Image).filter(
+            Image.processing_status == 'processing',
+            Image.last_processing_attempt < stale_threshold
+        ).count()
+        
+        if stale_processing > 0:
+            issues.append({
+                "type": "stale_processing",
+                "severity": "error",
+                "count": stale_processing,
+                "message": f"{stale_processing} images stuck in processing for over 1 hour",
+                "action": "optimize_database",
+                "action_label": "Optimize Database"
+            })
+        
+        # Check 3: Failed images with open circuit breakers
+        failed_count = db.query(Image).filter(Image.processing_status == 'failed').count()
+        if failed_count > 0:
+            warnings.append({
+                "type": "failed_images",
+                "severity": "info",
+                "count": failed_count,
+                "message": f"{failed_count} images failed processing",
+                "action": "optimize_database",
+                "action_label": "Reset & Retry"
+            })
+        
+        # Check 4: Large pending queue
+        pending_count = db.query(Image).filter(Image.processing_status == 'pending').count()
+        if pending_count > 50:
+            warnings.append({
+                "type": "large_queue",
+                "severity": "info",
+                "count": pending_count,
+                "message": f"{pending_count} images pending processing",
+                "action": None,
+                "action_label": None
+            })
+        
+        # Overall health status
+        has_critical = any(i["severity"] == "error" for i in issues)
+        has_warnings = len(issues) > 0 or len(warnings) > 0
+        
+        health_status = "critical" if has_critical else ("warning" if has_warnings else "healthy")
+        
+        return {
+            "status": health_status,
+            "issues": issues,
+            "warnings": warnings,
+            "timestamp": datetime.now().isoformat(),
+            "message": "System health check completed successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error during system health check: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"System health check failed: {str(e)}"
         )

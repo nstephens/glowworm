@@ -31,6 +31,20 @@ import DisplaysHeader from './components/DisplaysHeader';
 import PlaylistsHeader from './components/PlaylistsHeader';
 import AdminLogsHeader from './components/AdminLogsHeader';
 import SettingsHeader from './components/SettingsHeader';
+import ProcessingQueueHeader from './components/ProcessingQueueHeader';
+import ProcessingQueueDashboard from './components/admin/ProcessingQueueDashboard';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Create a React Query client for image processing updates
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
 
 // Wrapper component for Images with custom header
 const ImagesWithHeader: React.FC = () => {
@@ -52,14 +66,16 @@ const ImagesWithHeader: React.FC = () => {
   );
 
   return (
-    <AdminLayout headerContent={headerContent}>
-      <Images 
-        headerContent={headerContent} 
-        onDataChange={handleDataChange}
-        showUploadModal={showUploadModal}
-        setShowUploadModal={setShowUploadModal}
-      />
-    </AdminLayout>
+    <QueryClientProvider client={queryClient}>
+      <AdminLayout headerContent={headerContent}>
+        <Images 
+          headerContent={headerContent} 
+          onDataChange={handleDataChange}
+          showUploadModal={showUploadModal}
+          setShowUploadModal={setShowUploadModal}
+        />
+      </AdminLayout>
+    </QueryClientProvider>
   );
 };
 
@@ -144,6 +160,7 @@ function AppContent() {
             <Route path="/admin/playlists/:slug" element={<ProtectedRoute><AdminLayout headerContent={<PlaylistDetailHeader />}><PlaylistDetail /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/displays" element={<ProtectedRoute><DisplaysWithHeader /></ProtectedRoute>} />
             <Route path="/admin/logs" element={<AdminProtectedRoute><AdminLayout headerContent={<AdminLogsHeader />}><AdminLogs /></AdminLayout></AdminProtectedRoute>} />
+            <Route path="/admin/processing-queue" element={<AdminProtectedRoute><QueryClientProvider client={queryClient}><AdminLayout headerContent={<ProcessingQueueHeader />}><ProcessingQueueDashboard /></AdminLayout></QueryClientProvider></AdminProtectedRoute>} />
             <Route path="/admin/system/general" element={<AdminProtectedRoute><AdminLayout headerContent={<SettingsHeader />}><Settings /></AdminLayout></AdminProtectedRoute>} />
             <Route path="/admin/system/users" element={<AdminProtectedRoute><AdminLayout headerContent={<SettingsHeader />}><Settings /></AdminLayout></AdminProtectedRoute>} />
             <Route path="/admin/system/database" element={<AdminProtectedRoute><AdminLayout headerContent={<SettingsHeader />}><Settings /></AdminLayout></AdminProtectedRoute>} />

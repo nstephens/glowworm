@@ -24,6 +24,7 @@ import type { Image, Album } from '../types';
 import { useToast } from '../hooks/use-toast';
 import { Dashboard } from '../components/dashboard/Dashboard';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { SystemHealthBanner } from '../components/admin/SystemHealthBanner';
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -194,9 +195,9 @@ const AdminDashboard: React.FC = () => {
     
     // Show success toast
     toast({
-      title: "Images Uploaded",
-      description: `${newImages.length} image${newImages.length === 1 ? '' : 's'} uploaded successfully.`,
-      variant: "success",
+      title: "Upload Complete",
+      description: `${newImages.length} image${newImages.length === 1 ? '' : 's'} uploaded successfully. Processing in background...`,
+      duration: 5000,
     });
   };
 
@@ -328,6 +329,9 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      {/* System Health Banner */}
+      <SystemHealthBanner />
+      
       {/* Use the new mobile-optimized Dashboard component */}
       <Dashboard 
         data={dashboardData} 

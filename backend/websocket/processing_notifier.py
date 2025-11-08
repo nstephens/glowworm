@@ -2,13 +2,12 @@
 Helper functions for emitting image processing WebSocket notifications.
 
 Provides a simple interface for background tasks to send real-time processing
-updates to connected clients without dealing with async/sync context issues.
+updates to connected clients via Redis pub/sub (cross-process communication).
 """
 
-import asyncio
 import logging
 from typing import Optional, Dict, Any
-from .manager import connection_manager
+from .redis_bridge import publish_processing_update
 from .events import (
     WS_EVENT_THUMBNAIL_COMPLETE,
     WS_EVENT_THUMBNAIL_FAILED,
@@ -29,40 +28,18 @@ logger = logging.getLogger(__name__)
 
 def emit_processing_update_sync(event_payload: Dict[str, Any]):
     """
-    Emit a processing update from a synchronous context (like background tasks).
+    Emit a processing update from a synchronous context (Celery workers).
     
-    This function handles the async/sync bridge, allowing synchronous background
-    tasks to emit WebSocket events to connected clients.
+    Uses Redis pub/sub to bridge between Celery workers (separate processes)
+    and the FastAPI app (which has the WebSocket connections).
     
     Args:
         event_payload: Event dict from websocket.events module
     """
     try:
-        # Try to get the running event loop
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # No running loop, create a new one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        # Create a coroutine for the broadcast
-        async def _broadcast():
-            await connection_manager.broadcast_image_processing_update(event_payload)
-        
-        # Run it in the event loop
-        if loop.is_running():
-            # If loop is already running, schedule the coroutine
-            asyncio.create_task(_broadcast())
-        else:
-            # If loop is not running, run it until complete
-            loop.run_until_complete(_broadcast())
-            
-        logger.debug(f"Emitted WebSocket event: {event_payload.get('type')}")
-        
+        publish_processing_update(event_payload)
     except Exception as e:
-        # Don't let WebSocket errors break the processing
-        logger.warning(f"Failed to emit WebSocket update: {e}")
+        logger.warning(f"Failed to publish processing update: {e}")
 
 
 # Convenience functions for common events

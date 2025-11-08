@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
 import logging
 
-from models import get_db, Playlist
+from models import get_db, Playlist, Image
 from models.user import User
 from models.display_device import DisplayDevice, DeviceStatus
 from utils.middleware import get_current_user
@@ -467,12 +467,20 @@ async def reorder_playlist(
         db.commit()
         db.refresh(playlist)
         
-        # Auto-generate variants after sequence change
-        from services.playlist_variant_service import PlaylistVariantService
+        # Auto-generate variants after sequence change (in background)
+        import os
+        use_celery = os.getenv('USE_CELERY', 'true').lower() == 'true'
         try:
-            variant_service = PlaylistVariantService(db)
-            variant_result = variant_service.generate_variants_for_playlist(playlist_id)
-            logger.info(f"Auto-generated {variant_result.get('count', 0)} variants after reorder")
+            if use_celery:
+                from tasks.image_processing import generate_playlist_variants
+                generate_playlist_variants.apply_async(args=[playlist_id], queue='normal_priority')
+                logger.info(f"Queued playlist variant generation for playlist {playlist_id}")
+            else:
+                # Fallback to synchronous (not recommended for production)
+                from services.playlist_variant_service import PlaylistVariantService
+                variant_service = PlaylistVariantService(db)
+                variant_result = variant_service.generate_variants_for_playlist(playlist_id)
+                logger.info(f"Auto-generated {variant_result.get('count', 0)} variants after reorder")
         except Exception as e:
             logger.error(f"Auto variant generation failed (non-fatal): {e}")
             # Don't fail the reorder if variant generation fails
@@ -622,12 +630,20 @@ async def randomize_playlist(
         db.commit()
         db.refresh(playlist)
         
-        # Auto-generate variants after sequence change
-        from services.playlist_variant_service import PlaylistVariantService
+        # Auto-generate variants after sequence change (in background)
+        import os
+        use_celery = os.getenv('USE_CELERY', 'true').lower() == 'true'
         try:
-            variant_service = PlaylistVariantService(db)
-            variant_result = variant_service.generate_variants_for_playlist(playlist_id)
-            logger.info(f"Auto-generated {variant_result.get('count', 0)} variants after randomize")
+            if use_celery:
+                from tasks.image_processing import generate_playlist_variants
+                generate_playlist_variants.apply_async(args=[playlist_id], queue='normal_priority')
+                logger.info(f"Queued playlist variant generation for playlist {playlist_id}")
+            else:
+                # Fallback to synchronous (not recommended for production)
+                from services.playlist_variant_service import PlaylistVariantService
+                variant_service = PlaylistVariantService(db)
+                variant_result = variant_service.generate_variants_for_playlist(playlist_id)
+                logger.info(f"Auto-generated {variant_result.get('count', 0)} variants after randomize")
         except Exception as e:
             logger.error(f"Auto variant generation failed (non-fatal): {e}")
             # Don't fail the randomize if variant generation fails
@@ -758,24 +774,79 @@ async def generate_playlist_variants(
 
 @router.post("/generate-all-variants")
 async def generate_all_playlist_variants(
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Generate variants for all playlists"""
+    """Queue all playlist images for variant regeneration using Celery or BackgroundTasks"""
     try:
-        variant_service = PlaylistVariantService(db)
-        results = variant_service.regenerate_all_variants()
+        logger.info("🔄 Queueing playlist images for variant regeneration...")
+        
+        # Get all unique images that are in playlists
+        images_in_playlists = db.query(Image).filter(Image.playlist_id.isnot(None)).distinct().all()
+        
+        if not images_in_playlists:
+            return {
+                "message": "No playlist images found to regenerate",
+                "data": {"total_images": 0, "queued": 0},
+                "status_code": 200
+            }
+        
+        use_celery = os.getenv('USE_CELERY', 'true').lower() == 'true'
+        
+        # Reset variant status for all playlist images
+        for image in images_in_playlists:
+            image.variant_status = 'pending'
+            image.processing_status = 'pending'
+            image.processing_error = None
+            image.processing_attempts = 0
+            image.last_processing_attempt = None
+        
+        db.commit()
+        
+        # Queue tasks using Celery or fallback
+        queued_count = 0
+        if use_celery:
+            try:
+                from tasks.image_processing import process_variants
+                for image in images_in_playlists:
+                    process_variants.apply_async(
+                        args=[image.id, image.filename, 1],
+                        queue='low_priority'  # Bulk regeneration is low priority
+                    )
+                    queued_count += 1
+                logger.info(f"✅ Queued {queued_count} playlist images in Celery (low priority queue)")
+            except Exception as celery_error:
+                logger.warning(f"Celery unavailable, falling back to BackgroundTasks: {celery_error}")
+                from api.images import _process_variants_for_image
+                for image in images_in_playlists:
+                    background_tasks.add_task(_process_variants_for_image, image.id, image.filename, 1)
+                    queued_count += 1
+                logger.info(f"✅ Queued {queued_count} playlist images in BackgroundTasks (fallback)")
+        else:
+            from api.images import _process_variants_for_image
+            for image in images_in_playlists:
+                background_tasks.add_task(_process_variants_for_image, image.id, image.filename, 1)
+                queued_count += 1
+            logger.info(f"✅ Queued {queued_count} playlist images in BackgroundTasks")
         
         return {
-            "message": "Playlist variant generation completed",
-            "results": results
+            "message": f"Queued {queued_count} playlist images for variant regeneration",
+            "data": {
+                "total_images": len(images_in_playlists),
+                "queued": queued_count,
+                "status": "queued",
+                "using_celery": use_celery
+            },
+            "status_code": 200
         }
         
     except Exception as e:
         logger.error(f"Generate all playlist variants error: {e}")
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate playlist variants"
+            detail=f"Failed to queue playlist variant regeneration: {str(e)}"
         )
 
 @router.get("/{playlist_id}/variants")

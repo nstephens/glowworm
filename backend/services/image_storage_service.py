@@ -546,7 +546,7 @@ class ImageStorageService:
         
         Args:
             filename: The stored filename of the original image
-            user_id: Optional user ID for storage path resolution
+            user_id: Optional user ID (deprecated, not used - kept for compatibility)
             
         Returns:
             Dict mapping size names to thumbnail file paths
@@ -555,11 +555,11 @@ class ImageStorageService:
             FileNotFoundError: If original image not found
             Exception: If thumbnail generation fails after all retries
         """
-        # Get the original image path
-        storage_path = self._get_storage_path(filename, user_id)
+        # Get the original image path by searching (ignores user_id)
+        storage_path = self.get_image_path(filename)
         
-        if not storage_path.exists():
-            raise FileNotFoundError(f"Original image not found: {storage_path}")
+        if not storage_path or not storage_path.exists():
+            raise FileNotFoundError(f"Original image not found: {filename}")
         
         # Read the original image
         with open(storage_path, 'rb') as f:
@@ -596,7 +596,7 @@ class ImageStorageService:
         
         Args:
             filename: The stored filename of the original image
-            user_id: Optional user ID for storage path resolution
+            user_id: Optional user ID (deprecated, not used - kept for compatibility)
             
         Returns:
             Dict mapping size strings (e.g. "1920x1080") to scaled file paths
@@ -605,11 +605,11 @@ class ImageStorageService:
             FileNotFoundError: If original image not found
             Exception: If variant generation fails after all retries
         """
-        # Get the original image path
-        storage_path = self._get_storage_path(filename, user_id)
+        # Get the original image path by searching (ignores user_id)
+        storage_path = self.get_image_path(filename)
         
-        if not storage_path.exists():
-            raise FileNotFoundError(f"Original image not found: {storage_path}")
+        if not storage_path or not storage_path.exists():
+            raise FileNotFoundError(f"Original image not found: {filename}")
         
         # Read the original image
         with open(storage_path, 'rb') as f:

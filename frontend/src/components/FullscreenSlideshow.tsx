@@ -173,7 +173,7 @@ export const FullscreenSlideshow: React.FC<FullscreenSlideshowProps> = ({
         clearInterval(intervalRef.current);
       }
     };
-  }, [isPlaying, settings.interval, shuffledImages.length]);
+  }, [isPlaying, settings.interval, shuffledImages.length, nextImage]);
 
   // Fullscreen functionality
   useEffect(() => {

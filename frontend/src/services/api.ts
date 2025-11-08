@@ -510,6 +510,16 @@ class ApiService {
     return response.data;
   }
 
+  async regenerateThumbnails(): Promise<ApiResponse<any>> {
+    const response = await this.api.post('/images/regenerate-thumbnails');
+    return response.data;
+  }
+
+  async optimizeDatabase(): Promise<ApiResponse<any>> {
+    const response = await this.api.post('/images/admin/optimize-database');
+    return response.data;
+  }
+
   async getImageResolutions(imageId: number): Promise<ApiResponse<any>> {
     const response = await this.api.get(`/images/${imageId}/resolutions`);
     return response.data;
@@ -577,6 +587,17 @@ class ApiService {
   // Device endpoints
   async getDevices(): Promise<any[]> {
     const response = await this.api.get('/display-devices/admin/devices');
+    return response.data;
+  }
+
+  // Generic HTTP methods for dynamic API calls
+  async get(url: string): Promise<any> {
+    const response = await this.api.get(url);
+    return response.data;
+  }
+
+  async post(url: string, data?: any): Promise<any> {
+    const response = await this.api.post(url, data);
     return response.data;
   }
 }

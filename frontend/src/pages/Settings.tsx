@@ -19,6 +19,7 @@ import { MobileSettingsWrapper } from '../components/settings/MobileSettingsWrap
 import { SettingsSection } from '../components/settings/SettingsSection';
 import { ToggleSwitch } from '../components/settings/ToggleSwitch';
 import { SettingsInput } from '../components/settings/SettingsItem';
+import { SystemHealthBanner } from '../components/admin/SystemHealthBanner';
 
 interface DockerEnvironment {
   isDocker: boolean;
@@ -142,6 +143,8 @@ const Settings: React.FC = () => {
   // Variant generation state
   const [isGeneratingImageVariants, setIsGeneratingImageVariants] = useState(false);
   const [isGeneratingPlaylistVariants, setIsGeneratingPlaylistVariants] = useState(false);
+  const [isRegeneratingThumbnails, setIsRegeneratingThumbnails] = useState(false);
+  const [isOptimizingDatabase, setIsOptimizingDatabase] = useState(false);
   
   // Track original display sizes for change detection
   const [originalDisplaySizes, setOriginalDisplaySizes] = useState<string[]>([]);
@@ -1164,8 +1167,29 @@ const Settings: React.FC = () => {
   );
 
   const handleGenerateImageVariants = async () => {
-    // Use the same approach as handleRegenerateResolutions to show progress modal
-    handleRegenerateResolutions();
+    try {
+      setIsGeneratingImageVariants(true);
+      const response = await apiService.regenerateImageResolutions();
+      
+      const data = (response as any).data || {};
+      const queued = data.queued || 0;
+      
+      toast({
+        title: 'Variant Generation Queued',
+        description: `${queued} images queued for variant generation. Monitor progress in Processing Queue.`,
+        duration: 5000,
+      });
+      
+    } catch (error: any) {
+      console.error('Failed to queue variant generation:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to queue variant generation',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingImageVariants(false);
+    }
   };
 
   const handleGeneratePlaylistVariants = async () => {
@@ -1173,22 +1197,91 @@ const Settings: React.FC = () => {
       setIsGeneratingPlaylistVariants(true);
       const response = await apiService.generateAllPlaylistVariants();
       
-      const results = (response as any).results || {};
-      const totalVariants = results.variants_created || 0;
+      const data = (response as any).data || {};
+      const queued = data.queued || 0;
       
       toast({
-        title: 'Success',
-        description: `Generated ${totalVariants} playlist variants successfully`,
+        title: 'Playlist Variant Generation Queued',
+        description: `${queued} playlist images queued for variant generation. Monitor progress in Processing Queue.`,
+        duration: 5000,
       });
     } catch (error: any) {
-      console.error('Failed to generate playlist variants:', error);
+      console.error('Failed to queue playlist variant generation:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to generate playlist variants',
+        description: error.message || 'Failed to queue playlist variant generation',
         variant: 'destructive',
       });
     } finally {
       setIsGeneratingPlaylistVariants(false);
+    }
+  };
+
+  const handleRegenerateThumbnails = async () => {
+    try {
+      setIsRegeneratingThumbnails(true);
+      const response = await apiService.regenerateThumbnails();
+      
+      const data = (response as any).data || {};
+      const queued = data.queued || 0;
+      
+      toast({
+        title: 'Thumbnail Regeneration Queued',
+        description: `${queued} images queued for thumbnail regeneration. Monitor progress in Processing Queue.`,
+        duration: 5000,
+      });
+      
+    } catch (error: any) {
+      console.error('Failed to queue thumbnail regeneration:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to queue thumbnail regeneration',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRegeneratingThumbnails(false);
+    }
+  };
+
+  const handleOptimizeDatabase = async () => {
+    try {
+      setIsOptimizingDatabase(true);
+      const response = await apiService.optimizeDatabase();
+      
+      const data = (response as any).data || {};
+      const removed = data.orphaned_records_removed || 0;
+      const orphanedFiles = data.orphaned_files_found || 0;
+      const staleReset = data.stale_processing_reset || 0;
+      const circuitReset = data.circuit_breakers_reset || 0;
+      const errorsCleared = data.errors_cleared || 0;
+      
+      // Build detailed message
+      const details: string[] = [];
+      if (removed > 0) details.push(`${removed} orphaned records removed`);
+      if (orphanedFiles > 0) details.push(`${orphanedFiles} orphaned files found`);
+      if (staleReset > 0) details.push(`${staleReset} stale processes reset`);
+      if (circuitReset > 0) details.push(`${circuitReset} circuit breakers reset`);
+      if (errorsCleared > 0) details.push(`${errorsCleared} errors cleared`);
+      
+      const description = details.length > 0
+        ? details.join(', ')
+        : 'No issues found - database is clean!';
+      
+      toast({
+        title: 'Database Optimization Complete',
+        description: description,
+        duration: 8000,
+      });
+      
+    } catch (error: any) {
+      console.error('Failed to optimize database:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to optimize database',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsOptimizingDatabase(false);
     }
   };
 
@@ -1244,10 +1337,44 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
+      {/* Thumbnail Regeneration */}
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex-1">
+            <h4 className="text-sm font-medium text-green-900 flex items-center gap-2">
+              <RefreshCw className="w-4 h-4" />
+              Thumbnail Regeneration
+            </h4>
+            <p className="text-sm text-green-700 mt-1">
+              Regenerate thumbnails (150px, 300px, 600px) for all images.
+              Useful if thumbnails are missing or corrupted.
+            </p>
+          </div>
+          <Button
+            onClick={handleRegenerateThumbnails}
+            disabled={isRegeneratingThumbnails}
+            variant="outline"
+            className="border-green-300 text-green-700 hover:bg-green-100 flex-shrink-0"
+          >
+            {isRegeneratingThumbnails ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Regenerating...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Regenerate Thumbnails
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
       {/* Image Variant Generation */}
       <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex-1">
             <h4 className="text-sm font-medium text-purple-900 flex items-center gap-2">
               <Sparkles className="w-4 h-4" />
               Image Variant Generation
@@ -1261,7 +1388,7 @@ const Settings: React.FC = () => {
             onClick={handleGenerateImageVariants}
             disabled={isGeneratingImageVariants}
             variant="outline"
-            className="border-purple-300 text-purple-700 hover:bg-purple-100"
+            className="border-purple-300 text-purple-700 hover:bg-purple-100 flex-shrink-0"
           >
             {isGeneratingImageVariants ? (
               <>
@@ -1280,8 +1407,8 @@ const Settings: React.FC = () => {
 
       {/* Playlist Variant Generation */}
       <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex-1">
             <h4 className="text-sm font-medium text-indigo-900 flex items-center gap-2">
               <Sparkles className="w-4 h-4" />
               Playlist Variant Generation
@@ -1295,7 +1422,7 @@ const Settings: React.FC = () => {
             onClick={handleGeneratePlaylistVariants}
             disabled={isGeneratingPlaylistVariants}
             variant="outline"
-            className="border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+            className="border-indigo-300 text-indigo-700 hover:bg-indigo-100 flex-shrink-0"
           >
             {isGeneratingPlaylistVariants ? (
               <>
@@ -1306,6 +1433,40 @@ const Settings: React.FC = () => {
               <>
                 <Sparkles className="w-4 h-4 mr-2" />
                 Generate Playlist Variants
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Database Optimization */}
+      <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex-1">
+            <h4 className="text-sm font-medium text-orange-900 flex items-center gap-2">
+              <Database className="w-4 h-4" />
+              Database Optimization
+            </h4>
+            <p className="text-sm text-orange-700 mt-1">
+              Clean up orphaned records, reset stuck processes, and clear circuit breakers.
+              Removes database entries for deleted files and identifies files without records.
+            </p>
+          </div>
+          <Button
+            onClick={handleOptimizeDatabase}
+            disabled={isOptimizingDatabase}
+            variant="outline"
+            className="border-orange-300 text-orange-700 hover:bg-orange-100 flex-shrink-0"
+          >
+            {isOptimizingDatabase ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Optimizing...
+              </>
+            ) : (
+              <>
+                <Database className="w-4 h-4 mr-2" />
+                Optimize Database
               </>
             )}
           </Button>
@@ -1347,6 +1508,8 @@ const Settings: React.FC = () => {
         hasChanges={true}
       >
         <div className="space-y-4">
+          {/* System Health Banner */}
+          <SystemHealthBanner />
           <SettingsSection
             title="General Settings"
             description="Server and display configuration"
@@ -1473,6 +1636,9 @@ const Settings: React.FC = () => {
   // Desktop layout with tabs
   return (
     <div className="space-y-8">
+      {/* System Health Banner */}
+      <SystemHealthBanner />
+      
       {/* Content based on route */}
       <Card className="border-0 shadow-lg bg-card/50 backdrop-blur-sm animate-fade-in-up">
         <CardContent className="p-6">

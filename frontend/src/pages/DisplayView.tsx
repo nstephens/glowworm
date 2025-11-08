@@ -921,7 +921,8 @@ const DisplayView: React.FC = () => {
             playlist={currentPlaylist || undefined}
             initialSettings={{ 
               showInfo: currentPlaylist?.show_image_info || false,
-              interval: currentPlaylist?.display_time_seconds || 30
+              interval: currentPlaylist?.display_time_seconds || 30,
+              loop: true  // Explicitly ensure looping for display devices
             }}
             onClose={stopSlideshow}
             deviceToken={deviceStatus?.device_token}
