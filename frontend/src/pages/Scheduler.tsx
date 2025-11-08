@@ -36,16 +36,10 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
         apiService.getPlaylists()
       ]);
 
-      console.log('Schedules response:', schedulesResponse);
-      console.log('Devices response:', devicesResponse);
-      console.log('Playlists response:', playlistsResponse);
-
-      // Ensure we always set arrays
+      // Extract data with fallbacks
       const schedulesData = Array.isArray(schedulesResponse.data) 
         ? schedulesResponse.data 
-        : Array.isArray(schedulesResponse) 
-          ? schedulesResponse 
-          : [];
+        : [];
       
       const devicesData = Array.isArray(devicesResponse) 
         ? devicesResponse 
@@ -53,15 +47,11 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
       
       const playlistsData = Array.isArray(playlistsResponse.data) 
         ? playlistsResponse.data 
-        : Array.isArray(playlistsResponse) 
-          ? playlistsResponse 
-          : [];
+        : [];
 
       // Filter to only show authorized devices in the form
       const authorizedDevices = devicesData.filter((d: any) => d.status === 'authorized');
       
-      console.log('Setting schedules:', schedulesData);
-      console.log('Authorized devices:', authorizedDevices.length, 'of', devicesData.length);
       setSchedules(schedulesData);
       setDevices(authorizedDevices);
       setPlaylists(playlistsData);
