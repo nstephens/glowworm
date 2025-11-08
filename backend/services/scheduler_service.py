@@ -327,6 +327,8 @@ class SchedulerService:
             ScheduledPlaylist.enabled == True
         ).all()
         
+        logger.info(f"📋 Found {len(schedules)} enabled schedules for device {device_id}")
+        
         if not schedules:
             return None
         
@@ -334,9 +336,15 @@ class SchedulerService:
         active_schedules: List[Tuple[ScheduledPlaylist, int]] = []
         
         for schedule in schedules:
-            if schedule.is_active_at(at_datetime):
+            is_active = schedule.is_active_at(at_datetime)
+            logger.info(
+                f"🧪 Schedule '{schedule.name}' (ID: {schedule.id}, type: {schedule.schedule_type.value}) "
+                f"is_active_at({at_datetime.strftime('%Y-%m-%d %H:%M:%S')}): {is_active}"
+            )
+            if is_active:
                 effective_priority = schedule.get_effective_priority()
                 active_schedules.append((schedule, effective_priority))
+                logger.info(f"✓ Added to active_schedules with priority {effective_priority}")
         
         if not active_schedules:
             return None
@@ -368,7 +376,11 @@ class SchedulerService:
             devices_evaluated += 1
             
             # Get active schedule for this device
+            logger.info(f"🔍 Evaluating device {device.id} at {evaluated_at.strftime('%Y-%m-%d %H:%M:%S')}")
             active_schedule = self.get_active_schedule(device.id, evaluated_at)
+            
+            if active_schedule:
+                logger.info(f"✓ Found active schedule: {active_schedule.name} for device {device.id}")
             
             # Determine what playlist should be active
             if active_schedule:
