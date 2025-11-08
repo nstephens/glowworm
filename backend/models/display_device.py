@@ -45,6 +45,7 @@ class DisplayDevice(Base):
     
     # Relationships
     playlist = relationship("Playlist", foreign_keys=[playlist_id])
+    schedules = relationship("ScheduledPlaylist", back_populates="device", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<DisplayDevice(id={self.id}, device_name='{self.device_name}', status='{self.status}')>"
