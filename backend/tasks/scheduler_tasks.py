@@ -63,6 +63,7 @@ def evaluate_schedules(self):
     """
     from services.scheduler_service import SchedulerService
     from websocket.redis_bridge import publish_processing_update
+    from websocket.scheduler_events import playlist_scheduled_change_event, schedule_evaluated_event
     
     start_time = time.time()
     logger.info("🕒 Starting schedule evaluation")
@@ -78,27 +79,37 @@ def evaluate_schedules(self):
         if result['changes']:
             for change in result['changes']:
                 try:
-                    # Publish playlist change notification via Redis
-                    event_payload = {
-                        'type': 'playlist:scheduled_change',
-                        'data': {
-                            'device_id': change['device_id'],
-                            'device_name': change['device_name'],
-                            'old_playlist_id': change['old_playlist_id'],
-                            'new_playlist_id': change['new_playlist_id'],
-                            'schedule_id': change['schedule_id'],
-                            'schedule_name': change['schedule_name'],
-                            'changed_at': result['evaluated_at'],
-                        },
-                        'timestamp': datetime.now().isoformat()
-                    }
+                    # Create standardized playlist change event
+                    event_payload = playlist_scheduled_change_event(
+                        device_id=change['device_id'],
+                        device_name=change['device_name'],
+                        old_playlist_id=change['old_playlist_id'],
+                        new_playlist_id=change['new_playlist_id'],
+                        schedule_id=change['schedule_id'],
+                        schedule_name=change['schedule_name'],
+                        changed_at=result['evaluated_at']
+                    )
                     
+                    # Publish via Redis pub/sub (will be forwarded to WebSocket clients)
                     publish_processing_update(event_payload)
                     logger.info(f"📤 Sent playlist change notification for device {change['device_id']}")
                     
                 except Exception as notify_error:
                     # Don't fail the task if notification fails
                     logger.warning(f"Failed to send notification for device {change['device_id']}: {notify_error}")
+        
+        # Send evaluation summary to admins
+        try:
+            summary_event = schedule_evaluated_event(
+                evaluated_at=result['evaluated_at'],
+                devices_evaluated=result['devices_evaluated'],
+                schedules_active=result['schedules_active'],
+                devices_changed=result['devices_changed'],
+                duration=duration
+            )
+            publish_processing_update(summary_event)
+        except Exception as e:
+            logger.warning(f"Failed to send evaluation summary: {e}")
         
         duration = time.time() - start_time
         result['duration'] = round(duration, 3)
