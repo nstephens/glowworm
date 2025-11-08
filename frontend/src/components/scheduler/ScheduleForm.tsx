@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Switch } from '../ui/switch';
 import { Slider } from '../ui/slider';
 import { Badge } from '../ui/badge';
-import { Alert, AlertDescription } from '../ui/alert';
-import { X, Calendar, Clock, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { X, Calendar, Clock, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { useScheduleConflicts } from '../../hooks/useScheduleConflicts';
 import type { ScheduleFormData, ScheduledPlaylist, Playlist } from '../../types';
 
 interface ScheduleFormProps {
@@ -58,6 +59,26 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const { conflicts, loading: conflictsLoading, checkConflicts } = useScheduleConflicts();
+
+  // Check for conflicts when form data changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      checkConflicts(formData, schedule?.id);
+    }, 500); // Debounce to avoid too many API calls
+
+    return () => clearTimeout(timer);
+  }, [
+    formData.device_id,
+    formData.schedule_type,
+    formData.days_of_week,
+    formData.start_time,
+    formData.end_time,
+    formData.specific_date,
+    formData.specific_start_time,
+    formData.specific_end_time,
+    formData.priority,
+  ]);
 
   // Toggle day selection
   const toggleDay = (day: string) => {
@@ -376,11 +397,43 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
             </div>
           )}
 
+          {/* Conflict Warnings */}
+          {conflicts.length > 0 && (
+            <Alert variant={conflicts.some(c => !c.will_override) ? "destructive" : "default"} className="border-amber-500 bg-amber-50 dark:bg-amber-950">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertTitle className="text-amber-900 dark:text-amber-100">
+                Schedule Conflicts Detected ({conflicts.length})
+              </AlertTitle>
+              <AlertDescription className="text-amber-800 dark:text-amber-200">
+                <div className="space-y-2 mt-2">
+                  {conflicts.map((conflict) => (
+                    <div key={conflict.schedule_id} className="flex items-start gap-2 text-sm">
+                      <Badge variant={conflict.will_override ? "default" : "destructive"} className="mt-0.5">
+                        {conflict.will_override ? 'Will Override' : 'Will Be Overridden'}
+                      </Badge>
+                      <div>
+                        <p className="font-medium">{conflict.schedule_name}</p>
+                        <p className="text-xs">{conflict.reason}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-xs mt-2 flex items-center gap-1">
+                    <Info className="h-3 w-3" />
+                    Adjust the priority slider below to change conflict resolution
+                  </p>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Priority */}
           <div>
             <Label>Priority: {formData.priority}</Label>
             <p className="text-sm text-muted-foreground mb-2">
               Higher priority schedules override lower ones when they overlap
+              {formData.schedule_type === 'specific_date' && (
+                <span className="text-primary"> (Specific dates get +1000 boost)</span>
+              )}
             </p>
             <Slider
               value={[formData.priority]}
@@ -390,6 +443,9 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
               step={1}
               className="w-full"
             />
+            {conflictsLoading && (
+              <p className="text-xs text-muted-foreground mt-1">Checking for conflicts...</p>
+            )}
           </div>
 
           {/* Enabled Toggle */}
