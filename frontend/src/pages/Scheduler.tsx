@@ -35,12 +35,38 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
         apiService.getPlaylists()
       ]);
 
-      setSchedules(schedulesResponse.data || []);
-      setDevices(devicesResponse || []);
-      setPlaylists(playlistsResponse.data || []);
+      console.log('Schedules response:', schedulesResponse);
+      console.log('Devices response:', devicesResponse);
+      console.log('Playlists response:', playlistsResponse);
+
+      // Ensure we always set arrays
+      const schedulesData = Array.isArray(schedulesResponse.data) 
+        ? schedulesResponse.data 
+        : Array.isArray(schedulesResponse) 
+          ? schedulesResponse 
+          : [];
+      
+      const devicesData = Array.isArray(devicesResponse) 
+        ? devicesResponse 
+        : [];
+      
+      const playlistsData = Array.isArray(playlistsResponse.data) 
+        ? playlistsResponse.data 
+        : Array.isArray(playlistsResponse) 
+          ? playlistsResponse 
+          : [];
+
+      console.log('Setting schedules:', schedulesData);
+      setSchedules(schedulesData);
+      setDevices(devicesData);
+      setPlaylists(playlistsData);
     } catch (err: any) {
       setError(err.message || 'Failed to load scheduler data');
       console.error('Failed to load scheduler data:', err);
+      // Set empty arrays on error
+      setSchedules([]);
+      setDevices([]);
+      setPlaylists([]);
     } finally {
       setLoading(false);
     }
@@ -168,7 +194,7 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
             <CardTitle className="text-sm font-medium">Total Schedules</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{schedules.length}</div>
+            <div className="text-2xl font-bold">{Array.isArray(schedules) ? schedules.length : 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -177,7 +203,7 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {schedules.filter(s => s.enabled).length}
+              {Array.isArray(schedules) ? schedules.filter(s => s.enabled).length : 0}
             </div>
           </CardContent>
         </Card>
@@ -187,7 +213,7 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {schedules.filter(s => s.schedule_type === 'recurring').length}
+              {Array.isArray(schedules) ? schedules.filter(s => s.schedule_type === 'recurring').length : 0}
             </div>
           </CardContent>
         </Card>
@@ -197,7 +223,7 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {schedules.filter(s => s.schedule_type === 'specific_date').length}
+              {Array.isArray(schedules) ? schedules.filter(s => s.schedule_type === 'specific_date').length : 0}
             </div>
           </CardContent>
         </Card>
