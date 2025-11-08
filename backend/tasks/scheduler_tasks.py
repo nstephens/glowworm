@@ -17,6 +17,11 @@ from celery_app import celery_app
 from datetime import datetime
 import logging
 import time
+from utils.structured_logging import (
+    log_schedule_evaluation,
+    log_schedule_error,
+    log_performance_metric
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,16 +71,32 @@ def evaluate_schedules(self):
     from websocket.scheduler_events import playlist_scheduled_change_event, schedule_evaluated_event
     
     start_time = time.time()
-    logger.info("🕒 Starting schedule evaluation")
+    logger.info("🕒 Starting schedule evaluation", extra={
+        'event_type': 'schedule_evaluation_start',
+        'timestamp': datetime.now().isoformat()
+    })
     
     try:
         # Create service with database session
         scheduler_service = SchedulerService(self.db)
         
         # Evaluate all devices
+        eval_start = time.time()
         result = scheduler_service.evaluate_all_devices()
+        eval_duration = time.time() - eval_start
+        
+        log_performance_metric(
+            logger,
+            'schedule_evaluation_core',
+            eval_duration,
+            devices=result['devices_evaluated'],
+            changes=result['devices_changed']
+        )
         
         # Send WebSocket notifications for playlist changes
+        notifications_sent = 0
+        notifications_failed = 0
+        
         if result['changes']:
             for change in result['changes']:
                 try:
@@ -92,14 +113,22 @@ def evaluate_schedules(self):
                     
                     # Publish via Redis pub/sub (will be forwarded to WebSocket clients)
                     publish_processing_update(event_payload)
-                    logger.info(f"📤 Sent playlist change notification for device {change['device_id']}")
+                    notifications_sent += 1
+                    logger.debug(f"📤 Sent playlist change notification for device {change['device_id']}")
                     
                 except Exception as notify_error:
                     # Don't fail the task if notification fails
-                    logger.warning(f"Failed to send notification for device {change['device_id']}: {notify_error}")
+                    notifications_failed += 1
+                    log_schedule_error(
+                        logger,
+                        'notification_failed',
+                        str(notify_error),
+                        {'device_id': change['device_id']}
+                    )
         
         # Send evaluation summary to admins
         try:
+            duration = time.time() - start_time
             summary_event = schedule_evaluated_event(
                 evaluated_at=result['evaluated_at'],
                 devices_evaluated=result['devices_evaluated'],
@@ -113,8 +142,20 @@ def evaluate_schedules(self):
         
         duration = time.time() - start_time
         result['duration'] = round(duration, 3)
+        result['notifications_sent'] = notifications_sent
+        result['notifications_failed'] = notifications_failed
         
-        # Log summary
+        # Log structured summary
+        log_schedule_evaluation(
+            logger,
+            devices_evaluated=result['devices_evaluated'],
+            schedules_active=result['schedules_active'],
+            devices_changed=result['devices_changed'],
+            duration_seconds=duration,
+            changes=result['changes']
+        )
+        
+        # Human-readable log
         if result['devices_changed'] > 0:
             logger.info(
                 f"✅ Schedule evaluation complete in {duration:.2f}s: "
@@ -132,6 +173,16 @@ def evaluate_schedules(self):
         
     except Exception as e:
         duration = time.time() - start_time
+        
+        # Structured error logging
+        log_schedule_error(
+            logger,
+            'evaluation_exception',
+            str(e),
+            {'duration_seconds': duration}
+        )
+        
+        # Human-readable error log
         logger.error(f"❌ Schedule evaluation failed after {duration:.2f}s: {e}", exc_info=True)
         
         # Return error result but don't fail the task
@@ -139,10 +190,12 @@ def evaluate_schedules(self):
         return {
             'evaluated_at': datetime.now().isoformat(),
             'error': str(e),
+            'error_type': type(e).__name__,
             'devices_evaluated': 0,
             'schedules_active': 0,
             'devices_changed': 0,
-            'duration': round(duration, 3)
+            'duration': round(duration, 3),
+            'success': False
         }
 
 
@@ -157,6 +210,9 @@ def force_evaluate_now(self):
     Returns:
         dict: Evaluation statistics and results
     """
-    logger.info("🔔 Force evaluation triggered")
+    logger.info("🔔 Force evaluation triggered", extra={
+        'event_type': 'force_evaluation_triggered',
+        'timestamp': datetime.now().isoformat()
+    })
     return evaluate_schedules.apply().get()
 

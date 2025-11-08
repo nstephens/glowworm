@@ -10,11 +10,19 @@ from datetime import datetime, date, time as dt_time
 from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
+from sqlalchemy.exc import SQLAlchemyError
 
 from models.scheduled_playlist import ScheduledPlaylist, ScheduleType
 from models.display_device import DisplayDevice
 from models.playlist import Playlist
 from models.user import User
+from utils.structured_logging import (
+    log_schedule_created,
+    log_schedule_updated,
+    log_schedule_deleted,
+    log_schedule_activation,
+    log_schedule_error
+)
 
 logger = logging.getLogger(__name__)
 
@@ -127,12 +135,34 @@ class SchedulerService:
             annual_recurrence=annual_recurrence,
         )
         
-        self.db.add(schedule)
-        self.db.commit()
-        self.db.refresh(schedule)
-        
-        logger.info(f"Created schedule '{name}' (ID: {schedule.id}) for device {device_id}")
-        return schedule
+        try:
+            self.db.add(schedule)
+            self.db.commit()
+            self.db.refresh(schedule)
+            
+            # Structured logging
+            log_schedule_created(
+                logger,
+                schedule_id=schedule.id,
+                schedule_name=name,
+                device_id=device_id,
+                playlist_id=playlist_id,
+                schedule_type=schedule_type.value,
+                priority=priority,
+                created_by_user_id=created_by_user_id
+            )
+            
+            return schedule
+            
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            log_schedule_error(
+                logger,
+                'database_error_create',
+                str(e),
+                {'device_id': device_id, 'schedule_name': name}
+            )
+            raise
     
     def get_schedule_by_id(self, schedule_id: int) -> Optional[ScheduledPlaylist]:
         """Get a schedule by ID"""
@@ -203,15 +233,35 @@ class SchedulerService:
             raise ValueError("Must have at least one day of week")
         
         # Apply updates
+        fields_updated = []
         for key, value in kwargs.items():
             if hasattr(schedule, key):
                 setattr(schedule, key, value)
+                fields_updated.append(key)
         
-        self.db.commit()
-        self.db.refresh(schedule)
-        
-        logger.info(f"Updated schedule {schedule_id}")
-        return schedule
+        try:
+            self.db.commit()
+            self.db.refresh(schedule)
+            
+            # Structured logging
+            log_schedule_updated(
+                logger,
+                schedule_id=schedule_id,
+                fields_updated=fields_updated,
+                updated_by_user_id=None  # Can be passed in if needed
+            )
+            
+            return schedule
+            
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            log_schedule_error(
+                logger,
+                'database_error_update',
+                str(e),
+                {'schedule_id': schedule_id, 'fields': fields_updated}
+            )
+            raise
     
     def delete_schedule(self, schedule_id: int) -> bool:
         """Delete a schedule"""
@@ -219,11 +269,31 @@ class SchedulerService:
         if not schedule:
             return False
         
-        self.db.delete(schedule)
-        self.db.commit()
+        schedule_name = schedule.name
         
-        logger.info(f"Deleted schedule {schedule_id}")
-        return True
+        try:
+            self.db.delete(schedule)
+            self.db.commit()
+            
+            # Structured logging
+            log_schedule_deleted(
+                logger,
+                schedule_id=schedule_id,
+                schedule_name=schedule_name,
+                deleted_by_user_id=None  # Can be passed in if needed
+            )
+            
+            return True
+            
+        except SQLAlchemyError as e:
+            self.db.rollback()
+            log_schedule_error(
+                logger,
+                'database_error_delete',
+                str(e),
+                {'schedule_id': schedule_id}
+            )
+            raise
     
     # ==================== Schedule Evaluation ====================
     
@@ -325,6 +395,21 @@ class SchedulerService:
                     'schedule_name': schedule_name,
                 })
                 
+                # Structured logging for playlist change
+                if active_schedule:
+                    log_schedule_activation(
+                        logger,
+                        schedule_id=active_schedule.id,
+                        schedule_name=active_schedule.name,
+                        device_id=device.id,
+                        device_name=device.device_name,
+                        playlist_id=target_playlist_id,
+                        old_playlist_id=old_playlist_id,
+                        priority=active_schedule.priority,
+                        reason=f"Schedule active at {evaluated_at.strftime('%H:%M')}"
+                    )
+                
+                # Human-readable log
                 logger.info(
                     f"Schedule change: Device {device.id} ({device.device_name}) "
                     f"playlist {old_playlist_id} → {target_playlist_id} "
@@ -333,7 +418,17 @@ class SchedulerService:
         
         # Commit all changes
         if devices_changed > 0:
-            self.db.commit()
+            try:
+                self.db.commit()
+            except SQLAlchemyError as e:
+                self.db.rollback()
+                log_schedule_error(
+                    logger,
+                    'database_error_commit',
+                    str(e),
+                    {'devices_changed': devices_changed}
+                )
+                raise
         
         result = {
             'evaluated_at': evaluated_at.isoformat(),
@@ -343,7 +438,7 @@ class SchedulerService:
             'changes': changes
         }
         
-        logger.info(
+        logger.debug(
             f"Schedule evaluation complete: {devices_evaluated} devices, "
             f"{schedules_active} active schedules, {devices_changed} changes"
         )
