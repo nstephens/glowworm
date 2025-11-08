@@ -32,6 +32,9 @@ interface PreviewResult {
 }
 
 export const SchedulePreview: React.FC<SchedulePreviewProps> = ({ devices }) => {
+  // Filter to only show authorized devices
+  const authorizedDevices = devices.filter((d: any) => d.status === 'authorized');
+  
   const [selectedDevice, setSelectedDevice] = useState<number>(0);
   const [previewDate, setPreviewDate] = useState<string>(
     new Date().toISOString().split('T')[0]
@@ -104,11 +107,15 @@ export const SchedulePreview: React.FC<SchedulePreviewProps> = ({ devices }) => 
               <SelectValue placeholder="Select a device" />
             </SelectTrigger>
             <SelectContent>
-              {devices.map(device => (
-                <SelectItem key={device.id} value={device.id.toString()}>
-                  {device.device_name || `Device ${device.id}`}
-                </SelectItem>
-              ))}
+              {authorizedDevices.length === 0 ? (
+                <div className="p-2 text-sm text-muted-foreground">No authorized devices</div>
+              ) : (
+                authorizedDevices.map(device => (
+                  <SelectItem key={device.id} value={device.id.toString()}>
+                    {device.device_name || `Device ${device.id}`}
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
         </div>

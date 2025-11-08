@@ -57,9 +57,13 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
           ? playlistsResponse 
           : [];
 
+      // Filter to only show authorized devices in the form
+      const authorizedDevices = devicesData.filter((d: any) => d.status === 'authorized');
+      
       console.log('Setting schedules:', schedulesData);
+      console.log('Authorized devices:', authorizedDevices.length, 'of', devicesData.length);
       setSchedules(schedulesData);
-      setDevices(devicesData);
+      setDevices(authorizedDevices);
       setPlaylists(playlistsData);
     } catch (err: any) {
       setError(err.message || 'Failed to load scheduler data');

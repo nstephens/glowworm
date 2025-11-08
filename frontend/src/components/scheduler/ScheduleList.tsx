@@ -47,9 +47,10 @@ export const ScheduleList: React.FC<ScheduleListProps> = ({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>No Devices</CardTitle>
+          <CardTitle>No Authorized Devices</CardTitle>
           <CardDescription>
-            You need to register at least one display device before creating schedules.
+            You need to authorize at least one display device before creating schedules.
+            Visit the Displays page to authorize pending devices.
           </CardDescription>
         </CardHeader>
       </Card>
