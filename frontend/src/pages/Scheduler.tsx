@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { Badge } from '../components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Plus, Calendar, Clock, Play, Pause, Trash2, Edit, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import apiService from '../services/api';
 import { ScheduleForm } from '../components/scheduler/ScheduleForm';
+import { ScheduleList } from '../components/scheduler/ScheduleList';
 import type { ScheduledPlaylist, Device, Playlist, ScheduleFormData } from '../types';
 
 interface SchedulerPageProps {}
@@ -116,31 +115,6 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
     setEditingSchedule(undefined);
   };
 
-  const formatTime = (timeStr?: string) => {
-    if (!timeStr) return '';
-    // Convert 'HH:MM:SS' to 'h:MM AM/PM'
-    const [hours, minutes] = timeStr.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
-
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  const getDeviceSchedules = (deviceId: number) => {
-    return schedules.filter(s => s.device_id === deviceId);
-  };
-
-  const groupedSchedules = devices.reduce((acc, device) => {
-    acc[device.id] = getDeviceSchedules(device.id);
-    return acc;
-  }, {} as Record<number, ScheduledPlaylist[]>);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -230,78 +204,14 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
       </div>
 
       {/* Schedules List by Device */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Schedules by Device</CardTitle>
-          <CardDescription>
-            View and manage schedules organized by display device
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="all" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="all">All Devices</TabsTrigger>
-              {devices.map(device => (
-                <TabsTrigger key={device.id} value={device.id.toString()}>
-                  {device.device_name || `Device ${device.id}`}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            <TabsContent value="all" className="space-y-4">
-              {devices.map(device => {
-                const deviceSchedules = groupedSchedules[device.id] || [];
-                if (deviceSchedules.length === 0) return null;
-                
-                return (
-                  <div key={device.id} className="border rounded-lg p-4">
-                    <h3 className="font-semibold mb-3">
-                      {device.device_name || `Device ${device.id}`}
-                    </h3>
-                    <div className="space-y-2">
-                      {deviceSchedules.map(schedule => (
-                        <ScheduleCard
-                          key={schedule.id}
-                          schedule={schedule}
-                          onToggleEnabled={handleToggleEnabled}
-                          onDelete={handleDeleteSchedule}
-                          onEdit={handleStartEdit}
-                          formatTime={formatTime}
-                          formatDate={formatDate}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </TabsContent>
-            {devices.map(device => {
-              const deviceSchedules = groupedSchedules[device.id] || [];
-              
-              return (
-                <TabsContent key={device.id} value={device.id.toString()} className="space-y-2">
-                  {deviceSchedules.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      No schedules configured for this device
-                    </div>
-                  ) : (
-                    deviceSchedules.map(schedule => (
-                      <ScheduleCard
-                        key={schedule.id}
-                        schedule={schedule}
-                        onToggleEnabled={handleToggleEnabled}
-                        onDelete={handleDeleteSchedule}
-                        onEdit={handleStartEdit}
-                        formatTime={formatTime}
-                        formatDate={formatDate}
-                      />
-                    ))
-                  )}
-                </TabsContent>
-              );
-            })}
-          </Tabs>
-        </CardContent>
-      </Card>
+      <ScheduleList
+        schedules={schedules}
+        devices={devices}
+        onToggleEnabled={handleToggleEnabled}
+        onEdit={handleStartEdit}
+        onDelete={handleDeleteSchedule}
+        loading={false}
+      />
 
       {/* Create/Edit Schedule Form Modal */}
       {(showCreateForm || editingSchedule) && (
@@ -317,106 +227,6 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-// Schedule Card Component
-interface ScheduleCardProps {
-  schedule: ScheduledPlaylist;
-  onToggleEnabled: (schedule: ScheduledPlaylist) => void;
-  onDelete: (id: number) => void;
-  onEdit: (schedule: ScheduledPlaylist) => void;
-  formatTime: (time?: string) => string;
-  formatDate: (date?: string) => string;
-}
-
-const ScheduleCard: React.FC<ScheduleCardProps> = ({
-  schedule,
-  onToggleEnabled,
-  onDelete,
-  onEdit,
-  formatTime,
-  formatDate
-}) => {
-  return (
-    <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-      <div className="flex-1">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="font-medium">{schedule.name}</span>
-          <Badge variant={schedule.enabled ? "default" : "secondary"}>
-            {schedule.enabled ? 'Enabled' : 'Disabled'}
-          </Badge>
-          <Badge variant="outline">
-            {schedule.schedule_type === 'recurring' ? 'Recurring' : 'Specific Date'}
-          </Badge>
-          <Badge variant="outline">Priority: {schedule.priority}</Badge>
-        </div>
-        
-        <div className="text-sm text-muted-foreground">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1">
-              <Play className="h-3 w-3" />
-              {schedule.playlist_name || `Playlist ${schedule.playlist_id}`}
-            </span>
-            
-            {schedule.schedule_type === 'recurring' && schedule.days_of_week && (
-              <span className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {schedule.days_of_week.map(d => d.substring(0, 3)).join(', ')}
-              </span>
-            )}
-            
-            {schedule.schedule_type === 'specific_date' && schedule.specific_date && (
-              <span className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {formatDate(schedule.specific_date)}
-                {schedule.annual_recurrence && ' (Annual)'}
-              </span>
-            )}
-            
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {schedule.schedule_type === 'recurring' 
-                ? `${formatTime(schedule.start_time)} - ${formatTime(schedule.end_time)}`
-                : `${formatTime(schedule.specific_start_time)} - ${formatTime(schedule.specific_end_time)}`
-              }
-            </span>
-          </div>
-        </div>
-        
-        {schedule.description && (
-          <p className="text-xs text-muted-foreground mt-1">{schedule.description}</p>
-        )}
-      </div>
-      
-      <div className="flex items-center gap-2 ml-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onToggleEnabled(schedule)}
-        >
-          {schedule.enabled ? (
-            <Pause className="h-4 w-4" />
-          ) : (
-            <Play className="h-4 w-4" />
-          )}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onEdit(schedule)}
-        >
-          <Edit className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onDelete(schedule.id)}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
     </div>
   );
 };
