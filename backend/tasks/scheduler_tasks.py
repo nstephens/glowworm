@@ -22,6 +22,9 @@ from utils.structured_logging import (
     log_schedule_error,
     log_performance_metric
 )
+from services.scheduler_service import SchedulerService
+from websocket.redis_bridge import publish_processing_update
+from websocket.scheduler_events import playlist_scheduled_change_event, schedule_evaluated_event
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +69,6 @@ def evaluate_schedules(self):
     Returns:
         dict: Evaluation statistics and results
     """
-    from services.scheduler_service import SchedulerService
-    from websocket.redis_bridge import publish_processing_update
-    from websocket.scheduler_events import playlist_scheduled_change_event, schedule_evaluated_event
-    
     start_time = time.time()
     logger.info("🕒 Starting schedule evaluation", extra={
         'event_type': 'schedule_evaluation_start',
