@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { ArrowLeft, X, Monitor, Wifi, WifiOff, CheckCircle, Clock, AlertTriangle, FileText, RefreshCw } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
+import { ScheduleWidget } from '../components/scheduler/ScheduleWidget';
 import { apiService } from '../services/api';
 import { urlResolver } from '../services/urlResolver';
 import { displayLogger } from '../utils/logger';
@@ -633,11 +634,21 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                       </div>
                       
                       {device.status === 'authorized' && (
-                        <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                          <p className="text-sm text-gray-600">
-                            <span className="font-medium">Playlist:</span> {device.playlist_name || 'None assigned'}
-                          </p>
-                        </div>
+                        <>
+                          <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                            <p className="text-sm text-gray-600">
+                              <span className="font-medium">Playlist:</span> {device.playlist_name || 'None assigned'}
+                            </p>
+                          </div>
+                          
+                          {/* Schedule Widget */}
+                          <div className="mt-4">
+                            <ScheduleWidget 
+                              deviceId={device.id} 
+                              deviceName={device.device_name}
+                            />
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>

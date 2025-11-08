@@ -183,6 +183,17 @@ export class WebSocketClient extends EventEmitter {
         this.emit('playlist_update', message);
         break;
         
+      case 'playlist:scheduled_change':
+        // Scheduler changed the playlist for this device
+        this.emit('playlist:scheduled_change', message);
+        this.emit('playlist_update', message); // Also emit as playlist_update for compatibility
+        break;
+        
+      case 'scheduler:evaluated':
+        // Scheduler evaluation summary (for admin monitoring)
+        this.emit('scheduler:evaluated', message);
+        break;
+        
       case 'device_registered':
         this.emit('device_registered', message);
         break;
