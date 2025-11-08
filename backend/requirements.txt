@@ -31,7 +31,7 @@ websockets==12.0
 # Celery and task queue
 celery[redis]==5.3.4
 flower==2.0.1
-redis==5.0.1
+redis==4.6.0
 
 # Development tools
 pytest==7.4.3
