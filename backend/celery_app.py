@@ -20,7 +20,7 @@ celery_app = Celery(
     'glowworm',
     broker=CELERY_BROKER_URL,
     backend=CELERY_RESULT_BACKEND,
-    include=['tasks.image_processing']  # Import task modules
+    include=['tasks.image_processing', 'tasks.scheduler_tasks']  # Import task modules
 )
 
 # Celery configuration
@@ -55,6 +55,8 @@ celery_app.conf.update(
         'tasks.image_processing.process_full_image': {'queue': 'high_priority'},
         'tasks.image_processing.bulk_regenerate_variants': {'queue': 'low_priority'},
         'tasks.image_processing.bulk_regenerate_thumbnails': {'queue': 'low_priority'},
+        'tasks.scheduler_tasks.evaluate_schedules': {'queue': 'normal_priority'},
+        'tasks.scheduler_tasks.force_evaluate_now': {'queue': 'high_priority'},
     },
     
     # Task default queue
@@ -81,9 +83,18 @@ celery_app.conf.task_queues = [
     Queue('low_priority', exchange=default_exchange, routing_key='low', priority=1),
 ]
 
+# Celery Beat schedule - periodic tasks
+celery_app.conf.beat_schedule = {
+    'evaluate-playlist-schedules': {
+        'task': 'tasks.scheduler_tasks.evaluate_schedules',
+        'schedule': 60.0,  # Every 60 seconds
+    },
+}
+
 logger.info(f"📋 Celery app initialized with broker: {CELERY_BROKER_URL}")
 logger.info(f"📋 Result backend: {CELERY_RESULT_BACKEND}")
 logger.info(f"📋 Task queues configured: high_priority, normal_priority, low_priority")
+logger.info(f"⏰ Celery Beat schedule configured: evaluate schedules every 60 seconds")
 
 if __name__ == '__main__':
     celery_app.start()
