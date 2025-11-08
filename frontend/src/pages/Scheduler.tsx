@@ -6,7 +6,8 @@ import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Plus, Calendar, Clock, Play, Pause, Trash2, Edit, RefreshCw } from 'lucide-react';
 import apiService from '../services/api';
-import type { ScheduledPlaylist, Device, Playlist } from '../types';
+import { ScheduleForm } from '../components/scheduler/ScheduleForm';
+import type { ScheduledPlaylist, Device, Playlist, ScheduleFormData } from '../types';
 
 interface SchedulerPageProps {}
 
@@ -18,6 +19,7 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<number | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<ScheduledPlaylist | undefined>(undefined);
 
   useEffect(() => {
     loadData();
@@ -80,6 +82,38 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
     } catch (err: any) {
       setError(err.message || 'Failed to trigger evaluation');
     }
+  };
+
+  const handleCreateSchedule = async (data: ScheduleFormData) => {
+    try {
+      await apiService.createSchedule(data);
+      setShowCreateForm(false);
+      await loadData();
+    } catch (err: any) {
+      throw new Error(err.message || 'Failed to create schedule');
+    }
+  };
+
+  const handleEditSchedule = async (data: ScheduleFormData) => {
+    if (!editingSchedule) return;
+    
+    try {
+      await apiService.updateSchedule(editingSchedule.id, data);
+      setEditingSchedule(undefined);
+      await loadData();
+    } catch (err: any) {
+      throw new Error(err.message || 'Failed to update schedule');
+    }
+  };
+
+  const handleStartEdit = (schedule: ScheduledPlaylist) => {
+    setEditingSchedule(schedule);
+    setShowCreateForm(false);
+  };
+
+  const handleCancelForm = () => {
+    setShowCreateForm(false);
+    setEditingSchedule(undefined);
   };
 
   const formatTime = (timeStr?: string) => {
@@ -230,6 +264,7 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
                           schedule={schedule}
                           onToggleEnabled={handleToggleEnabled}
                           onDelete={handleDeleteSchedule}
+                          onEdit={handleStartEdit}
                           formatTime={formatTime}
                           formatDate={formatDate}
                         />
@@ -255,6 +290,7 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
                         schedule={schedule}
                         onToggleEnabled={handleToggleEnabled}
                         onDelete={handleDeleteSchedule}
+                        onEdit={handleStartEdit}
                         formatTime={formatTime}
                         formatDate={formatDate}
                       />
@@ -267,20 +303,18 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
         </CardContent>
       </Card>
 
-      {/* Create Schedule Form Modal - Placeholder */}
-      {showCreateForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="max-w-2xl w-full max-h-[90vh] overflow-auto">
-            <CardHeader>
-              <CardTitle>Create New Schedule</CardTitle>
-              <CardDescription>Form implementation coming in next subtask</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" onClick={() => setShowCreateForm(false)}>
-                Close
-              </Button>
-            </CardContent>
-          </Card>
+      {/* Create/Edit Schedule Form Modal */}
+      {(showCreateForm || editingSchedule) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-auto">
+          <div className="my-8">
+            <ScheduleForm
+              schedule={editingSchedule}
+              devices={devices}
+              playlists={playlists}
+              onSubmit={editingSchedule ? handleEditSchedule : handleCreateSchedule}
+              onCancel={handleCancelForm}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -292,6 +326,7 @@ interface ScheduleCardProps {
   schedule: ScheduledPlaylist;
   onToggleEnabled: (schedule: ScheduledPlaylist) => void;
   onDelete: (id: number) => void;
+  onEdit: (schedule: ScheduledPlaylist) => void;
   formatTime: (time?: string) => string;
   formatDate: (date?: string) => string;
 }
@@ -300,6 +335,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
   schedule,
   onToggleEnabled,
   onDelete,
+  onEdit,
   formatTime,
   formatDate
 }) => {
@@ -369,7 +405,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => {/* TODO: Edit functionality */}}
+          onClick={() => onEdit(schedule)}
         >
           <Edit className="h-4 w-4" />
         </Button>
