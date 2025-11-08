@@ -20,6 +20,7 @@ import {
 import { apiService } from '../services/api';
 import LiveDisplayStatus from '../components/LiveDisplayStatus';
 import ImageUpload from '../components/ImageUpload';
+import { SchedulerMonitor } from '../components/scheduler/SchedulerMonitor';
 import type { Image, Album } from '../types';
 import { useToast } from '../hooks/use-toast';
 import { Dashboard } from '../components/dashboard/Dashboard';
@@ -338,6 +339,9 @@ const AdminDashboard: React.FC = () => {
         loading={loading}
         className="animate-fade-in-up"
       />
+
+      {/* Scheduler Monitor */}
+      <SchedulerMonitor compact={true} />
 
       {/* Live Display Status */}
       <LiveDisplayStatus />
