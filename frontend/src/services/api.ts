@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance } from 'axios';
-import type { ApiResponse, User, Image, Album, Playlist } from '../types';
+import type { ApiResponse, User, Image, Album, Playlist, ScheduledPlaylist, ScheduleFormData, ActiveScheduleResponse } from '../types';
 import { urlResolver } from './urlResolver';
 import { apiLogger } from '../utils/logger';
 
@@ -599,6 +599,104 @@ class ApiService {
   async post(url: string, data?: any): Promise<any> {
     const response = await this.api.post(url, data);
     return response.data;
+  }
+
+  // Scheduler endpoints
+  async getSchedules(filters?: {
+    device_id?: number;
+    playlist_id?: number;
+    enabled?: boolean;
+    schedule_type?: string;
+  }): Promise<ApiResponse<ScheduledPlaylist[]>> {
+    const params = new URLSearchParams();
+    if (filters?.device_id) params.append('device_id', filters.device_id.toString());
+    if (filters?.playlist_id) params.append('playlist_id', filters.playlist_id.toString());
+    if (filters?.enabled !== undefined) params.append('enabled', filters.enabled.toString());
+    if (filters?.schedule_type) params.append('schedule_type', filters.schedule_type);
+
+    const queryString = params.toString();
+    const url = queryString ? `/scheduler/schedules?${queryString}` : '/scheduler/schedules';
+    const response = await this.api.get(url);
+    return {
+      message: "Schedules retrieved successfully",
+      data: response.data,
+      status_code: 200
+    };
+  }
+
+  async getSchedule(id: number): Promise<ApiResponse<ScheduledPlaylist>> {
+    const response = await this.api.get(`/scheduler/schedules/${id}`);
+    return {
+      message: "Schedule retrieved successfully",
+      data: response.data,
+      status_code: 200
+    };
+  }
+
+  async createSchedule(scheduleData: ScheduleFormData): Promise<ApiResponse<ScheduledPlaylist>> {
+    const response = await this.api.post('/scheduler/schedules', scheduleData);
+    return {
+      message: "Schedule created successfully",
+      data: response.data,
+      status_code: 201
+    };
+  }
+
+  async updateSchedule(id: number, scheduleData: Partial<ScheduleFormData>): Promise<ApiResponse<ScheduledPlaylist>> {
+    const response = await this.api.put(`/scheduler/schedules/${id}`, scheduleData);
+    return {
+      message: "Schedule updated successfully",
+      data: response.data,
+      status_code: 200
+    };
+  }
+
+  async deleteSchedule(id: number): Promise<ApiResponse<any>> {
+    const response = await this.api.delete(`/scheduler/schedules/${id}`);
+    return {
+      message: "Schedule deleted successfully",
+      data: response.data,
+      status_code: 200
+    };
+  }
+
+  async getDeviceSchedules(deviceId: number): Promise<ApiResponse<ScheduledPlaylist[]>> {
+    const response = await this.api.get(`/scheduler/devices/${deviceId}/schedules`);
+    return {
+      message: "Device schedules retrieved successfully",
+      data: response.data,
+      status_code: 200
+    };
+  }
+
+  async getActiveDeviceSchedule(deviceId: number): Promise<ApiResponse<ActiveScheduleResponse>> {
+    const response = await this.api.get(`/scheduler/devices/${deviceId}/active`);
+    return {
+      message: "Active schedule retrieved successfully",
+      data: response.data,
+      status_code: 200
+    };
+  }
+
+  async previewDeviceSchedule(deviceId: number, date: string, time: string): Promise<ApiResponse<any>> {
+    const response = await this.api.post(`/scheduler/devices/${deviceId}/preview`, {
+      date,
+      time
+    });
+    return {
+      message: "Schedule preview retrieved successfully",
+      data: response.data,
+      status_code: 200
+    };
+  }
+
+  async forceEvaluateSchedules(): Promise<ApiResponse<any>> {
+    const response = await this.api.post('/scheduler/evaluate-now');
+    return {
+      message: "Schedule evaluation triggered",
+      data: response.data,
+      status_code: 200
+    };
   }
 }
 

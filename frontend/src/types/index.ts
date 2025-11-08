@@ -84,3 +84,61 @@ export interface LoginCredentials {
   password: string;
   device_name?: string;
 }
+
+export type ScheduleType = 'recurring' | 'specific_date';
+
+export interface ScheduledPlaylist {
+  id: number;
+  device_id: number;
+  playlist_id: number;
+  schedule_type: ScheduleType;
+  // Recurring fields
+  days_of_week?: string[]; // ['monday', 'tuesday', ...]
+  start_time?: string; // 'HH:MM:SS'
+  end_time?: string; // 'HH:MM:SS'
+  // Specific date fields
+  specific_date?: string; // 'YYYY-MM-DD'
+  specific_start_time?: string; // 'HH:MM:SS'
+  specific_end_time?: string; // 'HH:MM:SS'
+  annual_recurrence?: boolean;
+  // Common fields
+  name: string;
+  description?: string | null;
+  priority: number;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by_user_id?: number | null;
+  // Relationships
+  device_name?: string | null;
+  playlist_name?: string | null;
+  is_active?: boolean;
+  next_activation?: string | null;
+}
+
+export interface ScheduleFormData {
+  device_id: number;
+  playlist_id: number;
+  schedule_type: ScheduleType;
+  name: string;
+  description?: string;
+  priority: number;
+  enabled: boolean;
+  days_of_week?: string[];
+  start_time?: string;
+  end_time?: string;
+  specific_date?: string;
+  specific_start_time?: string;
+  specific_end_time?: string;
+  annual_recurrence?: boolean;
+}
+
+export interface ActiveScheduleResponse {
+  schedule_id: number | null;
+  schedule_name: string | null;
+  playlist_id: number | null;
+  playlist_name: string | null;
+  active_since: string | null;
+  active_until: string | null;
+  is_default: boolean;
+}

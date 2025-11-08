@@ -19,6 +19,7 @@ import {
   Key,
   Wrench,
   RefreshCw,
+  Calendar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiService } from '@/services/api';
@@ -99,6 +100,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Monitor,
       description: 'Manage display devices',
       badge: counts.displays > 0 ? counts.displays.toString() : undefined,
+    },
+    {
+      name: 'Scheduler',
+      href: '/admin/scheduler',
+      icon: Calendar,
+      description: 'Schedule playlists for different times',
     },
   ];
 
