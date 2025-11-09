@@ -666,7 +666,7 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                           </div>
                           
                           {/* Device Controls Section - Collapsible */}
-                          <div className="mt-5 border-t pt-4">
+                          <div className="mt-5">
                             <button
                               onClick={() => {
                                 const newExpanded = new Set(expandedDeviceControls);
@@ -677,13 +677,13 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                                 }
                                 setExpandedDeviceControls(newExpanded);
                               }}
-                              className="flex items-center justify-between w-full text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                              className="flex items-center justify-between w-full px-4 py-3 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-semibold text-gray-800 transition-all shadow-sm"
                             >
-                              <span>Device Controls</span>
+                              <span>🔧 Device Controls</span>
                               {expandedDeviceControls.has(device.id) ? (
-                                <ChevronUp className="h-4 w-4" />
+                                <ChevronUp className="h-5 w-5" />
                               ) : (
-                                <ChevronDown className="h-4 w-4" />
+                                <ChevronDown className="h-5 w-5" />
                               )}
                             </button>
                             
