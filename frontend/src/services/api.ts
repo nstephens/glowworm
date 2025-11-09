@@ -676,7 +676,7 @@ class ApiService {
     const response = await this.api.get(`/scheduler/devices/${deviceId}/active`);
     return {
       message: "Active schedule retrieved successfully",
-      data: response.data,
+      data: response.data.data || response.data, // Extract nested data field
       status_code: 200
     };
   }
