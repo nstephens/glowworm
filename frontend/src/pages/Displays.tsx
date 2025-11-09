@@ -636,66 +636,95 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                       
                       {device.status === 'authorized' && (
                         <>
-                          <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                            <p className="text-sm text-gray-600">
-                              <span className="font-medium">Playlist:</span> {device.playlist_name || 'None assigned'}
-                            </p>
-                          </div>
-                          
-                          {/* Device Token for Daemon Setup */}
-                          <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <p className="text-xs font-medium text-blue-900 mb-1">
-                                  Device Token (for daemon setup):
-                                </p>
-                                <p className="text-sm font-mono font-bold text-blue-700">
-                                  {device.device_token}
-                                </p>
-                              </div>
+                          {/* Playlist Controls Section */}
+                          <div className="mt-4 space-y-3">
+                            <div className="p-3 bg-gray-50 rounded-md">
+                              <p className="text-sm text-gray-600">
+                                <span className="font-medium">Current Playlist:</span> {device.playlist_name || 'None assigned'}
+                              </p>
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-3">
                               <button
-                                onClick={() => {
-                                  // Fallback for browsers/contexts without clipboard API
-                                  if (navigator.clipboard && navigator.clipboard.writeText) {
-                                    navigator.clipboard.writeText(device.device_token);
-                                  } else {
-                                    // Fallback: use temporary textarea
-                                    const textArea = document.createElement('textarea');
-                                    textArea.value = device.device_token;
-                                    textArea.style.position = 'fixed';
-                                    textArea.style.left = '-999999px';
-                                    document.body.appendChild(textArea);
-                                    textArea.select();
-                                    try {
-                                      document.execCommand('copy');
-                                    } catch (err) {
-                                      console.error('Failed to copy:', err);
-                                    }
-                                    document.body.removeChild(textArea);
-                                  }
-                                }}
-                                className="ml-3 bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
-                                title="Copy token"
+                                onClick={() => openPlaylistModal(device)}
+                                className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700 transition-colors"
                               >
-                                Copy
+                                {device.playlist_name ? 'Change Playlist' : 'Select Playlist'}
+                              </button>
+                              <button
+                                onClick={() => handleRefreshBrowser(device)}
+                                className="bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-orange-700 transition-colors"
+                              >
+                                Refresh Browser
+                              </button>
+                              <button
+                                onClick={() => openUpdateModal(device)}
+                                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                              >
+                                Edit Device
                               </button>
                             </div>
                           </div>
                           
-                          {/* Daemon Control Panel */}
-                          <div className="mt-4">
+                          {/* Schedule Widget */}
+                          <div className="mt-6">
+                            <ScheduleWidget 
+                              deviceId={device.id} 
+                              deviceName={device.device_name}
+                            />
+                          </div>
+                          
+                          {/* Device Controls Section */}
+                          <div className="mt-6 space-y-4">
+                            <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">
+                              Device Controls
+                            </h4>
+                            
+                            {/* Device Token for Daemon Setup */}
+                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <p className="text-xs font-medium text-blue-900 mb-1">
+                                    Device Token (for daemon setup):
+                                  </p>
+                                  <p className="text-sm font-mono font-bold text-blue-700">
+                                    {device.device_token}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    // Fallback for browsers/contexts without clipboard API
+                                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                                      navigator.clipboard.writeText(device.device_token);
+                                    } else {
+                                      // Fallback: use temporary textarea
+                                      const textArea = document.createElement('textarea');
+                                      textArea.value = device.device_token;
+                                      textArea.style.position = 'fixed';
+                                      textArea.style.left = '-999999px';
+                                      document.body.appendChild(textArea);
+                                      textArea.select();
+                                      try {
+                                        document.execCommand('copy');
+                                      } catch (err) {
+                                        console.error('Failed to copy:', err);
+                                      }
+                                      document.body.removeChild(textArea);
+                                    }
+                                  }}
+                                  className="ml-3 bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
+                                  title="Copy token"
+                                >
+                                  Copy
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {/* Daemon Control Panel */}
                             <DeviceDaemonControl 
                               deviceId={device.id}
                               daemonEnabled={true}
                               currentUrl={device.browser_url || `http://10.10.10.2:3003/display/${device.device_token}`}
-                            />
-                          </div>
-                          
-                          {/* Schedule Widget */}
-                          <div className="mt-4">
-                            <ScheduleWidget 
-                              deviceId={device.id} 
-                              deviceName={device.device_name}
                             />
                           </div>
                         </>
@@ -717,29 +746,6 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                           className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
                         >
                           Reject
-                        </button>
-                      </>
-                    )}
-                    
-                    {device.status === 'authorized' && (
-                      <>
-                        <button
-                          onClick={() => openPlaylistModal(device)}
-                          className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700 transition-colors"
-                        >
-                          {device.playlist_name ? 'Change Playlist' : 'Select Playlist'}
-                        </button>
-                        <button
-                          onClick={() => handleRefreshBrowser(device)}
-                          className="bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-orange-700 transition-colors"
-                        >
-                          Refresh Browser
-                        </button>
-                        <button
-                          onClick={() => openUpdateModal(device)}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-                        >
-                          Edit
                         </button>
                       </>
                     )}
