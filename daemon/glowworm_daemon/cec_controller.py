@@ -318,6 +318,55 @@ class CECController:
         except Exception as e:
             logger.debug(f"Failed to get power status: {e}")
             return None
+    
+    def get_active_source(self, timeout: int = 5) -> Optional[Dict[str, Any]]:
+        """
+        Get currently active HDMI source
+        
+        Args:
+            timeout: Command timeout in seconds
+        
+        Returns:
+            Dict with active source info or None
+        """
+        if not self.available:
+            return None
+        
+        logger.info("Querying active CEC source...")
+        
+        try:
+            result = subprocess.run(
+                ['cec-client', '-s', '-d', '1'],
+                input=b'as\n',
+                capture_output=True,
+                timeout=timeout,
+                text=True,
+            )
+            
+            if result.returncode == 0:
+                # Parse active source from output
+                # Look for lines like "active source: 4" or "active source: 4.0.0.0"
+                match = re.search(r'active source:\s+([0-9.]+)', result.stdout, re.IGNORECASE)
+                
+                if match:
+                    address = match.group(1)
+                    logger.info(f"Active source: {address}")
+                    
+                    return {
+                        "address": address,
+                        "detected": True,
+                    }
+            
+            logger.debug("Could not determine active source")
+            return None
+        
+        except subprocess.TimeoutExpired:
+            logger.warning("Active source query timed out")
+            return None
+        
+        except Exception as e:
+            logger.debug(f"Failed to get active source: {e}")
+            return None
 
 
 if __name__ == "__main__":
