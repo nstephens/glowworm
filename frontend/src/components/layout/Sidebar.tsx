@@ -45,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     displays: 0,
   });
   const [systemExpanded, setSystemExpanded] = useState(false);
+  const [schedulerExpanded, setSchedulerExpanded] = useState(false);
 
   // Load counts for badges
   useEffect(() => {
@@ -101,13 +102,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
       description: 'Manage display devices',
       badge: counts.displays > 0 ? counts.displays.toString() : undefined,
     },
-    {
-      name: 'Scheduler',
-      href: '/admin/scheduler',
-      icon: Calendar,
-      description: 'Schedule playlists for different times',
-    },
   ];
+
+  const schedulerNavigation = {
+    name: 'Scheduler',
+    icon: Calendar,
+    description: 'Schedule playlists and device actions',
+    children: [
+      {
+        name: 'Playlists',
+        href: '/admin/scheduler/playlists',
+        icon: Play,
+        description: 'Schedule different playlists by time/day',
+      },
+      {
+        name: 'Device Actions',
+        href: '/admin/scheduler/actions',
+        icon: Monitor,
+        description: 'Schedule display on/off and other actions',
+      },
+    ],
+  };
 
   const systemNavigation = {
     name: 'System',
@@ -291,6 +306,84 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </Button>
             );
           })}
+          
+          {/* Scheduler Accordion */}
+          <div className="space-y-1">
+            <Button
+              variant={location.pathname.startsWith('/admin/scheduler') ? 'default' : 'ghost'}
+              className={cn(
+                'w-full justify-start h-11 transition-all duration-200 group',
+                isCollapsed && !isMobile ? 'px-3' : 'px-4',
+                location.pathname.startsWith('/admin/scheduler')
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-lg'
+                  : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+              )}
+              onClick={() => {
+                if (isCollapsed && !isMobile) {
+                  // If collapsed, go to playlist scheduler
+                  handleNavigation('/admin/scheduler/playlists');
+                } else {
+                  // If expanded, toggle accordion
+                  setSchedulerExpanded(!schedulerExpanded);
+                }
+              }}
+              title={isCollapsed && !isMobile ? schedulerNavigation.description : undefined}
+              aria-label={schedulerNavigation.description}
+              aria-expanded={schedulerExpanded}
+            >
+              <schedulerNavigation.icon 
+                className={cn(
+                  'w-5 h-5 flex-shrink-0',
+                  isCollapsed && !isMobile ? '' : 'mr-3'
+                )}
+                aria-hidden="true"
+              />
+              {(!isCollapsed || isMobile) && (
+                <>
+                  <span className="flex-1 text-left truncate">{schedulerNavigation.name}</span>
+                  <ChevronDown 
+                    className={cn(
+                      'w-4 h-4 flex-shrink-0 transition-transform duration-200',
+                      schedulerExpanded && 'transform rotate-180'
+                    )}
+                    aria-hidden="true"
+                  />
+                </>
+              )}
+            </Button>
+            
+            {/* Scheduler sub-items */}
+            {schedulerExpanded && (!isCollapsed || isMobile) && (
+              <div className="ml-4 space-y-1 animate-in slide-in-from-top-2 duration-200">
+                {schedulerNavigation.children.map((child) => {
+                  const active = isActive(child.href);
+                  return (
+                    <Button
+                      key={child.name}
+                      variant="ghost"
+                      className={cn(
+                        'w-full justify-start h-9 text-sm transition-all duration-200',
+                        'px-3',
+                        active
+                          ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                      )}
+                      onClick={() => handleNavigation(child.href)}
+                      aria-label={child.description}
+                      aria-current={active ? 'page' : undefined}
+                      role="link"
+                    >
+                      <child.icon 
+                        className="w-4 h-4 flex-shrink-0 mr-3"
+                        aria-hidden="true"
+                      />
+                      <span className="flex-1 text-left truncate">{child.name}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           
           {/* System Accordion */}
           <div className="space-y-1">

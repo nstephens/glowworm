@@ -160,7 +160,9 @@ function AppContent() {
             <Route path="/admin/playlists" element={<ProtectedRoute><PlaylistsWithHeader /></ProtectedRoute>} />
             <Route path="/admin/playlists/:slug" element={<ProtectedRoute><AdminLayout headerContent={<PlaylistDetailHeader />}><PlaylistDetail /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/displays" element={<ProtectedRoute><DisplaysWithHeader /></ProtectedRoute>} />
-            <Route path="/admin/scheduler" element={<ProtectedRoute><SchedulerPage /></ProtectedRoute>} />
+            <Route path="/admin/scheduler" element={<ProtectedRoute><Navigate to="/admin/scheduler/playlists" replace /></ProtectedRoute>} />
+            <Route path="/admin/scheduler/playlists" element={<ProtectedRoute><AdminLayout><SchedulerPage /></AdminLayout></ProtectedRoute>} />
+            <Route path="/admin/scheduler/actions" element={<ProtectedRoute><AdminLayout><div className="p-6">Device Actions (Coming Soon)</div></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/logs" element={<AdminProtectedRoute><AdminLayout headerContent={<AdminLogsHeader />}><AdminLogs /></AdminLayout></AdminProtectedRoute>} />
             <Route path="/admin/processing-queue" element={<AdminProtectedRoute><QueryClientProvider client={queryClient}><AdminLayout headerContent={<ProcessingQueueHeader />}><ProcessingQueueDashboard /></AdminLayout></QueryClientProvider></AdminProtectedRoute>} />
             <Route path="/admin/system/general" element={<AdminProtectedRoute><AdminLayout headerContent={<SettingsHeader />}><Settings /></AdminLayout></AdminProtectedRoute>} />
