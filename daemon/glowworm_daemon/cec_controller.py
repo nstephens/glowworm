@@ -350,28 +350,30 @@ class CECController:
         if not self.available:
             return None
         
-        logger.info("Querying active CEC source...")
+        logger.debug("Querying active CEC source...")
         
         try:
+            # Use 'pow' command to get device status which includes active source
             result = subprocess.run(
-                ['cec-client', '-s', '-d', '1'],
-                input='as\n',  # Use string, not bytes, when text=True
+                ['cec-client', '-s', '-d', '8'],  # Query for 8 seconds max
+                input='scan\n',
                 capture_output=True,
                 timeout=timeout,
                 text=True,
             )
             
             if result.returncode == 0:
-                # Parse active source from output
-                # Look for lines like "active source: 4" or "active source: 4.0.0.0"
-                match = re.search(r'active source:\s+([0-9.]+)', result.stdout, re.IGNORECASE)
+                # Parse for "currently active source: <name> (<address>)"
+                match = re.search(r'currently active source:\s+([^(]+)\((\d+)\)', result.stdout, re.IGNORECASE)
                 
                 if match:
-                    address = match.group(1)
-                    logger.info(f"Active source: {address}")
+                    name = match.group(1).strip()
+                    address = match.group(2)
+                    logger.debug(f"Active source: {name} ({address})")
                     
                     return {
                         "address": address,
+                        "name": name,
                         "detected": True,
                     }
             
@@ -379,12 +381,73 @@ class CECController:
             return None
         
         except subprocess.TimeoutExpired:
-            logger.warning("Active source query timed out")
+            logger.debug("Active source query timed out")
             return None
         
         except Exception as e:
             logger.debug(f"Failed to get active source: {e}")
             return None
+    
+    def power_on_and_switch(self, max_retries: int = 12, retry_interval: int = 5) -> Tuple[bool, str]:
+        """
+        Power on display and ensure it switches to this device
+        
+        Smart TVs often boot to their built-in apps (FireTV, etc.).
+        This command powers on the TV, then keeps trying to switch to
+        the Pi until successful or max retries reached.
+        
+        Args:
+            max_retries: Number of times to retry switch (default 12 = 60 seconds)
+            retry_interval: Seconds between retries (default 5)
+        
+        Returns:
+            Tuple of (success, message)
+        """
+        if not self.available:
+            return (False, "CEC not available")
+        
+        logger.info("Powering on display and switching to this device...")
+        
+        # Step 1: Power on the display
+        power_success, power_msg = self.power_on()
+        if not power_success:
+            return (False, f"Power on failed: {power_msg}")
+        
+        logger.info("✓ Display powered on, waiting for boot and switching input...")
+        
+        # Step 2: Wait a moment for TV to boot
+        import time
+        time.sleep(3)
+        
+        # Step 3: Try to switch to Pi, with retries
+        for attempt in range(max_retries):
+            logger.info(f"Switch attempt {attempt + 1}/{max_retries}...")
+            
+            # Make this device active
+            switch_success, switch_msg = self.set_input("self")
+            
+            if switch_success:
+                # Wait a moment, then check if we're actually active
+                time.sleep(2)
+                
+                active_source = self.get_active_source()
+                if active_source:
+                    # Check if we (device 1/Recorder) are active
+                    # Pi is typically device 1, so check for "1" or "Recorder"
+                    if active_source.get("address") == "1" or "recorder" in active_source.get("name", "").lower():
+                        logger.info(f"✓ Successfully switched to Pi (verified)")
+                        return (True, f"Display powered on and switched to Pi (took {attempt + 1} attempts)")
+                
+                logger.debug(f"Switch command sent but not yet active (current: {active_source})")
+            
+            # Not active yet, retry if we have attempts left
+            if attempt < max_retries - 1:
+                logger.debug(f"Retrying in {retry_interval}s...")
+                time.sleep(retry_interval)
+        
+        # Max retries reached
+        logger.warning(f"Display powered on but input switch unverified after {max_retries} attempts")
+        return (True, f"Display powered on (input switch attempted but not confirmed)")
 
 
 if __name__ == "__main__":

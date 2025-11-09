@@ -282,25 +282,59 @@ class CECPowerOnExecutor(CommandExecutor):
     
     def execute(self, command_data: Dict[str, Any]) -> Dict[str, Any]:
         """Execute CEC power on command"""
-        logger.info("Executing CEC power on")
         
-        timeout = command_data.get("timeout", self.config.cec_timeout)
-        success, message = self.cec.power_on(timeout=timeout)
+        # Check if we should also switch input (for Smart TVs that default to built-in apps)
+        auto_switch = command_data.get("auto_switch_input", True)  # Default to True
         
-        if success:
-            return {
-                "status": "success",
-                "message": message,
-                "cec_available": True,
-                "display_address": self.config.cec_display_address,
-            }
+        if auto_switch:
+            logger.info("Executing CEC power on with automatic input switching")
+            
+            # Use power_on_and_switch which retries until TV switches to Pi
+            max_retries = command_data.get("switch_retries", 12)  # 60 seconds total
+            retry_interval = command_data.get("retry_interval", 5)
+            
+            success, message = self.cec.power_on_and_switch(
+                max_retries=max_retries,
+                retry_interval=retry_interval
+            )
+            
+            if success:
+                return {
+                    "status": "success",
+                    "message": message,
+                    "cec_available": True,
+                    "auto_switched": True,
+                    "display_address": self.config.cec_display_address,
+                }
+            else:
+                return {
+                    "status": "failed",
+                    "error": message,
+                    "cec_available": True,
+                    "auto_switched": False,
+                    "display_address": self.config.cec_display_address,
+                }
         else:
-            return {
-                "status": "failed",
-                "error": message,
-                "cec_available": True,
-                "display_address": self.config.cec_display_address,
-            }
+            # Simple power on without input switching
+            logger.info("Executing CEC power on (no auto-switch)")
+            
+            timeout = command_data.get("timeout", self.config.cec_timeout)
+            success, message = self.cec.power_on(timeout=timeout)
+            
+            if success:
+                return {
+                    "status": "success",
+                    "message": message,
+                    "cec_available": True,
+                    "display_address": self.config.cec_display_address,
+                }
+            else:
+                return {
+                    "status": "failed",
+                    "error": message,
+                    "cec_available": True,
+                    "display_address": self.config.cec_display_address,
+                }
 
 
 class CECPowerOffExecutor(CommandExecutor):
