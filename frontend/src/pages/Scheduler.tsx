@@ -150,13 +150,19 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Playlist Scheduler</h1>
-          <p className="text-muted-foreground">
-            Schedule different playlists to play at different times
-          </p>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="bg-purple-100 dark:bg-purple-900/20 p-3 rounded-lg">
+            <Calendar className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Playlist Scheduler</h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Schedule different playlists to play at different times
+            </p>
+          </div>
         </div>
+        
         <div className="flex gap-2">
           <Button
             variant="outline"
