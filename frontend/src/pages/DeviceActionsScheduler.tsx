@@ -4,16 +4,17 @@ import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Plus, Monitor } from 'lucide-react';
 import apiService from '../services/api';
-import type { Device } from '../types';
+import type { Device, ScheduledAction, ActionFormData } from '../types';
 
 interface DeviceActionsSchedulerProps {}
 
 export const DeviceActionsScheduler: React.FC<DeviceActionsSchedulerProps> = () => {
-  const [actions, setActions] = useState<any[]>([]);
+  const [actions, setActions] = useState<ScheduledAction[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingAction, setEditingAction] = useState<ScheduledAction | undefined>(undefined);
 
   useEffect(() => {
     loadData();
@@ -24,8 +25,15 @@ export const DeviceActionsScheduler: React.FC<DeviceActionsSchedulerProps> = () 
       setLoading(true);
       setError(null);
 
-      const devicesResponse = await apiService.getDevices();
+      const [actionsResponse, devicesResponse] = await Promise.all([
+        apiService.getActions(),
+        apiService.getDevices()
+      ]);
       
+      const actionsData = Array.isArray(actionsResponse.data) 
+        ? actionsResponse.data 
+        : [];
+
       const devicesData = Array.isArray(devicesResponse) 
         ? devicesResponse 
         : [];
@@ -33,9 +41,8 @@ export const DeviceActionsScheduler: React.FC<DeviceActionsSchedulerProps> = () 
       // Filter to only show authorized devices
       const authorizedDevices = devicesData.filter((d: any) => d.status === 'authorized');
       
+      setActions(actionsData);
       setDevices(authorizedDevices);
-      // TODO: Load scheduled actions from backend
-      setActions([]);
     } catch (err: any) {
       setError(err.message || 'Failed to load device actions data');
       console.error('Failed to load device actions data:', err);
@@ -44,6 +51,60 @@ export const DeviceActionsScheduler: React.FC<DeviceActionsSchedulerProps> = () 
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleToggleEnabled = async (actionId: number) => {
+    try {
+      await apiService.toggleAction(actionId);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to toggle action');
+    }
+  };
+
+  const handleDeleteAction = async (actionId: number) => {
+    if (!confirm('Are you sure you want to delete this action?')) {
+      return;
+    }
+
+    try {
+      await apiService.deleteAction(actionId);
+      setActions(prev => prev.filter(a => a.id !== actionId));
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete action');
+    }
+  };
+
+  const handleCreateAction = async (data: ActionFormData) => {
+    try {
+      await apiService.createAction(data);
+      setShowCreateForm(false);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to create action');
+    }
+  };
+
+  const handleEditAction = async (data: ActionFormData) => {
+    if (!editingAction) return;
+
+    try {
+      await apiService.updateAction(editingAction.id, data);
+      setEditingAction(undefined);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to update action');
+    }
+  };
+
+  const handleStartEdit = (action: ScheduledAction) => {
+    setEditingAction(action);
+    setShowCreateForm(false);
+  };
+
+  const handleCancelForm = () => {
+    setShowCreateForm(false);
+    setEditingAction(undefined);
   };
 
   if (loading) {
@@ -95,7 +156,7 @@ export const DeviceActionsScheduler: React.FC<DeviceActionsSchedulerProps> = () 
             <CardTitle className="text-sm font-medium">Total Actions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{actions.length}</div>
+            <div className="text-2xl font-bold">{Array.isArray(actions) ? actions.length : 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -104,7 +165,7 @@ export const DeviceActionsScheduler: React.FC<DeviceActionsSchedulerProps> = () 
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {actions.filter(a => a.enabled).length}
+              {Array.isArray(actions) ? actions.filter(a => a.enabled).length : 0}
             </div>
           </CardContent>
         </Card>
@@ -114,7 +175,7 @@ export const DeviceActionsScheduler: React.FC<DeviceActionsSchedulerProps> = () 
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {actions.filter(a => a.action_type === 'power_on' || a.action_type === 'power_off').length}
+              {Array.isArray(actions) ? actions.filter(a => a.action_type === 'power_on' || a.action_type === 'power_off').length : 0}
             </div>
           </CardContent>
         </Card>
@@ -124,38 +185,13 @@ export const DeviceActionsScheduler: React.FC<DeviceActionsSchedulerProps> = () 
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {actions.filter(a => a.action_type === 'set_input').length}
+              {Array.isArray(actions) ? actions.filter(a => a.action_type === 'set_input').length : 0}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Coming Soon Message */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="text-center py-12">
-            <Monitor className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Device Actions Scheduler</h3>
-            <p className="text-muted-foreground mb-4">
-              Schedule your displays to turn on/off at specific times and automatically switch inputs.
-            </p>
-            <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg max-w-2xl mx-auto">
-              <p className="text-sm text-blue-900 dark:text-blue-100">
-                <strong>Coming Soon:</strong> Full implementation of device action scheduling including:
-              </p>
-              <ul className="text-sm text-blue-800 dark:text-blue-200 mt-2 space-y-1 text-left list-disc list-inside">
-                <li>Power on/off displays at scheduled times</li>
-                <li>Automatic input switching (e.g., ensure TV is on correct HDMI input)</li>
-                <li>Recurring schedules (daily, weekly patterns)</li>
-                <li>Specific date actions (holidays, events)</li>
-                <li>Integration with existing Playlist Scheduler</li>
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Actions List Placeholder */}
+      {/* Actions List - TODO: Create ActionsList component */}
       {devices.length > 0 && actions.length === 0 && (
         <Card>
           <CardContent className="pt-6">
@@ -164,6 +200,19 @@ export const DeviceActionsScheduler: React.FC<DeviceActionsSchedulerProps> = () 
                 No device actions scheduled yet. Click "Create Action" to get started.
               </p>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {actions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Scheduled Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Action list component coming next...
+            </p>
           </CardContent>
         </Card>
       )}
