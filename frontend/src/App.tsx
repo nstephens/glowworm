@@ -22,6 +22,7 @@ import Displays from './pages/Displays';
 import AdminLogs from './pages/AdminLogs';
 import Settings from './pages/Settings';
 import SchedulerPage from './pages/Scheduler';
+import DeviceActionsScheduler from './pages/DeviceActionsScheduler';
 import AdminLayout from './components/AdminLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
@@ -162,7 +163,7 @@ function AppContent() {
             <Route path="/admin/displays" element={<ProtectedRoute><DisplaysWithHeader /></ProtectedRoute>} />
             <Route path="/admin/scheduler" element={<ProtectedRoute><Navigate to="/admin/scheduler/playlists" replace /></ProtectedRoute>} />
             <Route path="/admin/scheduler/playlists" element={<ProtectedRoute><AdminLayout headerContent={<></>}><SchedulerPage /></AdminLayout></ProtectedRoute>} />
-            <Route path="/admin/scheduler/actions" element={<ProtectedRoute><AdminLayout headerContent={<></>}><div className="p-6">Device Actions (Coming Soon)</div></AdminLayout></ProtectedRoute>} />
+            <Route path="/admin/scheduler/actions" element={<ProtectedRoute><AdminLayout headerContent={<></>}><DeviceActionsScheduler /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/logs" element={<AdminProtectedRoute><AdminLayout headerContent={<AdminLogsHeader />}><AdminLogs /></AdminLayout></AdminProtectedRoute>} />
             <Route path="/admin/processing-queue" element={<AdminProtectedRoute><QueryClientProvider client={queryClient}><AdminLayout headerContent={<ProcessingQueueHeader />}><ProcessingQueueDashboard /></AdminLayout></QueryClientProvider></AdminProtectedRoute>} />
             <Route path="/admin/system/general" element={<AdminProtectedRoute><AdminLayout headerContent={<SettingsHeader />}><Settings /></AdminLayout></AdminProtectedRoute>} />
