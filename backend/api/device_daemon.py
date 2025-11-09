@@ -12,6 +12,9 @@ import secrets
 
 from models.database import get_db
 from models.display_device import DisplayDevice, DeviceStatus
+from models.device_daemon_status import DeviceDaemonStatus, DaemonStatus
+from models.device_command import DeviceCommand, CommandType, CommandStatus
+from services.device_daemon_service import DeviceDaemonService, DeviceCommandService
 from utils.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
@@ -170,8 +173,18 @@ async def register_daemon(
         f"(version: {request.daemon_version})"
     )
     
-    # TODO: Store daemon metadata in device_daemon table (Task 3)
-    # For now, just acknowledge registration
+    # Register daemon in database
+    daemon_status = DeviceDaemonService.register_daemon(
+        db=db,
+        device_id=device.id,
+        daemon_version=request.daemon_version,
+        capabilities=request.capabilities,
+    )
+    
+    logger.info(
+        f"Daemon registered for device {device.id}: "
+        f"capabilities={list(request.capabilities.keys())}"
+    )
     
     return DaemonRegistrationResponse(
         status="registered",
@@ -200,12 +213,33 @@ async def poll_commands(
     
     logger.debug(f"Command poll from device {device.id}")
     
-    # TODO: Fetch pending commands from device_commands table (Task 3)
-    # For now, return empty list
+    # Update heartbeat
+    DeviceDaemonService.update_heartbeat(db=db, device_id=device.id)
+    
+    # Fetch pending commands
+    commands = DeviceCommandService.get_pending_commands(
+        db=db,
+        device_id=device.id,
+        limit=10,
+    )
+    
+    # Convert to response format
+    command_list = [
+        CommandRequest(
+            id=cmd.id,
+            type=cmd.command_type.value,
+            parameters=cmd.command_data or {},
+            created_at=cmd.created_at.isoformat(),
+        )
+        for cmd in commands
+    ]
+    
+    if command_list:
+        logger.info(f"Sending {len(command_list)} command(s) to device {device.id}")
     
     return CommandPollResponse(
-        commands=[],
-        count=0,
+        commands=command_list,
+        count=len(command_list),
     )
 
 @router.post("/commands/{command_id}/result", response_model=CommandResultResponse)
@@ -225,11 +259,45 @@ async def report_command_result(
         f"Command result for #{command_id} from device {device.id}: {result.status}"
     )
     
-    # TODO: Update command status in device_commands table (Task 3)
-    # For now, just acknowledge
+    # Map status string to enum
+    status_map = {
+        "completed": CommandStatus.COMPLETED,
+        "failed": CommandStatus.FAILED,
+        "timeout": CommandStatus.TIMEOUT,
+    }
+    
+    command_status = status_map.get(result.status, CommandStatus.FAILED)
+    
+    # Update command in database
+    command = DeviceCommandService.update_command_status(
+        db=db,
+        command_id=command_id,
+        status=command_status,
+        result=result.result,
+        error_message=result.error,
+    )
+    
+    if not command:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Command {command_id} not found"
+        )
+    
+    # Verify command belongs to this device
+    if command.device_id != device.id:
+        logger.warning(
+            f"Device {device.id} attempted to update command {command_id} "
+            f"belonging to device {command.device_id}"
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Command does not belong to this device"
+        )
     
     if result.status == "failed":
         logger.error(f"Command {command_id} failed: {result.error}")
+    else:
+        logger.info(f"Command {command_id} completed successfully")
     
     return CommandResultResponse(
         status="acknowledged",
@@ -252,14 +320,274 @@ async def daemon_heartbeat(
         f"(uptime: {heartbeat.uptime_seconds:.1f}s)"
     )
     
-    # Update last seen (already done in authentication)
-    # TODO: Store heartbeat data in device_daemon table (Task 3)
+    # Update heartbeat with system info
+    DeviceDaemonService.update_heartbeat(
+        db=db,
+        device_id=device.id,
+        system_info=heartbeat.system_info,
+    )
+    
+    # Count pending commands
+    pending_count = db.query(DeviceCommand).filter(
+        DeviceCommand.device_id == device.id,
+        DeviceCommand.status == CommandStatus.PENDING,
+    ).count()
     
     return HeartbeatResponse(
         status="ok",
         server_time=datetime.now().isoformat(),
-        commands_pending=0,  # TODO: Get actual pending count
+        commands_pending=pending_count,
     )
+
+# ============================================================================
+# Device Control Endpoints
+# ============================================================================
+
+class URLUpdateRequest(BaseModel):
+    """Request to update device browser URL"""
+    url: str = Field(..., description="New browser URL")
+
+class PowerControlRequest(BaseModel):
+    """Request to control display power"""
+    power: str = Field(..., description="on or off")
+
+class InputSelectRequest(BaseModel):
+    """Request to select HDMI input"""
+    input_address: str = Field(..., description="CEC input address")
+    input_name: Optional[str] = Field(None, description="Human-readable input name")
+
+@router.put("/devices/{device_id}/browser-url")
+async def update_browser_url(
+    device_id: int,
+    request: URLUpdateRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Queue a browser URL update command for a device
+    
+    This endpoint allows admins to remotely update the browser URL
+    on a display device running the daemon.
+    """
+    # Verify device exists and has daemon enabled
+    device = db.query(DisplayDevice).filter(DisplayDevice.id == device_id).first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    if not device.daemon_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="Daemon control not enabled for this device"
+        )
+    
+    # Create command
+    command = DeviceCommandService.create_command(
+        db=db,
+        device_id=device_id,
+        command_type=CommandType.UPDATE_URL,
+        command_data={"url": request.url},
+    )
+    
+    # Update device's browser_url field
+    device.browser_url = request.url
+    db.commit()
+    
+    logger.info(f"Queued URL update for device {device_id}: {request.url}")
+    
+    return {
+        "status": "queued",
+        "message": "URL update command queued",
+        "command_id": command.id,
+    }
+
+@router.post("/devices/{device_id}/display/power")
+async def control_display_power(
+    device_id: int,
+    request: PowerControlRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Queue a display power control command
+    
+    Uses HDMI CEC to turn display on or off.
+    """
+    # Verify device exists and has daemon enabled
+    device = db.query(DisplayDevice).filter(DisplayDevice.id == device_id).first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    if not device.daemon_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="Daemon control not enabled for this device"
+        )
+    
+    # Check if CEC is available
+    daemon_status = DeviceDaemonService.get_daemon_status(db, device_id)
+    if not daemon_status or not daemon_status.cec_available:
+        raise HTTPException(
+            status_code=400,
+            detail="CEC control not available on this device"
+        )
+    
+    # Determine command type
+    if request.power.lower() == "on":
+        command_type = CommandType.CEC_POWER_ON
+    elif request.power.lower() == "off":
+        command_type = CommandType.CEC_POWER_OFF
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Power must be 'on' or 'off'"
+        )
+    
+    # Create command
+    command = DeviceCommandService.create_command(
+        db=db,
+        device_id=device_id,
+        command_type=command_type,
+        command_data={},
+    )
+    
+    logger.info(f"Queued power {request.power} for device {device_id}")
+    
+    return {
+        "status": "queued",
+        "message": f"Power {request.power} command queued",
+        "command_id": command.id,
+    }
+
+@router.get("/devices/{device_id}/display/inputs")
+async def get_display_inputs(
+    device_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Get available HDMI inputs from device's CEC scan
+    
+    Returns the list of detected CEC devices from the daemon's
+    last scan or status update.
+    """
+    # Verify device exists
+    device = db.query(DisplayDevice).filter(DisplayDevice.id == device_id).first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    # Get daemon status
+    daemon_status = DeviceDaemonService.get_daemon_status(db, device_id)
+    if not daemon_status:
+        raise HTTPException(
+            status_code=404,
+            detail="No daemon registered for this device"
+        )
+    
+    if not daemon_status.cec_available:
+        return {
+            "cec_available": False,
+            "inputs": [],
+            "message": "CEC not available on this device",
+        }
+    
+    return {
+        "cec_available": True,
+        "inputs": daemon_status.cec_devices or [],
+        "current_input": {
+            "name": device.cec_input_name,
+            "address": device.cec_input_address,
+        } if device.cec_input_name else None,
+    }
+
+@router.post("/devices/{device_id}/display/input")
+async def select_display_input(
+    device_id: int,
+    request: InputSelectRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Queue a command to select HDMI input via CEC
+    """
+    # Verify device exists and has daemon enabled
+    device = db.query(DisplayDevice).filter(DisplayDevice.id == device_id).first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    if not device.daemon_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="Daemon control not enabled for this device"
+        )
+    
+    # Check if CEC is available
+    daemon_status = DeviceDaemonService.get_daemon_status(db, device_id)
+    if not daemon_status or not daemon_status.cec_available:
+        raise HTTPException(
+            status_code=400,
+            detail="CEC control not available on this device"
+        )
+    
+    # Create command
+    command = DeviceCommandService.create_command(
+        db=db,
+        device_id=device_id,
+        command_type=CommandType.CEC_SET_INPUT,
+        command_data={
+            "input_address": request.input_address,
+            "input_name": request.input_name,
+        },
+    )
+    
+    # Update device's selected input
+    device.cec_input_address = request.input_address
+    device.cec_input_name = request.input_name
+    db.commit()
+    
+    logger.info(
+        f"Queued input switch for device {device_id}: "
+        f"{request.input_name or request.input_address}"
+    )
+    
+    return {
+        "status": "queued",
+        "message": "Input switch command queued",
+        "command_id": command.id,
+    }
+
+@router.post("/devices/{device_id}/display/scan-inputs")
+async def scan_display_inputs(
+    device_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Queue a command to scan for available CEC inputs
+    
+    The daemon will scan for connected CEC devices and report them
+    back via the next status update.
+    """
+    # Verify device exists and has daemon enabled
+    device = db.query(DisplayDevice).filter(DisplayDevice.id == device_id).first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    if not device.daemon_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="Daemon control not enabled for this device"
+        )
+    
+    # Create command
+    command = DeviceCommandService.create_command(
+        db=db,
+        device_id=device_id,
+        command_type=CommandType.CEC_SCAN_INPUTS,
+        command_data={},
+    )
+    
+    logger.info(f"Queued CEC scan for device {device_id}")
+    
+    return {
+        "status": "queued",
+        "message": "CEC input scan command queued",
+        "command_id": command.id,
+    }
 
 @router.get("/health")
 async def health_check():
