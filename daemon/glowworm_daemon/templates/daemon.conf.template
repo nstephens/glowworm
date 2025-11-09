@@ -1,0 +1,44 @@
+# Glowworm Display Device Daemon Configuration
+# This file should be located at /etc/glowworm/daemon.conf
+
+[daemon]
+# Backend API URL (required)
+backend_url = http://10.10.10.2:8002
+
+# Device authentication token (required)
+# Get this from the Glowworm admin UI when registering the device
+device_token = 
+
+# How often to poll for commands (seconds)
+poll_interval = 30
+
+# Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_level = INFO
+
+# Log file location
+log_file = /var/log/glowworm/daemon.log
+
+# Connection retry settings
+max_retries = 3
+retry_delay = 5
+
+[cec]
+# Enable HDMI CEC control
+enabled = true
+
+# Display logical address (usually 0)
+display_address = 0
+
+# CEC adapter device
+adapter = /dev/cec0
+
+# CEC command timeout (seconds)
+timeout = 5
+
+[fullpageos]
+# Path to FullPageOS configuration file
+config_path = /boot/firmware/fullpageos.txt
+
+# Create backup before modifying config
+backup_enabled = true
+
