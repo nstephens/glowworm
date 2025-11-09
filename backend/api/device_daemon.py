@@ -39,6 +39,7 @@ class DaemonRegistrationRequest(BaseModel):
         },
         description="Daemon capabilities"
     )
+    system_info: Optional[Dict[str, Any]] = Field(None, description="System information including CEC availability")
     # Note: device_token comes from Authorization header, not request body
 
 class DaemonRegistrationResponse(BaseModel):
@@ -180,6 +181,15 @@ async def register_daemon(
         daemon_version=request.daemon_version,
         capabilities=request.capabilities,
     )
+    
+    # Update CEC info from system_info if provided
+    if request.system_info:
+        if 'cec_available' in request.system_info:
+            daemon_status.cec_available = request.system_info['cec_available']
+        if 'cec_devices' in request.system_info:
+            daemon_status.cec_devices = request.system_info['cec_devices']
+        db.commit()
+        db.refresh(daemon_status)
     
     logger.info(
         f"Daemon registered for device {device.id}: "

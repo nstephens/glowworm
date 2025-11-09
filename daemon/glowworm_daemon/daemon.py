@@ -146,16 +146,44 @@ class GlowwormDaemon:
                     f"{self.max_registration_retries})..."
                 )
                 
+                # Detect actual CEC availability (not just config)
+                cec_available = False
+                cec_devices = []
+                
+                if self.config.cec_enabled:
+                    try:
+                        from .cec_controller import CECController
+                        cec = CECController(
+                            adapter=self.config.cec_adapter,
+                            display_address=self.config.cec_display_address,
+                        )
+                        cec_available = cec.available
+                        
+                        if cec_available:
+                            # Try to scan devices
+                            success, devices = cec.scan_devices(timeout=10)
+                            if success:
+                                cec_devices = devices
+                        
+                        logger.info(f"CEC availability: {cec_available}")
+                    except Exception as e:
+                        logger.warning(f"CEC detection failed: {e}")
+                        cec_available = False
+                
                 # Detect capabilities
                 capabilities = {
                     "url_update": True,
-                    "cec_control": self.config.cec_enabled,
+                    "cec_control": cec_available,  # Use actual availability, not just config
                 }
                 
-                # Prepare registration payload
+                # Prepare registration payload with system info
                 payload = {
                     "daemon_version": self.DAEMON_VERSION,
                     "capabilities": capabilities,
+                    "system_info": {
+                        "cec_available": cec_available,
+                        "cec_devices": cec_devices,
+                    }
                 }
                 
                 # Send registration request
