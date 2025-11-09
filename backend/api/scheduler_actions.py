@@ -13,7 +13,7 @@ from models.scheduled_action import ScheduledAction, ActionType
 from models.display_device import DisplayDevice
 from models.user import User
 from services.scheduled_action_service import ScheduledActionService
-from utils.auth import get_current_user, require_admin
+from utils.middleware import require_admin
 import logging
 
 logger = logging.getLogger(__name__)
