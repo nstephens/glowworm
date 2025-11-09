@@ -5,7 +5,7 @@ Works alongside SchedulerService for complete automation
 """
 import logging
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 
 from models.scheduled_action import ScheduledAction, ActionType
