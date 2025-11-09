@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { ArrowLeft, X, Monitor, Wifi, WifiOff, CheckCircle, Clock, AlertTriangle, FileText, RefreshCw } from 'lucide-react';
+import { ArrowLeft, X, Monitor, Wifi, WifiOff, CheckCircle, Clock, AlertTriangle, FileText, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { ScheduleWidget } from '../components/scheduler/ScheduleWidget';
 import { DeviceDaemonControl } from '../components/DeviceDaemonControl';
@@ -75,6 +75,9 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
   // Playlist state
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null);
+  
+  // Collapsible sections state
+  const [expandedDeviceControls, setExpandedDeviceControls] = useState<Set<number>>(new Set());
 
   // Do NOT early-return before hooks to avoid hook order mismatches when switching layouts.
 
@@ -617,115 +620,123 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                         </span>
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
-                        <div>
-                          <p className="font-medium text-gray-700 mb-1">Last Seen</p>
-                          <p className="text-gray-600">{formatDate(device.last_seen)}</p>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-700 mb-1">Created</p>
-                          <p className="text-gray-600">{formatDate(device.created_at)}</p>
-                        </div>
+                      <div className="text-xs text-gray-500 space-y-0.5">
+                        <p>Last seen: {formatDate(device.last_seen)}</p>
                         {device.authorized_at && (
-                          <div>
-                            <p className="font-medium text-gray-700 mb-1">Authorized</p>
-                            <p className="text-gray-600">{formatDate(device.authorized_at)}</p>
-                          </div>
+                          <p>Authorized: {formatDate(device.authorized_at)}</p>
                         )}
                       </div>
                       
                       {device.status === 'authorized' && (
                         <>
                           {/* Playlist Controls Section */}
-                          <div className="mt-4 space-y-3">
-                            <div className="p-3 bg-gray-50 rounded-md">
-                              <p className="text-sm text-gray-600">
-                                <span className="font-medium">Current Playlist:</span> {device.playlist_name || 'None assigned'}
-                              </p>
-                            </div>
+                          <div className="mt-5 space-y-3">
+                            <p className="text-sm text-gray-700">
+                              <span className="font-medium">Playing:</span> <span className="text-gray-600">{device.playlist_name || 'None'}</span>
+                            </p>
                             
-                            <div className="flex flex-wrap gap-3">
+                            <div className="flex flex-wrap gap-2">
                               <button
                                 onClick={() => openPlaylistModal(device)}
-                                className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700 transition-colors"
+                                className="bg-purple-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-purple-700 transition-colors"
                               >
-                                {device.playlist_name ? 'Change Playlist' : 'Select Playlist'}
+                                {device.playlist_name ? 'Change' : 'Select'} Playlist
                               </button>
                               <button
                                 onClick={() => handleRefreshBrowser(device)}
-                                className="bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-orange-700 transition-colors"
+                                className="bg-orange-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-orange-700 transition-colors"
                               >
-                                Refresh Browser
+                                Refresh
                               </button>
                               <button
                                 onClick={() => openUpdateModal(device)}
-                                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                                className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-blue-700 transition-colors"
                               >
-                                Edit Device
+                                Edit
                               </button>
                             </div>
                           </div>
                           
                           {/* Schedule Widget */}
-                          <div className="mt-6">
+                          <div className="mt-5">
                             <ScheduleWidget 
                               deviceId={device.id} 
                               deviceName={device.device_name}
                             />
                           </div>
                           
-                          {/* Device Controls Section */}
-                          <div className="mt-6 space-y-4">
-                            <h4 className="text-sm font-semibold text-gray-700 border-b pb-2">
-                              Device Controls
-                            </h4>
+                          {/* Device Controls Section - Collapsible */}
+                          <div className="mt-5 border-t pt-4">
+                            <button
+                              onClick={() => {
+                                const newExpanded = new Set(expandedDeviceControls);
+                                if (newExpanded.has(device.id)) {
+                                  newExpanded.delete(device.id);
+                                } else {
+                                  newExpanded.add(device.id);
+                                }
+                                setExpandedDeviceControls(newExpanded);
+                              }}
+                              className="flex items-center justify-between w-full text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                            >
+                              <span>Device Controls</span>
+                              {expandedDeviceControls.has(device.id) ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                            </button>
                             
-                            {/* Device Token for Daemon Setup */}
-                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <p className="text-xs font-medium text-blue-900 mb-1">
-                                    Device Token (for daemon setup):
-                                  </p>
-                                  <p className="text-sm font-mono font-bold text-blue-700">
-                                    {device.device_token}
-                                  </p>
+                            {expandedDeviceControls.has(device.id) && (
+                              <div className="mt-4 space-y-4">
+                                {/* Device Token for Daemon Setup */}
+                                <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                      <p className="text-xs font-medium text-blue-900 mb-1">
+                                        Device Token:
+                                      </p>
+                                      <p className="text-sm font-mono text-blue-700">
+                                        {device.device_token}
+                                      </p>
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        // Fallback for browsers/contexts without clipboard API
+                                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                                          navigator.clipboard.writeText(device.device_token);
+                                        } else {
+                                          // Fallback: use temporary textarea
+                                          const textArea = document.createElement('textarea');
+                                          textArea.value = device.device_token;
+                                          textArea.style.position = 'fixed';
+                                          textArea.style.left = '-999999px';
+                                          document.body.appendChild(textArea);
+                                          textArea.select();
+                                          try {
+                                            document.execCommand('copy');
+                                          } catch (err) {
+                                            console.error('Failed to copy:', err);
+                                          }
+                                          document.body.removeChild(textArea);
+                                        }
+                                      }}
+                                      className="ml-3 bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
+                                      title="Copy token"
+                                    >
+                                      Copy
+                                    </button>
+                                  </div>
                                 </div>
-                                <button
-                                  onClick={() => {
-                                    // Fallback for browsers/contexts without clipboard API
-                                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                                      navigator.clipboard.writeText(device.device_token);
-                                    } else {
-                                      // Fallback: use temporary textarea
-                                      const textArea = document.createElement('textarea');
-                                      textArea.value = device.device_token;
-                                      textArea.style.position = 'fixed';
-                                      textArea.style.left = '-999999px';
-                                      document.body.appendChild(textArea);
-                                      textArea.select();
-                                      try {
-                                        document.execCommand('copy');
-                                      } catch (err) {
-                                        console.error('Failed to copy:', err);
-                                      }
-                                      document.body.removeChild(textArea);
-                                    }
-                                  }}
-                                  className="ml-3 bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
-                                  title="Copy token"
-                                >
-                                  Copy
-                                </button>
+                                
+                                {/* Daemon Control Panel */}
+                                <DeviceDaemonControl 
+                                  deviceId={device.id}
+                                  daemonEnabled={true}
+                                  currentUrl={device.browser_url || `http://10.10.10.2:3003/display/${device.device_token}`}
+                                />
                               </div>
-                            </div>
-                            
-                            {/* Daemon Control Panel */}
-                            <DeviceDaemonControl 
-                              deviceId={device.id}
-                              daemonEnabled={true}
-                              currentUrl={device.browser_url || `http://10.10.10.2:3003/display/${device.device_token}`}
-                            />
+                            )}
                           </div>
                         </>
                       )}
