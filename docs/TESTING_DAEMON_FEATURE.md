@@ -233,9 +233,11 @@ Wants=network-online.target
 Type=simple
 User=root
 Group=root
-ExecStart=/usr/local/bin/glowworm-daemon
+ExecStart=/opt/glowworm-daemon/venv/bin/python -m glowworm_daemon.main
 Restart=always
 RestartSec=10
+Environment="PYTHONUNBUFFERED=1"
+Environment="PATH=/opt/glowworm-daemon/venv/bin:/usr/local/bin:/usr/bin:/bin"
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=glowworm-daemon
@@ -502,7 +504,15 @@ sudo systemctl disable glowworm-daemon
 # Remove files
 sudo rm /etc/systemd/system/glowworm-daemon.service
 sudo systemctl daemon-reload
-sudo pip3 uninstall -y glowworm-daemon
+
+# Remove virtual environment and installation
+sudo rm -rf /opt/glowworm-daemon
+
+# Remove symlinks
+sudo rm -f /usr/local/bin/glowworm-daemon
+sudo rm -f /usr/local/bin/glowworm-daemon-setup
+
+# Remove configuration
 sudo rm -rf /etc/glowworm
 sudo rm -rf /var/log/glowworm
 ```
@@ -753,7 +763,7 @@ sudo cat /etc/glowworm/daemon.conf
 
 # Run daemon in foreground (for debugging)
 sudo systemctl stop glowworm-daemon
-sudo python3 -m glowworm_daemon.main
+sudo /opt/glowworm-daemon/venv/bin/python -m glowworm_daemon.main
 ```
 
 ---

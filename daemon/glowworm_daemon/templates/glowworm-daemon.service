@@ -9,8 +9,8 @@ Type=simple
 User=root
 Group=root
 
-# Main process
-ExecStart=/usr/local/bin/glowworm-daemon
+# Main process (use venv Python)
+ExecStart=/opt/glowworm-daemon/venv/bin/python -m glowworm_daemon.main
 
 # Restart configuration
 Restart=always
@@ -28,6 +28,7 @@ MemoryLimit=256M
 
 # Environment
 Environment="PYTHONUNBUFFERED=1"
+Environment="PATH=/opt/glowworm-daemon/venv/bin:/usr/local/bin:/usr/bin:/bin"
 
 # Logging
 StandardOutput=journal

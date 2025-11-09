@@ -50,8 +50,9 @@ echo "📦 Installing system dependencies..."
 
 apt-get update -qq
 apt-get install -y -qq \
-    python3-pip \
+    python3 \
     python3-venv \
+    python3-full \
     cec-utils \
     libcec6 \
     python3-cec \
@@ -59,30 +60,35 @@ apt-get install -y -qq \
 
 echo "✅ System dependencies installed"
 
-# Install Python package
+# Create installation directory
+INSTALL_DIR="/opt/glowworm-daemon"
 echo ""
-echo "🐍 Installing Glowworm daemon Python package..."
+echo "📁 Creating installation directory: $INSTALL_DIR"
+mkdir -p "$INSTALL_DIR"
 
-pip3 install --upgrade pip
-pip3 install glowworm-daemon
+# Create virtual environment
+echo ""
+echo "🐍 Creating Python virtual environment..."
+python3 -m venv "$INSTALL_DIR/venv"
+echo "✅ Virtual environment created"
+
+# Install daemon package in venv
+echo ""
+echo "📦 Installing Glowworm daemon package..."
+"$INSTALL_DIR/venv/bin/pip" install --upgrade pip
+"$INSTALL_DIR/venv/bin/pip" install glowworm-daemon
+
+# Create symlink to daemon executable
+ln -sf "$INSTALL_DIR/venv/bin/glowworm-daemon" /usr/local/bin/glowworm-daemon
+ln -sf "$INSTALL_DIR/venv/bin/glowworm-daemon-setup" /usr/local/bin/glowworm-daemon-setup
 
 # Verify installation
 if ! command -v glowworm-daemon &> /dev/null; then
-    echo "⚠️  glowworm-daemon not found in PATH"
-    echo "   Trying to link manually..."
-    
-    # Try to find it
-    DAEMON_PATH=$(find /usr/local -name glowworm-daemon 2>/dev/null | head -1)
-    if [ -n "$DAEMON_PATH" ]; then
-        ln -sf "$DAEMON_PATH" /usr/local/bin/glowworm-daemon
-        echo "✅ Created symlink to $DAEMON_PATH"
-    else
-        echo "❌ Could not find glowworm-daemon executable"
-        exit 1
-    fi
+    echo "❌ Installation failed - daemon executable not found"
+    exit 1
 fi
 
-echo "✅ Glowworm daemon installed"
+echo "✅ Glowworm daemon installed in virtual environment"
 
 # Run setup wizard
 echo ""

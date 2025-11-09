@@ -47,13 +47,25 @@ curl -sSL https://raw.githubusercontent.com/yourusername/glowworm/main/daemon/sc
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y python3-pip cec-utils libcec6 python3-cec
+sudo apt-get install -y python3 python3-venv python3-full cec-utils libcec6 python3-cec
 ```
 
-#### 2. Install Python Package
+#### 2. Create Virtual Environment and Install Package
 
 ```bash
-sudo pip3 install glowworm-daemon
+# Create installation directory
+sudo mkdir -p /opt/glowworm-daemon
+
+# Create virtual environment
+sudo python3 -m venv /opt/glowworm-daemon/venv
+
+# Install daemon in venv
+sudo /opt/glowworm-daemon/venv/bin/pip install --upgrade pip
+sudo /opt/glowworm-daemon/venv/bin/pip install glowworm-daemon
+
+# Create convenient symlinks
+sudo ln -sf /opt/glowworm-daemon/venv/bin/glowworm-daemon /usr/local/bin/glowworm-daemon
+sudo ln -sf /opt/glowworm-daemon/venv/bin/glowworm-daemon-setup /usr/local/bin/glowworm-daemon-setup
 ```
 
 #### 3. Run Setup Wizard
@@ -291,8 +303,12 @@ sudo systemctl disable glowworm-daemon
 sudo rm /etc/systemd/system/glowworm-daemon.service
 sudo systemctl daemon-reload
 
-# Uninstall package
-sudo pip3 uninstall glowworm-daemon
+# Remove virtual environment and installation
+sudo rm -rf /opt/glowworm-daemon
+
+# Remove symlinks
+sudo rm -f /usr/local/bin/glowworm-daemon
+sudo rm -f /usr/local/bin/glowworm-daemon-setup
 
 # Remove configuration (optional)
 sudo rm -rf /etc/glowworm

@@ -203,9 +203,11 @@ Wants=network-online.target
 Type=simple
 User=root
 Group=root
-ExecStart=/usr/local/bin/glowworm-daemon
+ExecStart=/opt/glowworm-daemon/venv/bin/python -m glowworm_daemon.main
 Restart=always
 RestartSec=10
+Environment="PYTHONUNBUFFERED=1"
+Environment="PATH=/opt/glowworm-daemon/venv/bin:/usr/local/bin:/usr/bin:/bin"
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=glowworm-daemon

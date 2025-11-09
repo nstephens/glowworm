@@ -306,19 +306,47 @@ python3 -m glowworm_daemon.command_executor
 
 ## Development Setup
 
+### Modern Virtual Environment Approach (PEP 668 Compliant)
+
 ```bash
 # Clone repository
 git clone https://github.com/yourusername/glowworm.git
 cd glowworm/daemon
 
+# Create virtual environment
+python3 -m venv venv
+
+# Activate venv
+source venv/bin/activate
+
 # Install in development mode
-pip3 install -e .
+pip install --upgrade pip
+pip install -e .
+pip install -e ".[dev]"  # Include dev dependencies
 
 # Run locally
-python3 -m glowworm_daemon.main
+python -m glowworm_daemon.main
 
 # Run tests
 pytest tests/ -v
+
+# Deactivate when done
+deactivate
+```
+
+### For System-Wide Installation (Production)
+
+```bash
+# Create system venv
+sudo mkdir -p /opt/glowworm-daemon
+sudo python3 -m venv /opt/glowworm-daemon/venv
+
+# Install package
+sudo /opt/glowworm-daemon/venv/bin/pip install glowworm-daemon
+
+# Create symlinks
+sudo ln -sf /opt/glowworm-daemon/venv/bin/glowworm-daemon /usr/local/bin/
+sudo ln -sf /opt/glowworm-daemon/venv/bin/glowworm-daemon-setup /usr/local/bin/
 ```
 
 ## Debugging

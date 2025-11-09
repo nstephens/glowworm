@@ -19,7 +19,18 @@ curl -sSL https://raw.githubusercontent.com/yourusername/glowworm/main/daemon/sc
 Or manual installation:
 
 ```bash
-sudo pip3 install glowworm-daemon
+# Create virtual environment (PEP 668 compliant)
+sudo mkdir -p /opt/glowworm-daemon
+sudo python3 -m venv /opt/glowworm-daemon/venv
+
+# Install in venv
+sudo /opt/glowworm-daemon/venv/bin/pip install glowworm-daemon
+
+# Create symlinks
+sudo ln -sf /opt/glowworm-daemon/venv/bin/glowworm-daemon /usr/local/bin/
+sudo ln -sf /opt/glowworm-daemon/venv/bin/glowworm-daemon-setup /usr/local/bin/
+
+# Run setup
 sudo glowworm-daemon-setup
 ```
 
@@ -71,14 +82,22 @@ sudo journalctl -u glowworm-daemon -f
 ## Development
 
 ```bash
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
 # Install in development mode
-pip3 install -e .
+pip install -e .
+pip install -e ".[dev]"
 
 # Run tests
 pytest tests/
 
 # Run locally (for testing)
-python3 -m glowworm_daemon.main
+python -m glowworm_daemon.main
+
+# Deactivate when done
+deactivate
 ```
 
 ## Documentation
