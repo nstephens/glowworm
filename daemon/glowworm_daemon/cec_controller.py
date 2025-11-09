@@ -420,6 +420,7 @@ class CECController:
         time.sleep(3)
         
         # Step 3: Try to switch to Pi, with retries
+        successful_sends = 0
         for attempt in range(max_retries):
             logger.info(f"Switch attempt {attempt + 1}/{max_retries}...")
             
@@ -427,6 +428,8 @@ class CECController:
             switch_success, switch_msg = self.set_input("self")
             
             if switch_success:
+                successful_sends += 1
+                
                 # Wait a moment, then check if we're actually active
                 time.sleep(2)
                 
@@ -439,6 +442,12 @@ class CECController:
                         return (True, f"Display powered on and switched to Pi (took {attempt + 1} attempts)")
                 
                 logger.debug(f"Switch command sent but not yet active (current: {active_source})")
+                
+                # If we've sent the command successfully 3+ times but can't verify,
+                # assume it worked (some TVs don't respond to status queries)
+                if successful_sends >= 3 and active_source is None:
+                    logger.info(f"✓ Sent switch command {successful_sends} times - assuming successful (TV not responding to queries)")
+                    return (True, f"Display powered on and switched to Pi (verification unavailable after {successful_sends} attempts)")
             
             # Not active yet, retry if we have attempts left
             if attempt < max_retries - 1:
