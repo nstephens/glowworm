@@ -665,6 +665,15 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                             </div>
                           </div>
                           
+                          {/* Daemon Control Panel */}
+                          <div className="mt-4">
+                            <DeviceDaemonControl 
+                              deviceId={device.id}
+                              daemonEnabled={true}
+                              currentUrl={device.browser_url || `http://10.10.10.2:3003/display/${device.device_token}`}
+                            />
+                          </div>
+                          
                           {/* Schedule Widget */}
                           <div className="mt-4">
                             <ScheduleWidget 
