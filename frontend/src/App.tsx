@@ -33,7 +33,6 @@ import PlaylistsHeader from './components/PlaylistsHeader';
 import AdminLogsHeader from './components/AdminLogsHeader';
 import SettingsHeader from './components/SettingsHeader';
 import ProcessingQueueHeader from './components/ProcessingQueueHeader';
-import SchedulerHeader from './components/SchedulerHeader';
 import ProcessingQueueDashboard from './components/admin/ProcessingQueueDashboard';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -161,7 +160,7 @@ function AppContent() {
             <Route path="/admin/playlists" element={<ProtectedRoute><PlaylistsWithHeader /></ProtectedRoute>} />
             <Route path="/admin/playlists/:slug" element={<ProtectedRoute><AdminLayout headerContent={<PlaylistDetailHeader />}><PlaylistDetail /></AdminLayout></ProtectedRoute>} />
             <Route path="/admin/displays" element={<ProtectedRoute><DisplaysWithHeader /></ProtectedRoute>} />
-            <Route path="/admin/scheduler" element={<ProtectedRoute><AdminLayout headerContent={<SchedulerHeader />}><SchedulerPage /></AdminLayout></ProtectedRoute>} />
+            <Route path="/admin/scheduler" element={<ProtectedRoute><SchedulerPage /></ProtectedRoute>} />
             <Route path="/admin/logs" element={<AdminProtectedRoute><AdminLayout headerContent={<AdminLogsHeader />}><AdminLogs /></AdminLayout></AdminProtectedRoute>} />
             <Route path="/admin/processing-queue" element={<AdminProtectedRoute><QueryClientProvider client={queryClient}><AdminLayout headerContent={<ProcessingQueueHeader />}><ProcessingQueueDashboard /></AdminLayout></QueryClientProvider></AdminProtectedRoute>} />
             <Route path="/admin/system/general" element={<AdminProtectedRoute><AdminLayout headerContent={<SettingsHeader />}><Settings /></AdminLayout></AdminProtectedRoute>} />
