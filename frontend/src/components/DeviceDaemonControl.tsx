@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Power, MonitorPlay, RefreshCw, Wifi, WifiOff } from 'lucide-react';
-import { api } from '../services/api';
+import { apiService } from '../services/api';
 
 interface DeviceDaemonControlProps {
   deviceId: number;
@@ -35,7 +35,7 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
 
   const loadCECInputs = async () => {
     try {
-      const response = await api.getDeviceInputs(deviceId);
+      const response = await apiService.getDeviceInputs(deviceId);
       setCecAvailable(response.cec_available);
       if (response.inputs) {
         setCecInputs(response.inputs);
@@ -59,7 +59,7 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
     setSuccess(null);
 
     try {
-      await api.updateDeviceBrowserUrl(deviceId, browserUrl);
+      await apiService.updateDeviceBrowserUrl(deviceId, browserUrl);
       setSuccess('Browser URL update queued');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
@@ -75,7 +75,7 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
     setSuccess(null);
 
     try {
-      await api.controlDevicePower(deviceId, power);
+      await apiService.controlDevicePower(deviceId, power);
       setSuccess(`Power ${power} command queued`);
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
@@ -90,7 +90,7 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
     setError(null);
 
     try {
-      await api.scanDeviceInputs(deviceId);
+      await apiService.scanDeviceInputs(deviceId);
       setSuccess('Input scan queued - refresh in a moment');
       setTimeout(() => {
         loadCECInputs();
@@ -115,7 +115,7 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
 
     try {
       const inputInfo = cecInputs.find(i => i.address === selectedInput);
-      await api.selectDeviceInput(deviceId, selectedInput, inputInfo?.name);
+      await apiService.selectDeviceInput(deviceId, selectedInput, inputInfo?.name);
       setSuccess('Input switch command queued');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
