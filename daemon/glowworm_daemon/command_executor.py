@@ -11,6 +11,8 @@ from abc import ABC, abstractmethod
 from urllib.parse import urlparse
 from datetime import datetime
 
+from .cec_controller import CECController
+
 logger = logging.getLogger(__name__)
 
 
@@ -260,55 +262,108 @@ class URLUpdateExecutor(CommandExecutor):
 class CECPowerOnExecutor(CommandExecutor):
     """Executor for CEC power on"""
     
+    def __init__(self, config):
+        super().__init__(config)
+        self.cec = CECController(
+            adapter=config.cec_adapter,
+            display_address=config.cec_display_address,
+        )
+    
     def validate(self, command_data: Dict[str, Any]) -> bool:
         if not self.config.cec_enabled:
             logger.error("CEC not enabled in configuration")
             return False
+        
+        if not self.cec.available:
+            logger.error("CEC not available on this system")
+            return False
+        
         return True
     
     def execute(self, command_data: Dict[str, Any]) -> Dict[str, Any]:
         """Execute CEC power on command"""
         logger.info("Executing CEC power on")
         
-        # TODO: Implement actual CEC control (Task 7)
-        # For now, return not_implemented status
+        timeout = command_data.get("timeout", self.config.cec_timeout)
+        success, message = self.cec.power_on(timeout=timeout)
         
-        return {
-            "status": "not_implemented",
-            "message": "CEC power on feature will be implemented in Task 7",
-            "cec_enabled": self.config.cec_enabled,
-        }
+        if success:
+            return {
+                "status": "success",
+                "message": message,
+                "cec_available": True,
+                "display_address": self.config.cec_display_address,
+            }
+        else:
+            return {
+                "status": "failed",
+                "error": message,
+                "cec_available": True,
+                "display_address": self.config.cec_display_address,
+            }
 
 
 class CECPowerOffExecutor(CommandExecutor):
     """Executor for CEC power off"""
     
+    def __init__(self, config):
+        super().__init__(config)
+        self.cec = CECController(
+            adapter=config.cec_adapter,
+            display_address=config.cec_display_address,
+        )
+    
     def validate(self, command_data: Dict[str, Any]) -> bool:
         if not self.config.cec_enabled:
             logger.error("CEC not enabled in configuration")
             return False
+        
+        if not self.cec.available:
+            logger.error("CEC not available on this system")
+            return False
+        
         return True
     
     def execute(self, command_data: Dict[str, Any]) -> Dict[str, Any]:
         """Execute CEC power off command"""
-        logger.info("Executing CEC power off")
+        logger.info("Executing CEC power off (standby)")
         
-        # TODO: Implement actual CEC control (Task 7)
-        # For now, return not_implemented status
+        timeout = command_data.get("timeout", self.config.cec_timeout)
+        success, message = self.cec.power_off(timeout=timeout)
         
-        return {
-            "status": "not_implemented",
-            "message": "CEC power off feature will be implemented in Task 7",
-            "cec_enabled": self.config.cec_enabled,
-        }
+        if success:
+            return {
+                "status": "success",
+                "message": message,
+                "cec_available": True,
+                "display_address": self.config.cec_display_address,
+            }
+        else:
+            return {
+                "status": "failed",
+                "error": message,
+                "cec_available": True,
+                "display_address": self.config.cec_display_address,
+            }
 
 
 class CECSetInputExecutor(CommandExecutor):
     """Executor for CEC input switching"""
     
+    def __init__(self, config):
+        super().__init__(config)
+        self.cec = CECController(
+            adapter=config.cec_adapter,
+            display_address=config.cec_display_address,
+        )
+    
     def validate(self, command_data: Dict[str, Any]) -> bool:
         if not self.config.cec_enabled:
             logger.error("CEC not enabled in configuration")
+            return False
+        
+        if not self.cec.available:
+            logger.error("CEC not available on this system")
             return False
         
         if "input_address" not in command_data:
@@ -324,38 +379,70 @@ class CECSetInputExecutor(CommandExecutor):
         
         logger.info(f"Switching to CEC input: {input_name} ({input_address})")
         
-        # TODO: Implement actual CEC control (Task 7)
-        # For now, return not_implemented status
+        timeout = command_data.get("timeout", self.config.cec_timeout)
+        success, message = self.cec.set_input(input_address, timeout=timeout)
         
-        return {
-            "status": "not_implemented",
-            "message": "CEC input switching feature will be implemented in Task 7",
-            "input_address": input_address,
-            "input_name": input_name,
-        }
+        if success:
+            return {
+                "status": "success",
+                "message": message,
+                "input_address": input_address,
+                "input_name": input_name,
+                "cec_available": True,
+            }
+        else:
+            return {
+                "status": "failed",
+                "error": message,
+                "input_address": input_address,
+                "input_name": input_name,
+                "cec_available": True,
+            }
 
 
 class CECScanInputsExecutor(CommandExecutor):
     """Executor for CEC input scanning"""
     
+    def __init__(self, config):
+        super().__init__(config)
+        self.cec = CECController(
+            adapter=config.cec_adapter,
+            display_address=config.cec_display_address,
+        )
+    
     def validate(self, command_data: Dict[str, Any]) -> bool:
         if not self.config.cec_enabled:
             logger.error("CEC not enabled in configuration")
             return False
+        
+        if not self.cec.available:
+            logger.error("CEC not available on this system")
+            return False
+        
         return True
     
     def execute(self, command_data: Dict[str, Any]) -> Dict[str, Any]:
         """Execute CEC input scan command"""
-        logger.info("Scanning for CEC inputs")
+        logger.info("Scanning for CEC devices/inputs")
         
-        # TODO: Implement actual CEC scanning (Task 8)
-        # For now, return not_implemented status
+        timeout = command_data.get("timeout", 15)
+        success, devices = self.cec.scan_devices(timeout=timeout)
         
-        return {
-            "status": "not_implemented",
-            "message": "CEC input scanning feature will be implemented in Task 8",
-            "cec_enabled": self.config.cec_enabled,
-        }
+        if success:
+            return {
+                "status": "success",
+                "message": f"Found {len(devices)} CEC device(s)",
+                "devices": devices,
+                "cec_available": True,
+                "scan_timeout": timeout,
+            }
+        else:
+            return {
+                "status": "failed",
+                "error": "CEC scan failed",
+                "devices": [],
+                "cec_available": True,
+            }
 
 
 class CommandExecutorFactory:
