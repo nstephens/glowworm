@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, Calendar } from 'lucide-react';
 import apiService from '../services/api';
 import { ScheduleForm } from '../components/scheduler/ScheduleForm';
 import { ScheduleList } from '../components/scheduler/ScheduleList';
