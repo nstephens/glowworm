@@ -104,7 +104,8 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
   };
 
   const handleSelectInput = async () => {
-    if (!selectedInput) {
+    // Allow "self" for quick Pi switch, otherwise require selection
+    if (!selectedInput && selectedInput !== 'self') {
       setError('Please select an input');
       return;
     }
@@ -115,8 +116,9 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
 
     try {
       const inputInfo = cecInputs.find(i => i.address === selectedInput);
-      await apiService.selectDeviceInput(deviceId, selectedInput, inputInfo?.name);
-      setSuccess('Input switch command queued');
+      const inputName = selectedInput === 'self' ? 'This Device' : inputInfo?.name;
+      await apiService.selectDeviceInput(deviceId, selectedInput, inputName);
+      setSuccess(selectedInput === 'self' ? 'Switching TV to Glowworm display...' : 'Input switch command queued');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to switch input');
@@ -201,39 +203,67 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
       )}
 
       {/* HDMI Input Selection */}
-      {cecAvailable && cecInputs.length > 0 && (
+      {cecAvailable && (
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-gray-900 mb-3">HDMI Input Source</h4>
-          <div className="space-y-2">
-            <select
-              value={selectedInput}
-              onChange={(e) => setSelectedInput(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select input...</option>
-              {cecInputs.map((input) => (
-                <option key={input.address} value={input.address}>
-                  {input.name} (Address: {input.address})
-                </option>
-              ))}
-            </select>
-            <div className="flex space-x-2">
+          <h4 className="text-sm font-medium text-gray-900 mb-3">HDMI Input Control</h4>
+          <div className="space-y-3">
+            {/* Quick action: Switch to Pi */}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-xs text-blue-900 mb-2">
+                Switch TV from FireTV/SmartTV to this Raspberry Pi
+              </p>
               <button
-                onClick={handleSelectInput}
-                disabled={loading || !selectedInput}
-                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
-              >
-                Switch Input
-              </button>
-              <button
-                onClick={handleScanInputs}
+                onClick={() => {
+                  // Use "self" to trigger 'as' command
+                  setSelectedInput('self');
+                  handleSelectInput();
+                }}
                 disabled={loading}
-                className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                className="w-full bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center"
               >
-                <RefreshCw className="w-4 h-4 mr-1" />
-                Scan
+                <MonitorPlay className="w-4 h-4 mr-2" />
+                Switch to Glowworm Display
               </button>
             </div>
+
+            {/* Advanced: Select specific device */}
+            {cecInputs.length > 0 && (
+              <details className="text-sm">
+                <summary className="cursor-pointer text-gray-600 hover:text-gray-900 mb-2">
+                  Advanced: Switch to Other Devices
+                </summary>
+                <div className="space-y-2 mt-2">
+                  <select
+                    value={selectedInput}
+                    onChange={(e) => setSelectedInput(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select device...</option>
+                    {cecInputs.map((input) => (
+                      <option key={input.address} value={input.address}>
+                        {input.name} (Address: {input.address})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={handleSelectInput}
+                      disabled={loading || !selectedInput}
+                      className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-700 transition-colors disabled:opacity-50"
+                    >
+                      Switch to Selected
+                    </button>
+                    <button
+                      onClick={handleScanInputs}
+                      disabled={loading}
+                      className="bg-gray-500 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-600 transition-colors disabled:opacity-50 flex items-center justify-center"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </details>
+            )}
           </div>
         </div>
       )}
