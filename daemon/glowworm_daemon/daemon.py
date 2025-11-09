@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 class GlowwormDaemon:
     """Main daemon service class"""
     
+    DAEMON_VERSION = "1.0.0"
+    
     def __init__(self, config: DaemonConfig):
         """
         Initialize the daemon
@@ -26,9 +28,13 @@ class GlowwormDaemon:
         """
         self.config = config
         self.running = False
+        self.registered = False
+        self.device_id = None
         self.last_poll_time = None
         self.consecutive_errors = 0
         self.max_consecutive_errors = 10
+        self.registration_retry_count = 0
+        self.max_registration_retries = 5
         
         # Setup logging
         setup_logging(
@@ -38,9 +44,10 @@ class GlowwormDaemon:
         )
         
         logger.info("=" * 60)
-        logger.info("Glowworm Display Device Daemon v1.0.0")
+        logger.info(f"Glowworm Display Device Daemon v{self.DAEMON_VERSION}")
         logger.info("=" * 60)
         logger.info(f"Backend URL: {config.backend_url}")
+        logger.info(f"Device Token: {config.device_token[:4]}****")
         logger.info(f"Poll Interval: {config.poll_interval}s")
         logger.info(f"CEC Enabled: {config.cec_enabled}")
         logger.info(f"Log Level: {config.log_level}")
@@ -54,6 +61,11 @@ class GlowwormDaemon:
             # Validate connectivity on startup
             if not self._check_backend_connectivity():
                 logger.error("Failed to connect to backend, entering retry mode...")
+            
+            # Register with backend
+            if not self._register_with_backend():
+                logger.error("Failed to register with backend after retries")
+                logger.error("Continuing with polling anyway...")
             
             # Main polling loop
             while self.running:
@@ -98,7 +110,7 @@ class GlowwormDaemon:
             response = requests.get(
                 url,
                 timeout=5,
-                headers={"User-Agent": "Glowworm-Daemon/1.0.0"}
+                headers={"User-Agent": f"Glowworm-Daemon/{self.DAEMON_VERSION}"}
             )
             
             if response.status_code == 200:
@@ -115,6 +127,91 @@ class GlowwormDaemon:
         except Exception as e:
             logger.error(f"Connectivity check failed: {e}")
             return False
+    
+    def _register_with_backend(self) -> bool:
+        """
+        Register daemon with backend
+        
+        Returns:
+            True if registration successful, False otherwise
+        """
+        while self.registration_retry_count < self.max_registration_retries:
+            try:
+                logger.info(
+                    f"Registering with backend (attempt {self.registration_retry_count + 1}/"
+                    f"{self.max_registration_retries})..."
+                )
+                
+                # Detect capabilities
+                capabilities = {
+                    "url_update": True,
+                    "cec_control": self.config.cec_enabled,
+                }
+                
+                # Prepare registration payload
+                payload = {
+                    "daemon_version": self.DAEMON_VERSION,
+                    "capabilities": capabilities,
+                }
+                
+                # Send registration request
+                url = f"{self.config.backend_url}/api/device-daemon/register"
+                response = requests.post(
+                    url,
+                    json=payload,
+                    headers={
+                        "Authorization": f"Bearer {self.config.device_token}",
+                        "User-Agent": f"Glowworm-Daemon/{self.DAEMON_VERSION}",
+                    },
+                    timeout=10,
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    self.registered = True
+                    logger.info("✓ Successfully registered with backend")
+                    logger.info(f"  Recommended poll interval: {data.get('poll_interval', 30)}s")
+                    logger.info(f"  Capabilities: {list(capabilities.keys())}")
+                    return True
+                
+                elif response.status_code == 401:
+                    logger.error("✗ Authentication failed - invalid device token")
+                    logger.error("  Please check your daemon.conf configuration")
+                    return False
+                
+                elif response.status_code == 403:
+                    logger.error("✗ Device not authorized")
+                    logger.error("  Please authorize this device in the admin UI")
+                    return False
+                
+                else:
+                    logger.warning(f"Registration returned status {response.status_code}")
+                    self.registration_retry_count += 1
+                    if self.registration_retry_count < self.max_registration_retries:
+                        retry_delay = min(2 ** self.registration_retry_count, 30)
+                        logger.info(f"Retrying in {retry_delay}s...")
+                        time.sleep(retry_delay)
+            
+            except requests.exceptions.Timeout:
+                logger.warning("Registration request timed out")
+                self.registration_retry_count += 1
+                if self.registration_retry_count < self.max_registration_retries:
+                    time.sleep(5)
+            
+            except requests.exceptions.ConnectionError:
+                logger.warning("Connection error during registration")
+                self.registration_retry_count += 1
+                if self.registration_retry_count < self.max_registration_retries:
+                    time.sleep(5)
+            
+            except Exception as e:
+                logger.error(f"Registration error: {e}", exc_info=True)
+                self.registration_retry_count += 1
+                if self.registration_retry_count < self.max_registration_retries:
+                    time.sleep(5)
+        
+        logger.error(f"Failed to register after {self.max_registration_retries} attempts")
+        return False
     
     def _poll_and_execute_commands(self) -> None:
         """Poll for commands and execute them"""
