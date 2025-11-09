@@ -150,7 +150,7 @@ class CECController:
         Switch to specific HDMI input via CEC
         
         Args:
-            input_address: CEC logical address (e.g., "1", "4") or physical (e.g., "1.0.0.0")
+            input_address: CEC logical address (e.g., "1", "3") or "self" to make this device active
             timeout: Command timeout in seconds
         
         Returns:
@@ -161,18 +161,23 @@ class CECController:
         
         logger.info(f"Switching to CEC input: {input_address}")
         
-        # If address is just a number, try using 'as' command to make it active source
-        # Otherwise, try direct address command
-        if input_address.isdigit():
-            # Simple logical address - use 'as' command
+        # Determine command based on address
+        if input_address in ["self", "this", ""] or input_address.startswith("3."):
+            # Make this device (the Pi) the active source
+            # This is the most common use case - taking over from FireTV/SmartTV apps
+            cmd = 'as\n'
+            logger.debug("Using 'as' command to make Pi the active source")
+        elif input_address.isdigit():
+            # Simple logical address - make that device active
             cmd = f'as {input_address}\n'
+            logger.debug(f"Using 'as {input_address}' to make device {input_address} active")
         else:
-            # Physical or complex address - try direct active source command
-            # Format: tx {source}:{dest}:82:{physical_address}
-            # For broadcast from TV: tx 0F:82:{physical_address}
-            cmd = f'tx 0F:82:{input_address.replace(".", "")}\n'
-        
-        logger.debug(f"CEC command: {cmd.strip()}")
+            # Physical address format (e.g., "1.0.0.0")
+            # Convert to CEC active source command
+            # Remove dots and use as hex bytes in tx command
+            physical_hex = input_address.replace(".", "")
+            cmd = f'tx 0F:82:{physical_hex}\n'
+            logger.debug(f"Using tx command for physical address {input_address}")
         
         try:
             result = subprocess.run(
@@ -184,8 +189,8 @@ class CECController:
             )
             
             if result.returncode == 0:
-                logger.info(f"✓ CEC input switch command sent to {input_address}")
-                return (True, f"Input switched to {input_address}")
+                logger.info(f"✓ CEC input switch command sent")
+                return (True, f"Switched to input {input_address}")
             else:
                 error_msg = result.stderr.strip() if result.stderr else "Unknown error"
                 logger.warning(f"CEC input switch failed: {error_msg}")
