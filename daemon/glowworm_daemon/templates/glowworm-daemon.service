@@ -1,0 +1,42 @@
+[Unit]
+Description=Glowworm Display Device Daemon
+Documentation=https://github.com/yourusername/glowworm
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# Main process
+ExecStart=/usr/local/bin/glowworm-daemon
+
+# Restart configuration
+Restart=always
+RestartSec=10
+StartLimitInterval=200
+StartLimitBurst=5
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits
+CPUQuota=50%
+MemoryLimit=256M
+
+# Environment
+Environment="PYTHONUNBUFFERED=1"
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=glowworm-daemon
+
+# Working directory
+WorkingDirectory=/var/lib/glowworm
+
+[Install]
+WantedBy=multi-user.target
+
