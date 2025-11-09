@@ -30,7 +30,6 @@ command_rate_limiter = RateLimiter(max_requests=10, time_window=60)
 
 class DaemonRegistrationRequest(BaseModel):
     """Request to register a daemon with the backend"""
-    device_token: str = Field(..., description="Display device token")
     daemon_version: str = Field("1.0.0", description="Daemon version")
     capabilities: Dict[str, bool] = Field(
         default_factory=lambda: {
@@ -40,6 +39,7 @@ class DaemonRegistrationRequest(BaseModel):
         },
         description="Daemon capabilities"
     )
+    # Note: device_token comes from Authorization header, not request body
 
 class DaemonRegistrationResponse(BaseModel):
     """Response from daemon registration"""
