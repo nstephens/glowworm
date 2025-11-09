@@ -641,6 +641,30 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                             </p>
                           </div>
                           
+                          {/* Device Token for Daemon Setup */}
+                          <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <p className="text-xs font-medium text-blue-900 mb-1">
+                                  Device Token (for daemon setup):
+                                </p>
+                                <p className="text-sm font-mono font-bold text-blue-700">
+                                  {device.device_token}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(device.device_token);
+                                  // Could add toast notification here
+                                }}
+                                className="ml-3 bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
+                                title="Copy token"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          </div>
+                          
                           {/* Schedule Widget */}
                           <div className="mt-4">
                             <ScheduleWidget 
