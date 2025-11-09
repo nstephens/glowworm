@@ -26,6 +26,7 @@ from api.migration import router as migration_router
 from api.logs import router as logs_router
 from api.websocket import router as websocket_api_router
 from api.scheduler import router as scheduler_router
+from api.device_daemon import router as device_daemon_router
 from websocket.endpoints import router as websocket_router
 from websocket.manager import connection_manager
 from models.database import create_tables
@@ -157,6 +158,7 @@ app.include_router(logs_router)
 app.include_router(websocket_api_router)
 app.include_router(websocket_router)
 app.include_router(scheduler_router)
+app.include_router(device_daemon_router)
 
 # Global OPTIONS handler for unmatched routes only (after routers)
 # @app.options("/{path:path}")
