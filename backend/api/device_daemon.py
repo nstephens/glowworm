@@ -174,6 +174,12 @@ async def register_daemon(
         f"(version: {request.daemon_version})"
     )
     
+    # Enable daemon control on the device (auto-enable when daemon registers)
+    if not device.daemon_enabled:
+        device.daemon_enabled = True
+        db.commit()
+        logger.info(f"Auto-enabled daemon control for device {device.id}")
+    
     # Register daemon in database
     daemon_status = DeviceDaemonService.register_daemon(
         db=db,
