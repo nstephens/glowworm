@@ -39,6 +39,12 @@ class DisplayDevice(Base):
     device_pixel_ratio = Column(String(10), nullable=True)  # e.g., "2.0", "1.5"
     orientation = Column(String(20), nullable=False, server_default='portrait')  # 'portrait' or 'landscape'
     
+    # Daemon and remote control
+    browser_url = Column(String(512), nullable=True, comment="Current browser URL for remote updates")
+    cec_input_name = Column(String(64), nullable=True, comment="Selected CEC input name")
+    cec_input_address = Column(String(16), nullable=True, comment="Selected CEC input address")
+    daemon_enabled = Column(Boolean, default=False, nullable=False, comment="Whether daemon control is enabled")
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -46,6 +52,8 @@ class DisplayDevice(Base):
     # Relationships
     playlist = relationship("Playlist", foreign_keys=[playlist_id])
     schedules = relationship("ScheduledPlaylist", back_populates="device", cascade="all, delete-orphan")
+    daemon_status = relationship("DeviceDaemonStatus", back_populates="device", uselist=False, cascade="all, delete-orphan")
+    commands = relationship("DeviceCommand", back_populates="device", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<DisplayDevice(id={self.id}, device_name='{self.device_name}', status='{self.status}')>"

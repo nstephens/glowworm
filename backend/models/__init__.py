@@ -11,6 +11,8 @@ from .device_log import DeviceLog, LogLevel
 from .user_log import UserLog, UserLogLevel, UserLogAction
 from .system_settings import SystemSettings, SettingType
 from .scheduled_playlist import ScheduledPlaylist, ScheduleType
+from .device_daemon_status import DeviceDaemonStatus, DaemonStatus
+from .device_command import DeviceCommand, CommandType, CommandStatus
 
 __all__ = [
     "Base",
@@ -38,5 +40,10 @@ __all__ = [
     "SystemSettings",
     "SettingType",
     "ScheduledPlaylist",
-    "ScheduleType"
+    "ScheduleType",
+    "DeviceDaemonStatus",
+    "DaemonStatus",
+    "DeviceCommand",
+    "CommandType",
+    "CommandStatus"
 ]
