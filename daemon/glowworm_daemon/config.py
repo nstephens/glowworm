@@ -21,7 +21,7 @@ FALLBACK_CONFIG_PATHS = [
 # Default configuration values
 DEFAULT_CONFIG = {
     "daemon": {
-        "backend_url": "http://localhost:8002",
+        "backend_url": "http://localhost:3003",  # Frontend URL (proxies /api/ to backend)
         "device_token": "",
         "poll_interval": "30",
         "log_level": "INFO",

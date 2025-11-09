@@ -88,6 +88,10 @@ echo "✅ Glowworm daemon installed"
 echo ""
 echo "🔧 Running setup wizard..."
 echo ""
+echo "⚠️  IMPORTANT: When prompted for URL, use your Glowworm frontend URL"
+echo "   Example: http://10.10.10.2:3003 (NOT the backend port 8001/8002)"
+echo "   This should be the same URL you use to access the admin UI."
+echo ""
 
 glowworm-daemon-setup
 

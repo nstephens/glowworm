@@ -2,8 +2,10 @@
 # This file should be located at /etc/glowworm/daemon.conf
 
 [daemon]
-# Backend API URL (required)
-backend_url = http://10.10.10.2:8002
+# Glowworm frontend URL (required)
+# This should be the same URL you use to access the admin UI
+# The frontend proxies API requests to the backend
+backend_url = http://10.10.10.2:3003
 
 # Device authentication token (required)
 # Get this from the Glowworm admin UI when registering the device

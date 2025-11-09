@@ -21,15 +21,23 @@ The Glowworm Display Device Daemon is a Python service that runs on Raspberry Pi
 │  │  │  (30s)     │                      │  URL Updater    │   │  │
 │  │  └────────────┘                      └─────────────────┘   │  │
 │  └───────────────────────────────────────────────────────────┘  │
-│         ↕ HTTPS                               ↓                 │
+│         ↕ HTTP (port 3003)                    ↓                 │
 │  ┌──────────────────┐              ┌──────────────────────┐     │
 │  │  FullPageOS      │              │  HDMI CEC Bus        │     │
 │  │  Config          │              │  (Display Control)   │     │
 │  └──────────────────┘              └──────────────────────┘     │
 └─────────────────────────────────────────────────────────────────┘
-                   ↕ REST API
+                   ↕ HTTP to Frontend
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Glowworm Backend                             │
+│              Glowworm Frontend (Port 3003)                      │
+│  ┌──────────────────────┐                                       │
+│  │  Nginx/Vite Proxy    │→ Proxies /api/* to backend            │
+│  │  Routes /api/* →     │                                       │
+│  └──────────────────────┘                                       │
+└─────────────────────────────────────────────────────────────────┘
+                   ↕ Internal Network
+┌─────────────────────────────────────────────────────────────────┐
+│              Glowworm Backend (Port 8001/8002)                  │
 │  ┌──────────────────────┐  ┌───────────────┐  ┌─────────────┐  │
 │  │  Device Daemon API   │→ │ Command Queue │→ │  Database   │  │
 │  │  (/api/device-daemon)│  │   Service     │  │             │  │
@@ -39,6 +47,11 @@ The Glowworm Display Device Daemon is a Python service that runs on Raspberry Pi
 │  │  (Celery Beat)       │   actions                             │
 │  └──────────────────────┘                                       │
 └─────────────────────────────────────────────────────────────────┘
+
+**Key Architecture Point:**
+The daemon connects to the frontend URL (e.g., http://10.10.10.2:3003),
+which then proxies /api/* requests to the backend. This maintains a
+single entry point and works with the existing proxy configuration.
 ```
 
 ## Database Schema
@@ -123,8 +136,11 @@ Authorization: Bearer {device_token}
 
 ### Register Daemon
 
+**Important:** All API calls go through the frontend URL (which proxies to backend).
+
 ```http
-POST /api/device-daemon/register
+POST http://10.10.10.2:3003/api/device-daemon/register
+Authorization: Bearer {device_token}
 Content-Type: application/json
 
 {
@@ -135,6 +151,8 @@ Content-Type: application/json
   }
 }
 ```
+
+The frontend (Nginx/Vite) proxies `/api/*` to the backend automatically.
 
 Response:
 ```json

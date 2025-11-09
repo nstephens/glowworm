@@ -36,7 +36,9 @@ Configuration file: `/etc/glowworm/daemon.conf`
 
 ```ini
 [daemon]
-backend_url = http://10.10.10.2:8002
+# Use the frontend URL (same as admin UI), NOT the backend URL
+# The frontend proxies /api/ requests to the backend
+backend_url = http://10.10.10.2:3003
 device_token = your-device-token-here
 poll_interval = 30
 log_level = INFO

@@ -32,11 +32,13 @@ def setup_wizard() -> None:
     # Gather configuration
     config = {}
     
-    # Backend URL
-    print("\n📡 Backend Configuration")
+    # Glowworm URL
+    print("\n📡 Glowworm Configuration")
     print("-" * 40)
-    default_url = "http://10.10.10.2:8002"
-    backend_url = input(f"Backend URL [{default_url}]: ").strip() or default_url
+    print("Enter the URL you use to access the Glowworm admin UI")
+    print("(The daemon will connect via the frontend, which proxies API requests)")
+    default_url = "http://10.10.10.2:3003"
+    backend_url = input(f"Glowworm URL [{default_url}]: ").strip() or default_url
     config['backend_url'] = backend_url
     
     # Device token

@@ -63,11 +63,13 @@ sudo glowworm-daemon-setup
 ```
 
 The wizard will prompt you for:
-- Backend URL (e.g., `http://10.10.10.2:8002`)
+- Glowworm URL (e.g., `http://10.10.10.2:3003`) - Same URL you use for admin UI
 - Device Token (from Glowworm admin UI)
 - Poll interval (default: 30 seconds)
 - Log level (default: INFO)
 - CEC configuration
+
+**Important:** Use the **frontend URL** (port 3003), not the backend URL (port 8001/8002). The frontend proxies API requests to the backend automatically.
 
 #### 4. Start the Daemon
 
@@ -88,8 +90,10 @@ Configuration file: `/etc/glowworm/daemon.conf`
 
 ```ini
 [daemon]
-# Backend API URL (required)
-backend_url = http://10.10.10.2:8002
+# Glowworm frontend URL (required)
+# This should be the same URL you use to access the Glowworm admin UI
+# The frontend proxies /api/ requests to the backend
+backend_url = http://10.10.10.2:3003
 
 # Device authentication token (required)
 # Get this from the Glowworm admin UI
@@ -241,9 +245,13 @@ ls -l /boot/firmware/fullpageos.txt.bak*
 
 ### Connection Issues
 
-**Test backend connectivity:**
+**Test Glowworm connectivity:**
 ```bash
-curl http://10.10.10.2:8002/health
+# Test frontend (should return HTML)
+curl http://10.10.10.2:3003/
+
+# Test API via frontend proxy (should return JSON)
+curl http://10.10.10.2:3003/health
 ```
 
 **Check device authorization:**
