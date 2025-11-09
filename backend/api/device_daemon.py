@@ -21,8 +21,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/device-daemon", tags=["device-daemon"])
 
-# Rate limiter: 10 requests per device per minute
-command_rate_limiter = RateLimiter(max_requests=10, time_window=60)
+# Rate limiter: 20 requests per device per minute
+# Allows 5-second polling (12 req/min) with headroom
+# For LAN deployments with authenticated devices, this is safe
+command_rate_limiter = RateLimiter(max_requests=20, time_window=60)
 
 # ============================================================================
 # Pydantic Models
@@ -224,7 +226,7 @@ async def poll_commands(
         logger.warning(f"Rate limit exceeded for device {device.id}")
         raise HTTPException(
             status_code=429,
-            detail="Rate limit exceeded. Max 10 requests per minute."
+            detail="Rate limit exceeded. Max 20 requests per minute."
         )
     
     logger.debug(f"Command poll from device {device.id}")
