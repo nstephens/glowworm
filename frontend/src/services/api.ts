@@ -701,6 +701,52 @@ class ApiService {
       status_code: 200
     };
   }
+
+  // ==================== Device Daemon Control ====================
+  
+  async updateDeviceBrowserUrl(deviceId: number, url: string): Promise<ApiResponse<any>> {
+    const response = await this.api.put(`/device-daemon/devices/${deviceId}/browser-url`, { url });
+    return {
+      message: "Browser URL update queued",
+      data: response.data,
+      status_code: 200
+    };
+  }
+
+  async controlDevicePower(deviceId: number, power: 'on' | 'off'): Promise<ApiResponse<any>> {
+    const response = await this.api.post(`/device-daemon/devices/${deviceId}/display/power`, { power });
+    return {
+      message: `Power ${power} command queued`,
+      data: response.data,
+      status_code: 200
+    };
+  }
+
+  async getDeviceInputs(deviceId: number): Promise<any> {
+    const response = await this.api.get(`/device-daemon/devices/${deviceId}/display/inputs`);
+    return response.data;
+  }
+
+  async selectDeviceInput(deviceId: number, inputAddress: string, inputName?: string): Promise<ApiResponse<any>> {
+    const response = await this.api.post(`/device-daemon/devices/${deviceId}/display/input`, {
+      input_address: inputAddress,
+      input_name: inputName
+    });
+    return {
+      message: "Input switch command queued",
+      data: response.data,
+      status_code: 200
+    };
+  }
+
+  async scanDeviceInputs(deviceId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.post(`/device-daemon/devices/${deviceId}/display/scan-inputs`);
+    return {
+      message: "Input scan command queued",
+      data: response.data,
+      status_code: 200
+    };
+  }
 }
 
 export const apiService = new ApiService();
