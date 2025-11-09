@@ -204,7 +204,7 @@ class CECController:
         try:
             result = subprocess.run(
                 ['cec-client', '-s', '-d', '1'],
-                input=b'scan\n',
+                input='scan\n',  # Use string, not bytes, when text=True
                 capture_output=True,
                 timeout=timeout,
                 text=True,
@@ -337,7 +337,7 @@ class CECController:
         try:
             result = subprocess.run(
                 ['cec-client', '-s', '-d', '1'],
-                input=b'as\n',
+                input='as\n',  # Use string, not bytes, when text=True
                 capture_output=True,
                 timeout=timeout,
                 text=True,
