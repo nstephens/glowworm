@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { Plus, RefreshCw, Calendar } from 'lucide-react';
+import { Plus, Calendar } from 'lucide-react';
 import apiService from '../services/api';
 import { ScheduleForm } from '../components/scheduler/ScheduleForm';
 import { ScheduleList } from '../components/scheduler/ScheduleList';
@@ -93,16 +93,6 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
     }
   };
 
-  const handleForceEvaluate = async () => {
-    try {
-      setError(null);
-      await apiService.forceEvaluateSchedules();
-      // Reload schedules to see updated active status
-      await loadData();
-    } catch (err: any) {
-      setError(err.message || 'Failed to trigger evaluation');
-    }
-  };
 
   const handleCreateSchedule = async (data: ScheduleFormData) => {
     try {
@@ -163,22 +153,12 @@ export const SchedulerPage: React.FC<SchedulerPageProps> = () => {
           </div>
         </div>
         
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleForceEvaluate}
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Evaluate Now
-          </Button>
-          <Button
-            onClick={() => setShowCreateForm(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create Schedule
-          </Button>
-        </div>
+        <Button
+          onClick={() => setShowCreateForm(true)}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Create Schedule
+        </Button>
       </div>
 
       {/* Error Alert */}
