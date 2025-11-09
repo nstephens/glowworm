@@ -8,7 +8,7 @@ interface DeviceDaemonControlProps {
   currentUrl?: string;
 }
 
-interface CEC Input {
+interface CECInput {
   address: string;
   name: string;
   type: string;
