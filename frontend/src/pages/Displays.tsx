@@ -6,6 +6,7 @@ import { Badge } from '../components/ui/badge';
 import { ArrowLeft, X, Monitor, Wifi, WifiOff, CheckCircle, Clock, AlertTriangle, FileText, RefreshCw } from 'lucide-react';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { ScheduleWidget } from '../components/scheduler/ScheduleWidget';
+import { DeviceDaemonControl } from '../components/DeviceDaemonControl';
 import { apiService } from '../services/api';
 import { urlResolver } from '../services/urlResolver';
 import { displayLogger } from '../utils/logger';
