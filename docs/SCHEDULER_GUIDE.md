@@ -24,6 +24,17 @@ The Playlist Scheduler allows you to automatically change what playlist displays
 - ✅ **Real-Time Updates**: Devices update automatically via WebSocket
 - ✅ **Preview & Simulation**: Test schedules before they go live
 - ✅ **Conflict Detection**: Warns you about overlapping schedules
+- ✅ **Local Timezone Support**: All times are in America/New_York (EST/EDT)
+
+### Important Behaviors
+
+**Schedule End Behavior:**
+When a schedule's time window ends, the device **continues playing the current playlist** until:
+- Another schedule activates
+- An admin manually changes the playlist
+- The device is restarted
+
+This ensures continuous playback without interruptions. If you need a playlist to revert to a "default" after a schedule ends, create a lower-priority schedule for that time range.
 
 ---
 
