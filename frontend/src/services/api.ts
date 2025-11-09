@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance } from 'axios';
-import type { ApiResponse, User, Image, Album, Playlist, ScheduledPlaylist, ScheduleFormData, ActiveScheduleResponse } from '../types';
+import type { ApiResponse, User, Image, Album, Playlist, ScheduledPlaylist, ScheduleFormData, ActiveScheduleResponse, ScheduledAction, ActionFormData } from '../types';
 import { urlResolver } from './urlResolver';
 import { apiLogger } from '../utils/logger';
 
@@ -699,6 +699,72 @@ class ApiService {
       message: "Schedule evaluation triggered",
       data: response.data,
       status_code: 200
+    };
+  }
+
+  // ==================== Scheduled Actions ====================
+  
+  async getActions(deviceId?: number): Promise<ApiResponse<ScheduledAction[]>> {
+    const params = deviceId ? { device_id: deviceId } : {};
+    const response = await this.api.get('/scheduler-actions/', { params });
+    return {
+      message: "Scheduled actions retrieved successfully",
+      data: response.data.data || response.data || [],
+      status_code: response.data.status_code || 200
+    };
+  }
+
+  async getAction(id: number): Promise<ApiResponse<ScheduledAction>> {
+    const response = await this.api.get(`/scheduler-actions/${id}`);
+    return {
+      message: "Scheduled action retrieved successfully",
+      data: response.data.data || response.data,
+      status_code: response.data.status_code || 200
+    };
+  }
+
+  async createAction(actionData: ActionFormData): Promise<ApiResponse<ScheduledAction>> {
+    const response = await this.api.post('/scheduler-actions/', actionData);
+    return {
+      message: "Scheduled action created successfully",
+      data: response.data.data || response.data,
+      status_code: response.data.status_code || 201
+    };
+  }
+
+  async updateAction(id: number, actionData: Partial<ActionFormData>): Promise<ApiResponse<ScheduledAction>> {
+    const response = await this.api.put(`/scheduler-actions/${id}`, actionData);
+    return {
+      message: "Scheduled action updated successfully",
+      data: response.data.data || response.data,
+      status_code: response.data.status_code || 200
+    };
+  }
+
+  async deleteAction(id: number): Promise<ApiResponse<any>> {
+    const response = await this.api.delete(`/scheduler-actions/${id}`);
+    return {
+      message: "Scheduled action deleted successfully",
+      data: response.data,
+      status_code: 200
+    };
+  }
+
+  async toggleAction(id: number): Promise<ApiResponse<ScheduledAction>> {
+    const response = await this.api.patch(`/scheduler-actions/${id}/toggle`);
+    return {
+      message: "Scheduled action toggled successfully",
+      data: response.data.data || response.data,
+      status_code: response.data.status_code || 200
+    };
+  }
+
+  async getDeviceActiveActions(deviceId: number): Promise<ApiResponse<any>> {
+    const response = await this.api.get(`/scheduler-actions/devices/${deviceId}/active`);
+    return {
+      message: "Active actions retrieved successfully",
+      data: response.data.data || response.data,
+      status_code: response.data.status_code || 200
     };
   }
 

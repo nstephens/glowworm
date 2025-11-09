@@ -133,6 +133,54 @@ export interface ScheduleFormData {
   annual_recurrence?: boolean;
 }
 
+export type ActionType = 'power_on' | 'power_off' | 'set_input';
+
+export interface ScheduledAction {
+  id: number;
+  device_id: number;
+  action_type: ActionType;
+  action_data?: Record<string, any> | null;
+  schedule_type: ScheduleType;
+  // Recurring fields
+  days_of_week?: string[];
+  start_time?: string;
+  end_time?: string;
+  // Specific date fields
+  specific_date?: string;
+  specific_start_time?: string;
+  specific_end_time?: string;
+  annual_recurrence?: boolean;
+  // Common fields
+  name: string;
+  description?: string | null;
+  priority: number;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by_user_id?: number | null;
+  // Relationships
+  device_name?: string | null;
+  is_active?: boolean;
+}
+
+export interface ActionFormData {
+  device_id: number;
+  action_type: ActionType;
+  action_data?: Record<string, any>;
+  schedule_type: ScheduleType;
+  name: string;
+  description?: string;
+  priority: number;
+  enabled: boolean;
+  days_of_week?: string[];
+  start_time?: string;
+  end_time?: string;
+  specific_date?: string;
+  specific_start_time?: string;
+  specific_end_time?: string;
+  annual_recurrence?: boolean;
+}
+
 export interface ActiveScheduleResponse {
   schedule_id: number | null;
   schedule_name: string | null;
