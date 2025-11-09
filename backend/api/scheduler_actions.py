@@ -18,7 +18,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/scheduler-actions", tags=["Scheduler Actions"])
+router = APIRouter(prefix="/api/scheduler-actions", tags=["Scheduler Actions"])
 
 
 # Pydantic models for request/response
