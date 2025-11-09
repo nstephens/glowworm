@@ -150,7 +150,7 @@ class CECController:
         Switch to specific HDMI input via CEC
         
         Args:
-            input_address: CEC address of the input device (e.g., "4.0.0.0")
+            input_address: CEC logical address (e.g., "1", "4") or physical (e.g., "1.0.0.0")
             timeout: Command timeout in seconds
         
         Returns:
@@ -161,20 +161,33 @@ class CECController:
         
         logger.info(f"Switching to CEC input: {input_address}")
         
+        # If address is just a number, try using 'as' command to make it active source
+        # Otherwise, try direct address command
+        if input_address.isdigit():
+            # Simple logical address - use 'as' command
+            cmd = f'as {input_address}\n'
+        else:
+            # Physical or complex address - try direct active source command
+            # Format: tx {source}:{dest}:82:{physical_address}
+            # For broadcast from TV: tx 0F:82:{physical_address}
+            cmd = f'tx 0F:82:{input_address.replace(".", "")}\n'
+        
+        logger.debug(f"CEC command: {cmd.strip()}")
+        
         try:
-            # CEC command to switch active source
             result = subprocess.run(
                 ['cec-client', '-s', '-d', '1'],
-                input=f'tx 1F:82:{input_address}\n'.encode(),
+                input=cmd,
                 capture_output=True,
                 timeout=timeout,
+                text=True,
             )
             
             if result.returncode == 0:
                 logger.info(f"✓ CEC input switch command sent to {input_address}")
                 return (True, f"Input switched to {input_address}")
             else:
-                error_msg = result.stderr.decode().strip() if result.stderr else "Unknown error"
+                error_msg = result.stderr.strip() if result.stderr else "Unknown error"
                 logger.warning(f"CEC input switch failed: {error_msg}")
                 return (False, f"Command failed: {error_msg}")
         
