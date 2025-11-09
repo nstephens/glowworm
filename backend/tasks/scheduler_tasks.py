@@ -23,6 +23,7 @@ from utils.structured_logging import (
     log_performance_metric
 )
 from services.scheduler_service import SchedulerService
+from services.scheduled_action_service import ScheduledActionService
 from websocket.redis_bridge import publish_processing_update
 from websocket.scheduler_events import playlist_scheduled_change_event, schedule_evaluated_event
 
@@ -79,10 +80,16 @@ def evaluate_schedules(self):
         # Create service with database session
         scheduler_service = SchedulerService(self.db)
         
-        # Evaluate all devices
+        # Evaluate all devices for playlist schedules
         eval_start = time.time()
         result = scheduler_service.evaluate_all_devices()
         eval_duration = time.time() - eval_start
+        
+        # Also evaluate scheduled display actions
+        action_result = ScheduledActionService.evaluate_all_devices(self.db)
+        result['actions_evaluated'] = action_result.get('devices_evaluated', 0)
+        result['actions_executed'] = action_result.get('actions_executed', 0)
+        result['action_commands'] = action_result.get('commands_created', [])
         
         log_performance_metric(
             logger,
