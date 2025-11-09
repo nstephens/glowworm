@@ -655,8 +655,24 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                               </div>
                               <button
                                 onClick={() => {
-                                  navigator.clipboard.writeText(device.device_token);
-                                  // Could add toast notification here
+                                  // Fallback for browsers/contexts without clipboard API
+                                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                                    navigator.clipboard.writeText(device.device_token);
+                                  } else {
+                                    // Fallback: use temporary textarea
+                                    const textArea = document.createElement('textarea');
+                                    textArea.value = device.device_token;
+                                    textArea.style.position = 'fixed';
+                                    textArea.style.left = '-999999px';
+                                    document.body.appendChild(textArea);
+                                    textArea.select();
+                                    try {
+                                      document.execCommand('copy');
+                                    } catch (err) {
+                                      console.error('Failed to copy:', err);
+                                    }
+                                    document.body.removeChild(textArea);
+                                  }
                                 }}
                                 className="ml-3 bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
                                 title="Copy token"
