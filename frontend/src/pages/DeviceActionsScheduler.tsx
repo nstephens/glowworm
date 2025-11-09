@@ -4,6 +4,8 @@ import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Plus, Monitor } from 'lucide-react';
 import apiService from '../services/api';
+import { ActionForm } from '../components/scheduler/ActionForm';
+import { ActionList } from '../components/scheduler/ActionList';
 import type { Device, ScheduledAction, ActionFormData } from '../types';
 
 interface DeviceActionsSchedulerProps {}
@@ -191,42 +193,43 @@ export const DeviceActionsScheduler: React.FC<DeviceActionsSchedulerProps> = () 
         </Card>
       </div>
 
-      {/* Actions List - TODO: Create ActionsList component */}
-      {devices.length > 0 && actions.length === 0 && (
+      {/* Actions List */}
+      {actions.length > 0 ? (
+        <ActionList
+          actions={actions}
+          devices={devices}
+          onToggleEnabled={handleToggleEnabled}
+          onEdit={handleStartEdit}
+          onDelete={handleDeleteAction}
+          loading={false}
+        />
+      ) : (
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-8">
               <p className="text-muted-foreground">
-                No device actions scheduled yet. Click "Create Action" to get started.
+                {devices.length === 0 
+                  ? 'No authorized devices found. Please authorize devices first from the Displays page.'
+                  : 'No device actions scheduled yet. Click "Create Action" to get started.'
+                }
               </p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {actions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Scheduled Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Action list component coming next...
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {devices.length === 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">
-                No authorized devices found. Please authorize devices first from the Displays page.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Create/Edit Action Form Modal */}
+      {(showCreateForm || editingAction) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-auto">
+          <div className="my-8">
+            <ActionForm
+              action={editingAction}
+              devices={devices}
+              onSubmit={editingAction ? handleEditAction : handleCreateAction}
+              onCancel={handleCancelForm}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
