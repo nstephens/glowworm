@@ -10,6 +10,7 @@ from datetime import datetime
 
 from .config import DaemonConfig
 from .logging_config import setup_logging
+from .command_executor import CommandExecutorFactory
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,9 @@ class GlowwormDaemon:
         self.max_consecutive_errors = 10
         self.registration_retry_count = 0
         self.max_registration_retries = 5
+        
+        # Initialize command executor factory
+        self.command_factory = CommandExecutorFactory(config)
         
         # Setup logging
         setup_logging(
@@ -303,7 +307,7 @@ class GlowwormDaemon:
     
     def _dispatch_command(self, command_type: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Dispatch command to appropriate handler
+        Dispatch command to appropriate handler using executor factory
         
         Args:
             command_type: Type of command (url_update, cec_power, etc.)
@@ -315,30 +319,39 @@ class GlowwormDaemon:
         Raises:
             NotImplementedError: If command type is not supported
         """
-        # Placeholder for command handlers (will be implemented in later tasks)
-        logger.debug(f"Command dispatch: {command_type}")
+        logger.debug(f"Dispatching command: {command_type}")
         
-        if command_type == "url_update":
-            return {"status": "not_implemented", "message": "URL update feature pending"}
+        # Get executor from factory
+        executor = self.command_factory.get_executor(command_type)
         
-        elif command_type == "cec_power_on":
-            return {"status": "not_implemented", "message": "CEC power on pending"}
+        if not executor:
+            raise NotImplementedError(f"No executor for command type: {command_type}")
         
-        elif command_type == "cec_power_off":
-            return {"status": "not_implemented", "message": "CEC power off pending"}
+        # Validate command data
+        if not executor.validate(parameters):
+            return {
+                "status": "failed",
+                "message": "Command validation failed",
+                "command_type": command_type,
+            }
         
-        elif command_type == "cec_set_input":
-            return {"status": "not_implemented", "message": "CEC set input pending"}
+        # Execute command
+        try:
+            result = executor.execute(parameters)
+            
+            # Ensure result has required fields
+            if "status" not in result:
+                result["status"] = "success"
+            
+            return result
         
-        elif command_type == "cec_scan_inputs":
-            return {"status": "not_implemented", "message": "CEC scan inputs pending"}
-        
-        elif command_type == "test":
-            # Test command for development
-            return {"status": "success", "message": "Test command executed"}
-        
-        else:
-            raise NotImplementedError(f"Unknown command type: {command_type}")
+        except Exception as e:
+            logger.error(f"Command execution error: {e}", exc_info=True)
+            return {
+                "status": "failed",
+                "message": str(e),
+                "command_type": command_type,
+            }
     
     def _report_command_result(
         self, 
