@@ -343,6 +343,21 @@ const DisplayView: React.FC = () => {
           }
         });
 
+        client.on('clear_cache', async (message) => {
+          console.log('🗑️ CACHE: Clear cache command received from admin');
+          try {
+            await imageCacheService.clearCache();
+            console.log('✅ CACHE: Cache cleared successfully');
+            // Optionally trigger a re-download
+            if (currentPlaylist) {
+              console.log('🔄 CACHE: Triggering cache re-download for playlist', currentPlaylist.id);
+              // This will re-download all images since cache is now empty
+            }
+          } catch (error) {
+            console.error('❌ CACHE: Failed to clear cache:', error);
+          }
+        });
+
         client.on('error', (error) => {
           console.warn('WebSocket error (non-critical):', error);
         });

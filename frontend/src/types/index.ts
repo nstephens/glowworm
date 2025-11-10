@@ -56,6 +56,8 @@ export interface ImageManifestItem {
   filename: string;
   mime_type: string;
   file_size: number;
+  checksum: string | null;  // MD5 hash for cache invalidation
+  updated_at: string | null;  // ISO timestamp for change detection
 }
 
 export interface ImageManifest {

@@ -734,6 +734,8 @@ async def get_playlist_images_manifest(
                 "filename": image.filename,
                 "mime_type": image.mime_type or "image/jpeg",
                 "file_size": image.file_size or 0,
+                "checksum": image.file_hash,  # MD5 hash for cache invalidation
+                "updated_at": image.uploaded_at.isoformat() if image.uploaded_at else None,
             })
         
         logger.info(

@@ -222,6 +222,11 @@ export class WebSocketClient extends EventEmitter {
         this.emit('device_error', message);
         break;
         
+      case 'clear_cache':
+        // Manual cache invalidation from admin
+        this.emit('clear_cache', message);
+        break;
+        
       case 'error':
         this.emit('websocket_error', message);
         break;

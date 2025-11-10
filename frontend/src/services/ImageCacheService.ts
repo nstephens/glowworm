@@ -37,6 +37,12 @@ export interface CachedImage {
   
   /** Optional expiration timestamp (for TTL-based eviction) */
   expiresAt?: number;
+  
+  /** MD5 hash for cache invalidation (detects server-side changes) */
+  checksum?: string | null;
+  
+  /** ISO timestamp from backend for change detection */
+  updatedAt?: string | null;
 }
 
 /**
@@ -413,7 +419,9 @@ export class ImageCacheService {
     url: string,
     blob: Blob,
     playlistId: number,
-    expiresAt?: number
+    expiresAt?: number,
+    checksum?: string | null,
+    updatedAt?: string | null
   ): Promise<void> {
     const db = await this.ensureDatabase();
 
@@ -427,6 +435,8 @@ export class ImageCacheService {
       cachedAt: Date.now(),
       lastAccessedAt: Date.now(),
       expiresAt,
+      checksum,
+      updatedAt,
     };
 
     return new Promise((resolve, reject) => {

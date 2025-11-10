@@ -291,14 +291,31 @@ export class PreloadManager {
     
     const uncachedImages: ImageManifestItem[] = [];
     
-    // Check cache status for each image
+    // Check cache status and validate checksums for each image
     for (const item of manifest) {
       try {
-        const isCached = await imageCacheService.hasImage(item.id);
+        const cachedImage = await imageCacheService.getImage(item.id);
         
-        if (!isCached) {
+        if (!cachedImage) {
+          // Not cached at all
           uncachedImages.push(item);
+          continue;
         }
+        
+        // Validate checksum if available
+        if (item.checksum && cachedImage.checksum !== item.checksum) {
+          console.log(
+            `[PreloadManager] Cache invalidation: Image ${item.id} checksum mismatch ` +
+            `(cached: ${cachedImage.checksum?.substring(0, 8)}..., ` +
+            `server: ${item.checksum.substring(0, 8)}...) - will re-download`
+          );
+          // Remove stale cached version
+          await imageCacheService.removeImage(item.id);
+          uncachedImages.push(item);
+          continue;
+        }
+        
+        // Image is cached and valid
       } catch (error) {
         // If cache check fails, assume not cached (fail safe)
         console.warn(`[PreloadManager] Cache check failed for ${item.id}, assuming not cached`);
@@ -646,7 +663,10 @@ export class PreloadManager {
       item.id,
       item.url,
       blob,
-      playlistId
+      playlistId,
+      undefined, // expiresAt
+      item.checksum,
+      item.updated_at
     );
 
     return blob;
