@@ -108,3 +108,4 @@ cleanup_for_publish.sh
 # Working notes and PRDs (internal documentation)
 docs/notes/
 docs/prd/
+wiki/
