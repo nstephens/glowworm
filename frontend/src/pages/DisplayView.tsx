@@ -6,6 +6,8 @@ import { DeviceWebSocketClient } from '../services/websocket';
 import { apiService } from '../services/api';
 import { applyDeviceOptimizations } from '../utils/deviceDetection';
 import { displayDeviceLogger } from '../services/displayDeviceLogger';
+import { imageCacheService, ImageCacheService } from '../services/ImageCacheService';
+import { preloadManager } from '../services/PreloadManager';
 import type { Image, Playlist } from '../types';
 
 interface DeviceStatus {
@@ -32,6 +34,11 @@ const DisplayView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [showSlideshow, setShowSlideshow] = useState(false);
+  
+  // Cache-first loading state
+  const [cachePreloadProgress, setCachePreloadProgress] = useState(0);
+  const [cachePreloadComplete, setCachePreloadComplete] = useState(false);
+  const [cachedImageUrls, setCachedImageUrls] = useState<Map<string, string>>(new Map());
   
   // Debug showSlideshow state changes
   useEffect(() => {
@@ -692,6 +699,94 @@ const DisplayView: React.FC = () => {
     }
   }, [deviceStatus?.status, playlistImages.length, showSlideshow, startSlideshow]);
   
+  // Start IndexedDB cache preload when playlist is loaded
+  useEffect(() => {
+    if (!currentPlaylist || playlistImages.length === 0) return;
+    if (!ImageCacheService.isSupported()) {
+      console.log('[DisplayView] IndexedDB not supported, skipping cache preload');
+      return;
+    }
+
+    console.log(`[DisplayView] 🚀 Starting IndexedDB cache preload for playlist ${currentPlaylist.id} (${currentPlaylist.name})`);
+    
+    // Start preload in background with progress tracking
+    preloadManager.prefetchPlaylist(currentPlaylist.id, (progress) => {
+      setCachePreloadProgress(progress.percentComplete);
+      
+      if (progress.percentComplete % 10 === 0 || progress.percentComplete === 100) {
+        console.log(
+          `[DisplayView] 📦 Cache preload: ${progress.percentComplete.toFixed(0)}% ` +
+          `(${progress.successCount}/${progress.total} images, ${(progress.bytesDownloaded / (1024*1024)).toFixed(1)}MB)`
+        );
+      }
+    }).then((result) => {
+      console.log(
+        `[DisplayView] ✅ Cache preload complete: ${result.successCount}/${result.totalImages} images cached ` +
+        `(${(result.bytesDownloaded / (1024*1024)).toFixed(1)}MB in ${(result.durationMs / 1000).toFixed(1)}s)`
+      );
+      if (result.failedCount > 0) {
+        console.warn(`[DisplayView] ⚠️ ${result.failedCount} images failed to cache:`, result.failedImageIds);
+      }
+      setCachePreloadComplete(true);
+    }).catch((error) => {
+      console.error('[DisplayView] ❌ Cache preload failed:', error);
+      // Continue anyway - will fall back to network
+      setCachePreloadComplete(true);
+    });
+  }, [currentPlaylist?.id, playlistImages.length]);
+  
+  // Load cached images as blob URLs
+  useEffect(() => {
+    if (!currentPlaylist || playlistImages.length === 0) return;
+    if (!ImageCacheService.isSupported()) return;
+
+    const loadCachedImages = async () => {
+      const newCachedUrls = new Map(cachedImageUrls);
+      let updated = false;
+
+      for (const image of playlistImages) {
+        const imageId = image.id.toString();
+        
+        // Skip if already have blob URL
+        if (newCachedUrls.has(imageId)) continue;
+
+        try {
+          // Try to get from cache
+          const blob = await imageCacheService.getImage(imageId);
+          
+          if (blob) {
+            // Create blob URL
+            const blobUrl = URL.createObjectURL(blob);
+            newCachedUrls.set(imageId, blobUrl);
+            updated = true;
+            console.log(`[DisplayView] 💾 Loaded image ${imageId} from cache`);
+          }
+        } catch (error) {
+          // Cache miss - will use network URL
+          console.debug(`[DisplayView] Cache miss for image ${imageId}`);
+        }
+      }
+
+      if (updated) {
+        setCachedImageUrls(newCachedUrls);
+        console.log(`[DisplayView] 🎯 Updated cached URLs: ${newCachedUrls.size} images`);
+      }
+    };
+
+    loadCachedImages();
+  }, [playlistImages, currentPlaylist, cachedImageUrls]);
+  
+  // Cleanup blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      cachedImageUrls.forEach((blobUrl) => {
+        if (blobUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(blobUrl);
+        }
+      });
+    };
+  }, [cachedImageUrls]);
+  
   // Debug useEffect dependencies
   useEffect(() => {
     console.log('🎬 SLIDESHOW DEPS: useEffect dependencies changed:', {
@@ -908,6 +1003,19 @@ const DisplayView: React.FC = () => {
     }
   };
 
+  // Transform images to use cached blob URLs where available
+  const enhancedImages = React.useMemo(() => {
+    return playlistImages.map((image) => {
+      const cachedUrl = cachedImageUrls.get(image.id.toString());
+      if (cachedUrl) {
+        // Use cached blob URL
+        return { ...image, url: cachedUrl, _fromCache: true };
+      }
+      // Fall back to network URL
+      return image;
+    });
+  }, [playlistImages, cachedImageUrls]);
+
   return (
     <div className="frameless-display bg-black flex items-center justify-center">
       {renderContent()}
@@ -917,7 +1025,7 @@ const DisplayView: React.FC = () => {
         <>
           {console.log('🎬 SLIDESHOW: Rendering FullscreenSlideshowOptimized component')}
           <FullscreenSlideshowOptimized
-            images={playlistImages}
+            images={enhancedImages}
             playlist={currentPlaylist || undefined}
             initialSettings={{ 
               showInfo: currentPlaylist?.show_image_info || false,
