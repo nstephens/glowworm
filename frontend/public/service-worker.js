@@ -1,12 +1,17 @@
 /**
  * Service Worker for Glowworm - Content Caching and Offline Support
- * Version: 1.0.0
+ * Version: 2.0.0 - Enhanced with IndexedDB cache-first image serving
  */
 
 const CACHE_NAME = 'glowworm-cache-v1';
 const STATIC_CACHE_NAME = 'glowworm-static-v1';
 const DYNAMIC_CACHE_NAME = 'glowworm-dynamic-v1';
 const IMAGE_CACHE_NAME = 'glowworm-images-v1';
+
+// IndexedDB configuration for image cache
+const IDB_NAME = 'glowworm_image_cache';
+const IDB_VERSION = 1;
+const IDB_STORE_NAME = 'cached_images';
 
 // Static assets to cache on install
 const STATIC_ASSETS = [
@@ -108,9 +113,9 @@ async function handleRequest(request) {
       return await cacheFirst(request, STATIC_CACHE_NAME);
     }
     
-    // Images - Cache First with fallback
+    // Images - IndexedDB Cache First with Cache API and Network fallback
     if (isImageRequest(url)) {
-      return await cacheFirst(request, IMAGE_CACHE_NAME);
+      return await indexedDBCacheFirst(request, url);
     }
     
     // API requests - Network First with cache fallback
@@ -140,6 +145,72 @@ async function handleRequest(request) {
     
     throw error;
   }
+}
+
+// IndexedDB Cache First strategy - check IndexedDB -> Cache API -> Network
+async function indexedDBCacheFirst(request, url) {
+  try {
+    // Step 1: Try IndexedDB (NEW - highest priority)
+    const imageId = extractImageIdFromUrl(url);
+    
+    if (imageId) {
+      const cachedBlob = await getImageFromCache(imageId);
+      
+      if (cachedBlob) {
+        console.log(`[SW] ✓ IndexedDB cache hit: image ${imageId}`);
+        return createBlobResponse(cachedBlob, cachedBlob.type);
+      } else {
+        console.log(`[SW] IndexedDB cache miss: image ${imageId}`);
+      }
+    }
+    
+    // Step 2: Try Cache API (existing cache)
+    const cachedResponse = await caches.match(request);
+    
+    if (cachedResponse) {
+      console.log('[SW] ✓ Cache API hit:', url.pathname);
+      return cachedResponse;
+    }
+    
+    // Step 3: Fetch from network
+    console.log('[SW] Fetching from network:', url.pathname);
+    const networkResponse = await fetch(request);
+    
+    // Cache successful responses in Cache API (not IndexedDB - that's managed by PreloadManager)
+    if (networkResponse.ok) {
+      const cache = await caches.open(IMAGE_CACHE_NAME);
+      await cache.put(request, networkResponse.clone());
+    }
+    
+    return networkResponse;
+    
+  } catch (error) {
+    console.error('[SW] Error in indexedDBCacheFirst:', error);
+    
+    // Final fallback: try Cache API one more time
+    const fallbackResponse = await caches.match(request);
+    if (fallbackResponse) {
+      return fallbackResponse;
+    }
+    
+    throw error;
+  }
+}
+
+// Placeholder functions for IndexedDB operations
+async function getPendingActions() {
+  // This would interact with IndexedDB to get pending actions
+  return [];
+}
+
+async function processPendingAction(action) {
+  // This would process the pending action (e.g., upload image, create album)
+  console.log('Processing pending action:', action);
+}
+
+async function removePendingAction(actionId) {
+  // This would remove the processed action from IndexedDB
+  console.log('Removing pending action:', actionId);
 }
 
 // Cache First strategy - check cache first, fallback to network
@@ -210,9 +281,22 @@ function isStaticAsset(url) {
          url.pathname.endsWith('.ttf');
 }
 
-// Check if request is for images
+// Check if request is for images (enhanced for IndexedDB integration)
 function isImageRequest(url) {
+  // Check for /uploads/images/ path (our main image endpoint)
+  if (url.pathname.includes('/uploads/images/')) {
+    return true;
+  }
+  
+  // Check for other image patterns
   return IMAGE_CACHE_PATTERNS.some(pattern => pattern.test(url.pathname));
+}
+
+// Extract image ID from URL path
+function extractImageIdFromUrl(url) {
+  // Pattern: /uploads/images/image_123.jpg → returns "123"
+  const match = url.pathname.match(/\/uploads\/images\/image_(\d+)\./);
+  return match ? match[1] : null;
 }
 
 // Check if request is for API
@@ -334,6 +418,96 @@ async function cleanupCache(cacheName) {
   );
 }
 
+// ==================== IndexedDB Image Cache Functions ====================
+
+/**
+ * Open IndexedDB database
+ */
+async function openImageCacheDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(IDB_NAME, IDB_VERSION);
+    
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+    
+    // Database upgrade handler
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      
+      if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
+        const objectStore = db.createObjectStore(IDB_STORE_NAME, { keyPath: 'id' });
+        objectStore.createIndex('by_playlist', 'playlistId', { unique: false });
+        objectStore.createIndex('by_last_accessed', 'lastAccessedAt', { unique: false });
+      }
+    };
+  });
+}
+
+/**
+ * Get image from IndexedDB cache
+ * 
+ * @param {string} imageId - Image identifier
+ * @returns {Promise<Blob|null>} - Cached image blob or null if not found
+ */
+async function getImageFromCache(imageId) {
+  try {
+    const db = await openImageCacheDB();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([IDB_STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(IDB_STORE_NAME);
+      const request = store.get(imageId);
+      
+      request.onsuccess = () => {
+        const cachedImage = request.result;
+        
+        if (!cachedImage) {
+          resolve(null);
+          return;
+        }
+        
+        // Check if expired
+        if (cachedImage.expiresAt && cachedImage.expiresAt < Date.now()) {
+          // Remove expired image
+          store.delete(imageId);
+          resolve(null);
+          return;
+        }
+        
+        // Update lastAccessedAt for LRU tracking
+        cachedImage.lastAccessedAt = Date.now();
+        store.put(cachedImage);
+        
+        resolve(cachedImage.blob);
+      };
+      
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.error('[SW] Error accessing IndexedDB cache:', error);
+    return null;
+  }
+}
+
+/**
+ * Create Response from cached blob
+ * 
+ * @param {Blob} blob - Image blob from cache
+ * @param {string} mimeType - MIME type for response header
+ * @returns {Response} - Response object for fetch event
+ */
+function createBlobResponse(blob, mimeType = 'image/jpeg') {
+  return new Response(blob, {
+    status: 200,
+    statusText: 'OK',
+    headers: {
+      'Content-Type': mimeType,
+      'Cache-Control': 'public, max-age=31536000', // 1 year
+      'X-Cache-Source': 'indexeddb',
+    },
+  });
+}
+
 // Placeholder functions for IndexedDB operations
 async function getPendingActions() {
   // This would interact with IndexedDB to get pending actions
@@ -352,6 +526,7 @@ async function removePendingAction(actionId) {
 
 // Periodic cleanup
 setInterval(monitorCacheSize, 5 * 60 * 1000); // Every 5 minutes
+
 
 
 

@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance } from 'axios';
-import type { ApiResponse, User, Image, Album, Playlist, ScheduledPlaylist, ScheduleFormData, ActiveScheduleResponse, ScheduledAction, ActionFormData } from '../types';
+import type { ApiResponse, User, Image, Album, Playlist, ScheduledPlaylist, ScheduleFormData, ActiveScheduleResponse, ScheduledAction, ActionFormData, ImageManifest } from '../types';
 import { urlResolver } from './urlResolver';
 import { apiLogger } from '../utils/logger';
 
@@ -309,6 +309,12 @@ class ApiService {
       data: response.data.images,
       status_code: 200
     };
+  }
+
+  async getPlaylistImagesManifest(id: number): Promise<ImageManifest> {
+    const response = await this.api.get(`/playlists/${id}/images/manifest`);
+    // Backend returns ImageManifest structure
+    return response.data;
   }
 
   async getDefaultPlaylist(): Promise<ApiResponse<Playlist>> {

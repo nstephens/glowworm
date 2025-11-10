@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FullscreenSlideshow } from './FullscreenSlideshow';
 import { SmartPreloadMonitor } from './SmartPreloadMonitor';
 import { smartPreloadService } from '../services/smartPreload';
+import { imageCacheService, ImageCacheService } from '../services/ImageCacheService';
+import { preloadManager } from '../services/PreloadManager';
 import type { Image, Playlist } from '../types';
 
 interface SmartSlideshowProps {
@@ -38,6 +40,10 @@ export const SmartSlideshow: React.FC<SmartSlideshowProps> = ({
   const [preloadStarted, setPreloadStarted] = useState(false);
   const [preloadComplete, setPreloadComplete] = useState(false);
   const [showMonitor, setShowMonitor] = useState(showPreloadMonitor);
+  
+  // Cache-first loading state
+  const [cachePreloadProgress, setCachePreloadProgress] = useState(0);
+  const [cachedImageUrls, setCachedImageUrls] = useState<Map<string, string>>(new Map());
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const preloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -82,28 +88,42 @@ export const SmartSlideshow: React.FC<SmartSlideshowProps> = ({
     try {
       setPreloadStarted(true);
       
-      // Check if preload is recommended
-      const isRecommended = await smartPreloadService.isPreloadRecommended(playlist.id);
-      if (!isRecommended) {
-        console.log('Smart preload not recommended for current conditions');
-        setPreloadComplete(true);
-        return;
+      // Start IndexedDB cache preload (NEW - cache-first reliability)
+      if (imageCacheService && ImageCacheService.isSupported()) {
+        console.log('[SmartSlideshow] Starting IndexedDB cache preload for playlist:', playlist.name);
+        
+        // Start preload in background with progress tracking
+        preloadManager.prefetchPlaylist(playlist.id, (progress) => {
+          setCachePreloadProgress(progress.percentComplete);
+          console.log(
+            `[SmartSlideshow] Cache preload: ${progress.percentComplete.toFixed(0)}% ` +
+            `(${progress.successCount}/${progress.total} images)`
+          );
+        }).then((result) => {
+          console.log(
+            `[SmartSlideshow] Cache preload complete: ${result.successCount}/${result.totalImages} images cached`
+          );
+          setPreloadComplete(true);
+        }).catch((error) => {
+          console.error('[SmartSlideshow] Cache preload failed:', error);
+          // Continue anyway - will fall back to network
+          setPreloadComplete(true);
+        });
       }
-
-      // Start smart preload
-      await smartPreloadService.smartPreloadForSlideshow(
-        playlist.id,
-        currentIndex,
-        settings.interval,
-        ['webp', 'avif']
-      );
-
-      console.log('Smart preload started for playlist:', playlist.name);
       
-      // Set a timeout to consider preload "complete" for UI purposes
-      preloadTimeoutRef.current = setTimeout(() => {
-        setPreloadComplete(true);
-      }, 10000); // 10 seconds
+      // Also start smart preload (existing backend optimization)
+      const isRecommended = await smartPreloadService.isPreloadRecommended(playlist.id);
+      if (isRecommended) {
+        await smartPreloadService.smartPreloadForSlideshow(
+          playlist.id,
+          currentIndex,
+          settings.interval,
+          ['webp', 'avif']
+        );
+        console.log('Smart preload started for playlist:', playlist.name);
+      } else {
+        console.log('Smart preload not recommended for current conditions');
+      }
 
     } catch (error) {
       console.error('Failed to start smart preload:', error);
@@ -164,8 +184,15 @@ export const SmartSlideshow: React.FC<SmartSlideshowProps> = ({
       clearTimeout(preloadTimeoutRef.current);
     }
     
+    // Clean up cached blob URLs
+    cachedImageUrls.forEach((blobUrl) => {
+      if (blobUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    });
+    
     onClose?.();
-  }, [onClose]);
+  }, [onClose, cachedImageUrls]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -173,8 +200,74 @@ export const SmartSlideshow: React.FC<SmartSlideshowProps> = ({
       if (preloadTimeoutRef.current) {
         clearTimeout(preloadTimeoutRef.current);
       }
+      
+      // Revoke all blob URLs
+      cachedImageUrls.forEach((blobUrl) => {
+        if (blobUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(blobUrl);
+        }
+      });
     };
-  }, []);
+  }, [cachedImageUrls]);
+
+  // Transform images to use cached versions (cache-first loading)
+  const enhancedImages = React.useMemo(() => {
+    return images.map((image) => {
+      // Check if we have a cached blob URL for this image
+      const cachedUrl = cachedImageUrls.get(image.id.toString());
+      
+      if (cachedUrl) {
+        // Use cached blob URL
+        return {
+          ...image,
+          url: cachedUrl,
+          _fromCache: true,
+        };
+      }
+      
+      // Fall back to network URL
+      return image;
+    });
+  }, [images, cachedImageUrls]);
+
+  // Load cached images as they become available
+  useEffect(() => {
+    if (!playlist || !ImageCacheService.isSupported()) return;
+
+    const loadCachedImages = async () => {
+      const newCachedUrls = new Map(cachedImageUrls);
+      let updated = false;
+
+      for (const image of images) {
+        const imageId = image.id.toString();
+        
+        // Skip if already have blob URL
+        if (newCachedUrls.has(imageId)) continue;
+
+        try {
+          // Try to get from cache
+          const blob = await imageCacheService.getImage(imageId);
+          
+          if (blob) {
+            // Create blob URL
+            const blobUrl = URL.createObjectURL(blob);
+            newCachedUrls.set(imageId, blobUrl);
+            updated = true;
+            console.log(`[SmartSlideshow] Loaded ${imageId} from cache`);
+          }
+        } catch (error) {
+          // Cache miss or error - will use network URL
+          console.debug(`[SmartSlideshow] Cache miss for ${imageId}:`, error);
+        }
+      }
+
+      if (updated) {
+        setCachedImageUrls(newCachedUrls);
+      }
+    };
+
+    loadCachedImages();
+  }, [images, playlist, cachedImageUrls]);
 
   if (images.length === 0) {
     return (
@@ -218,8 +311,9 @@ export const SmartSlideshow: React.FC<SmartSlideshowProps> = ({
                 preloadStarted ? 'bg-yellow-500 animate-pulse' : 'bg-gray-500'
               }`}></div>
               <span className="text-sm">
-                {preloadComplete ? 'Preload Ready' : 
-                 preloadStarted ? 'Preloading...' : 'Preparing...'}
+                {preloadComplete ? 'Cache Ready' : 
+                 preloadStarted && cachePreloadProgress > 0 ? `Caching ${cachePreloadProgress.toFixed(0)}%` :
+                 preloadStarted ? 'Starting cache...' : 'Preparing...'}
               </span>
             </div>
           </div>
@@ -240,7 +334,7 @@ export const SmartSlideshow: React.FC<SmartSlideshowProps> = ({
 
       {/* Main Slideshow */}
       <FullscreenSlideshow
-        images={images}
+        images={enhancedImages}
         playlist={playlist}
         initialSettings={settings}
         onClose={handleClose}
@@ -251,6 +345,7 @@ export const SmartSlideshow: React.FC<SmartSlideshowProps> = ({
 };
 
 export default SmartSlideshow;
+
 
 
 
