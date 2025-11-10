@@ -7,6 +7,7 @@
 
 import { imageCacheService, type CachedImage } from './ImageCacheService';
 import { apiService } from './api';
+import { urlResolver } from './urlResolver';
 import type { ImageManifest, ImageManifestItem } from '../types';
 
 // ==================== Type Definitions ====================
@@ -616,9 +617,10 @@ export class PreloadManager {
     playlistId: number
   ): Promise<Blob> {
     // Construct absolute URL if relative path is provided
+    // Use urlResolver to get the correct backend server URL (port 8002)
     const imageUrl = item.url.startsWith('http') 
       ? item.url 
-      : `${window.location.origin}${item.url}`;
+      : `${urlResolver.getServerBaseUrl()}${item.url}`;
     
     // Fetch image from URL
     const response = await fetch(imageUrl, {
