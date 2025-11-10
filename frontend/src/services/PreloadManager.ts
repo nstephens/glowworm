@@ -632,15 +632,16 @@ export class PreloadManager {
 
     const blob = await response.blob();
 
-    // Validate MIME type matches expected - throw error to trigger retry
-    if (blob.type && blob.type !== item.mime_type) {
+    // Validate that we got an actual image, not an error page
+    // The smart endpoint may convert formats (mpo→jpeg), so we can't do exact MIME matching
+    if (blob.type && !blob.type.startsWith('image/')) {
       throw new Error(
-        `MIME type mismatch for ${item.id}: ` +
-        `expected ${item.mime_type}, got ${blob.type}`
+        `Invalid content type for ${item.id}: ` +
+        `expected image/*, got ${blob.type} (likely an error page)`
       );
     }
 
-    // Store in cache (only if MIME validation passed)
+    // Store in cache (only if validation passed)
     await imageCacheService.storeImage(
       item.id,
       item.url,
