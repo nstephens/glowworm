@@ -697,11 +697,11 @@ async def get_playlist_images(
 @router.get("/{playlist_id}/images/manifest")
 async def get_playlist_images_manifest(
     playlist_id: int,
-    current_user: User = Depends(get_current_user),
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
-    Get lightweight image manifest for cache prefetching
+    Get lightweight image manifest for cache prefetching (public endpoint for display devices)
     
     Returns only essential metadata for each image in the playlist,
     optimized for client-side caching in IndexedDB.
