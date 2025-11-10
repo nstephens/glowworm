@@ -721,11 +721,12 @@ async def get_playlist_images_manifest(
         playlist_service = PlaylistService(db)
         images = playlist_service.get_playlist_images_ordered(playlist_id)
         
-        # Build lightweight manifest (using relative URLs - frontend will construct full URLs)
+        # Build lightweight manifest using API smart image endpoint
         manifest = []
         for image in images:
-            # Use relative URL path - frontend can prepend server base URL
-            image_url = f"/uploads/images/{image.filename}"
+            # Use smart image API endpoint (matches the URL pattern used by the slideshow)
+            # This endpoint automatically handles device resolution and returns optimized images
+            image_url = f"/api/images/{image.id}/smart"
             
             manifest.append({
                 "id": str(image.id),  # String for IndexedDB key
