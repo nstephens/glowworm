@@ -615,8 +615,13 @@ export class PreloadManager {
     item: ImageManifestItem,
     playlistId: number
   ): Promise<Blob> {
+    // Construct absolute URL if relative path is provided
+    const imageUrl = item.url.startsWith('http') 
+      ? item.url 
+      : `${window.location.origin}${item.url}`;
+    
     // Fetch image from URL
-    const response = await fetch(item.url, {
+    const response = await fetch(imageUrl, {
       signal: this.abortController?.signal,
     });
 
