@@ -694,6 +694,76 @@ async def get_playlist_images(
             detail="Failed to retrieve playlist images"
         )
 
+@router.get("/{playlist_id}/images/manifest")
+async def get_playlist_images_manifest(
+    playlist_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get lightweight image manifest for cache prefetching
+    
+    Returns only essential metadata for each image in the playlist,
+    optimized for client-side caching in IndexedDB.
+    
+    Response includes: id, url, filename, mime_type, file_size
+    """
+    try:
+        # Check if playlist exists
+        playlist = db.query(Playlist).filter(Playlist.id == playlist_id).first()
+        if not playlist:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Playlist {playlist_id} not found"
+            )
+        
+        # Get ordered images
+        playlist_service = PlaylistService(db)
+        images = playlist_service.get_playlist_images_ordered(playlist_id)
+        
+        # Build lightweight manifest
+        from config.server_config import server_config
+        base_url = server_config.get_server_base_url()
+        
+        manifest = []
+        for image in images:
+            # Construct full URL for the image
+            image_url = f"{base_url}/uploads/images/{image.filename}"
+            
+            manifest.append({
+                "id": str(image.id),  # String for IndexedDB key
+                "url": image_url,
+                "filename": image.filename,
+                "mime_type": image.mime_type or "image/jpeg",
+                "file_size": image.file_size or 0,
+                # Optional: Add checksum if available for validation
+                # "checksum": image.checksum if hasattr(image, 'checksum') else None
+            })
+        
+        logger.info(
+            f"Generated manifest for playlist {playlist_id} ({playlist.name}): "
+            f"{len(manifest)} images, "
+            f"~{sum(img['file_size'] for img in manifest) / (1024*1024):.1f}MB total"
+        )
+        
+        return {
+            "success": True,
+            "playlist_id": playlist_id,
+            "playlist_name": playlist.name,
+            "manifest": manifest,
+            "count": len(manifest),
+            "total_size": sum(img["file_size"] for img in manifest),
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get playlist manifest error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve playlist manifest"
+        )
+
 @router.get("/stats/overview")
 async def get_playlist_statistics(
     current_user: User = Depends(get_current_user),

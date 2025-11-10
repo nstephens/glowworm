@@ -46,6 +46,27 @@ export interface Image {
   processing_completed_at?: string | null;
 }
 
+/**
+ * Lightweight image manifest for cache prefetching
+ * Contains only essential metadata for IndexedDB storage
+ */
+export interface ImageManifestItem {
+  id: string;
+  url: string;
+  filename: string;
+  mime_type: string;
+  file_size: number;
+}
+
+export interface ImageManifest {
+  success: boolean;
+  playlist_id: number;
+  playlist_name: string;
+  manifest: ImageManifestItem[];
+  count: number;
+  total_size: number;
+}
+
 export interface Album {
   id: number;
   name: string;
