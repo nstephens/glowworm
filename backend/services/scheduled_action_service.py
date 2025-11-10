@@ -28,6 +28,8 @@ class ScheduledActionService:
         """
         Get all active actions for a device at a specific time
         
+        DEPRECATED: Use get_executable_actions() instead for catch-up support
+        
         Args:
             db: Database session
             device_id: Display device ID
@@ -62,13 +64,63 @@ class ScheduledActionService:
         return active_actions
     
     @staticmethod
+    def get_executable_actions(
+        db: Session,
+        device_id: int,
+        check_time: Optional[datetime] = None,
+    ) -> List[ScheduledAction]:
+        """
+        Get all actions that should execute for a device at a specific time
+        
+        Includes catch-up logic for missed actions within their catch-up window.
+        This enables resilience to server failures, daemon downtime, and power outages.
+        
+        Args:
+            db: Database session
+            device_id: Display device ID
+            check_time: Time to check (defaults to now in local timezone)
+        
+        Returns:
+            List of scheduled actions that should execute (create commands)
+        """
+        if check_time is None:
+            check_time = datetime.now()
+        
+        # Get all enabled actions for this device
+        actions = db.query(ScheduledAction).filter(
+            ScheduledAction.device_id == device_id,
+            ScheduledAction.enabled == True,
+        ).all()
+        
+        # Filter to ones that should execute (with catch-up)
+        executable_actions = [
+            action for action in actions
+            if action.should_execute_at(check_time)
+        ]
+        
+        # Sort by priority (highest first)
+        executable_actions.sort(key=lambda a: a.priority, reverse=True)
+        
+        logger.debug(
+            f"Found {len(executable_actions)} executable action(s) for device {device_id} "
+            f"at {check_time.strftime('%H:%M:%S')}"
+        )
+        
+        return executable_actions
+    
+    @staticmethod
     def evaluate_and_execute_actions(
         db: Session,
         device_id: int,
         check_time: Optional[datetime] = None,
     ) -> Dict[str, Any]:
         """
-        Evaluate actions for a device and create commands
+        Evaluate actions for a device and create commands with catch-up support
+        
+        This method now implements persistent execution:
+        - Actions are executed even if server was down at scheduled time
+        - Catch-up window prevents very stale actions (default 10 min)
+        - last_executed_at prevents duplicate executions
         
         Args:
             db: Database session
@@ -92,14 +144,14 @@ class ScheduledActionService:
             logger.debug(f"Device {device_id} does not have daemon enabled, skipping actions")
             return {"skipped": "daemon_not_enabled"}
         
-        # Get active actions
-        active_actions = ScheduledActionService.get_active_actions(db, device_id, check_time)
+        # Get executable actions (with catch-up support)
+        executable_actions = ScheduledActionService.get_executable_actions(db, device_id, check_time)
         
-        if not active_actions:
-            return {"actions_executed": 0, "message": "No active actions"}
+        if not executable_actions:
+            return {"actions_executed": 0, "message": "No executable actions"}
         
         # Execute highest priority action
-        action = active_actions[0]
+        action = executable_actions[0]
         
         logger.info(
             f"Executing scheduled action '{action.name}' "
@@ -128,9 +180,14 @@ class ScheduledActionService:
                 command_data=action.action_data or {},
             )
             
+            # Update last_executed_at to prevent duplicate executions
+            action.last_executed_at = check_time
+            db.commit()
+            
             logger.info(
                 f"Created command #{command.id} ({command_type.value}) "
-                f"from scheduled action '{action.name}'"
+                f"from scheduled action '{action.name}' "
+                f"(last_executed_at updated to {check_time.isoformat()})"
             )
             
             return {
@@ -144,6 +201,7 @@ class ScheduledActionService:
         
         except Exception as e:
             logger.error(f"Failed to create command for action {action.id}: {e}", exc_info=True)
+            db.rollback()
             return {"error": str(e)}
     
     @staticmethod

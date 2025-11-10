@@ -8,7 +8,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .database import Base
 import enum
-from datetime import datetime, date, time as dt_time
+from datetime import datetime, date, time as dt_time, timedelta
 from typing import Optional
 
 
@@ -67,6 +67,10 @@ class ScheduledAction(Base):
     priority = Column(Integer, default=0, nullable=False, index=True)
     enabled = Column(Boolean, default=True, nullable=False, index=True)
     
+    # Execution tracking (for persistent catch-up)
+    last_executed_at = Column(DateTime(timezone=True), nullable=True)
+    catch_up_window_minutes = Column(Integer, default=10, nullable=False)
+    
     # Audit fields
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -101,6 +105,8 @@ class ScheduledAction(Base):
             "description": self.description,
             "priority": self.priority,
             "enabled": self.enabled,
+            "last_executed_at": self.last_executed_at.isoformat() if self.last_executed_at else None,
+            "catch_up_window_minutes": self.catch_up_window_minutes,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "created_by_user_id": self.created_by_user_id,
@@ -170,4 +176,109 @@ class ScheduledAction(Base):
             return self.specific_start_time <= current_time <= self.specific_end_time
         else:
             return current_time >= self.specific_start_time
+    
+    def should_execute_at(self, check_time: datetime) -> bool:
+        """
+        Check if action should execute at given time, with catch-up logic
+        
+        This method implements persistent execution:
+        - Returns True if action is currently active AND hasn't executed yet
+        - Returns True if action was recently scheduled but missed (within catch-up window)
+        - Returns False if action already executed for this occurrence
+        
+        Args:
+            check_time: Datetime to check (should be in local timezone)
+        
+        Returns:
+            True if action should execute now (create command)
+        """
+        if not self.enabled:
+            return False
+        
+        # Check if action is scheduled for this time
+        if self.schedule_type == "recurring":
+            return self._should_execute_recurring(check_time)
+        elif self.schedule_type == "specific_date":
+            return self._should_execute_specific_date(check_time)
+        
+        return False
+    
+    def _should_execute_recurring(self, check_time: datetime) -> bool:
+        """Check if recurring action should execute with catch-up"""
+        if not self.days_of_week or not self.start_time:
+            return False
+        
+        day_name = check_time.strftime("%A").lower()
+        if day_name not in [d.lower() for d in self.days_of_week]:
+            return False
+        
+        current_time = check_time.time()
+        
+        # For recurring actions, we only care about the start_time (the trigger point)
+        # Calculate when the action should have triggered today
+        trigger_datetime = datetime.combine(check_time.date(), self.start_time)
+        
+        # Check if we're within the catch-up window after the trigger time
+        time_since_trigger = (check_time - trigger_datetime).total_seconds() / 60
+        
+        # If we're before the trigger time, not ready yet
+        if time_since_trigger < 0:
+            return False
+        
+        # If we're past the catch-up window, missed it for today
+        if time_since_trigger > self.catch_up_window_minutes:
+            return False
+        
+        # Check if we already executed for this occurrence
+        if self.last_executed_at:
+            # If we executed today after the trigger time, don't execute again
+            if (self.last_executed_at.date() == check_time.date() and
+                self.last_executed_at.time() >= self.start_time):
+                return False
+        
+        # We're within window and haven't executed yet
+        return True
+    
+    def _should_execute_specific_date(self, check_time: datetime) -> bool:
+        """Check if specific date action should execute with catch-up"""
+        if not self.specific_date or not self.specific_start_time:
+            return False
+        
+        check_date = check_time.date()
+        
+        # Check if date matches
+        if self.annual_recurrence:
+            matches_date = (
+                check_date.month == self.specific_date.month and
+                check_date.day == self.specific_date.day
+            )
+        else:
+            matches_date = check_date == self.specific_date
+        
+        if not matches_date:
+            return False
+        
+        # Calculate when the action should have triggered
+        trigger_datetime = datetime.combine(check_date, self.specific_start_time)
+        
+        # Check if we're within the catch-up window after the trigger time
+        time_since_trigger = (check_time - trigger_datetime).total_seconds() / 60
+        
+        # If we're before the trigger time, not ready yet
+        if time_since_trigger < 0:
+            return False
+        
+        # If we're past the catch-up window, missed it
+        if time_since_trigger > self.catch_up_window_minutes:
+            return False
+        
+        # Check if we already executed for this occurrence
+        if self.last_executed_at:
+            # For specific dates, check if we executed on this date after the trigger time
+            if (self.last_executed_at.date() == check_date and
+                self.last_executed_at.time() >= self.specific_start_time):
+                return False
+        
+        # We're within window and haven't executed yet
+        return True
 
