@@ -7,7 +7,6 @@
 
 import { imageCacheService, type CachedImage } from './ImageCacheService';
 import { apiService } from './api';
-import { urlResolver } from './urlResolver';
 import type { ImageManifest, ImageManifestItem } from '../types';
 
 // ==================== Type Definitions ====================
@@ -616,13 +615,13 @@ export class PreloadManager {
     item: ImageManifestItem,
     playlistId: number
   ): Promise<Blob> {
-    // Construct absolute URL if relative path is provided
-    // Use urlResolver to get the correct backend server URL (port 8002)
+    // Use relative URLs as-is - frontend server proxies to backend automatically
+    // Browser cannot access backend directly (CORS + network isolation)
     const imageUrl = item.url.startsWith('http') 
       ? item.url 
-      : `${urlResolver.getServerBaseUrl()}${item.url}`;
+      : item.url; // Keep as relative path - frontend proxies /uploads/* to backend
     
-    // Fetch image from URL
+    // Fetch image from URL (will route through frontend proxy)
     const response = await fetch(imageUrl, {
       signal: this.abortController?.signal,
     });
