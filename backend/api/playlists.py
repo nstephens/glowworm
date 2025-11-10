@@ -721,14 +721,11 @@ async def get_playlist_images_manifest(
         playlist_service = PlaylistService(db)
         images = playlist_service.get_playlist_images_ordered(playlist_id)
         
-        # Build lightweight manifest
-        from config.server_config import server_config
-        base_url = server_config.get_server_base_url()
-        
+        # Build lightweight manifest (using relative URLs - frontend will construct full URLs)
         manifest = []
         for image in images:
-            # Construct full URL for the image
-            image_url = f"{base_url}/uploads/images/{image.filename}"
+            # Use relative URL path - frontend can prepend server base URL
+            image_url = f"/uploads/images/{image.filename}"
             
             manifest.append({
                 "id": str(image.id),  # String for IndexedDB key
@@ -736,8 +733,6 @@ async def get_playlist_images_manifest(
                 "filename": image.filename,
                 "mime_type": image.mime_type or "image/jpeg",
                 "file_size": image.file_size or 0,
-                # Optional: Add checksum if available for validation
-                # "checksum": image.checksum if hasattr(image, 'checksum') else None
             })
         
         logger.info(
@@ -758,10 +753,14 @@ async def get_playlist_images_manifest(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"MANIFEST ERROR: {e}")
+        print(f"TRACEBACK:\n{error_details}")
         logger.error(f"Get playlist manifest error: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve playlist manifest"
+            detail=f"Failed to retrieve playlist manifest: {str(e)}"
         )
 
 @router.get("/stats/overview")
