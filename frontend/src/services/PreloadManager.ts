@@ -631,15 +631,15 @@ export class PreloadManager {
 
     const blob = await response.blob();
 
-    // Validate MIME type matches expected
+    // Validate MIME type matches expected - throw error to trigger retry
     if (blob.type && blob.type !== item.mime_type) {
-      console.warn(
-        `[PreloadManager] MIME type mismatch for ${item.id}: ` +
+      throw new Error(
+        `MIME type mismatch for ${item.id}: ` +
         `expected ${item.mime_type}, got ${blob.type}`
       );
     }
 
-    // Store in cache
+    // Store in cache (only if MIME validation passed)
     await imageCacheService.storeImage(
       item.id,
       item.url,
