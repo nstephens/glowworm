@@ -57,21 +57,21 @@ if [ "$CLEAN_INSTALL" = true ]; then
     
     # Stop containers if running
     if [ -f docker-compose.yml ]; then
-        echo -e "${YELLOW}Stopping containers...${NC}"
+        echo -e "${YELLOW}Stopping containers and removing volumes...${NC}"
         if command -v docker compose &> /dev/null; then
             DOCKER_COMPOSE="docker compose"
         else
             DOCKER_COMPOSE="docker-compose"
         fi
-        $DOCKER_COMPOSE down 2>/dev/null || true
-        echo -e "${GREEN}✅ Containers stopped${NC}"
+        $DOCKER_COMPOSE down -v 2>/dev/null || true
+        echo -e "${GREEN}✅ Containers and volumes removed${NC}"
     fi
     
-    # Delete data directory (Docker creates files as root, so we need sudo)
-    if [ -d data ]; then
-        echo -e "${YELLOW}Deleting data directory (requires sudo)...${NC}"
-        sudo rm -rf data
-        echo -e "${GREEN}✅ Data directory deleted${NC}"
+    # Delete uploads directory (bind mount)
+    if [ -d data/uploads ]; then
+        echo -e "${YELLOW}Deleting uploads directory...${NC}"
+        rm -rf data/uploads 2>/dev/null || sudo rm -rf data/uploads
+        echo -e "${GREEN}✅ Uploads directory deleted${NC}"
     fi
     
     # Delete .env file
@@ -279,18 +279,12 @@ fi
 echo -e "${GREEN}✅ Configuration file ready${NC}"
 echo ""
 
-# Create data directories for persistent storage
-echo -e "${YELLOW}📁 Creating data directories...${NC}"
-mkdir -p data/mysql data/uploads
+# Create uploads directory for image storage
+# Note: MySQL and Redis use Docker named volumes (no directory needed)
+echo -e "${YELLOW}📁 Creating uploads directory...${NC}"
+mkdir -p data/uploads
 
-# Set permissions for container users (UID 1000 for glowworm/node users)
-# MySQL runs as UID 999, uploads needs UID 1000
-if command -v sudo &> /dev/null && [ "$EUID" -ne 0 ]; then
-    echo -e "${YELLOW}Setting directory permissions (may require sudo)...${NC}"
-    sudo chown -R 1000:1000 data/uploads 2>/dev/null || chown -R 1000:1000 data/uploads 2>/dev/null || true
-fi
-
-echo -e "${GREEN}✅ Data directories created${NC}"
+echo -e "${GREEN}✅ Data directory created${NC}"
 echo ""
 
 # Download required files if they don't exist
@@ -358,29 +352,26 @@ fi
 echo -e "${BLUE}🌐 Access the application:${NC}"
 if [ "$SERVER_IP" != "YOUR_SERVER_IP" ]; then
     echo "   📱 From this server:    http://localhost:3003"
-    echo "   📱 From other devices:  http://$SERVER_IP:3003"a
-    echo "   🔌 Backend API:         http://$SERVER_IP:8001/api"
+    echo "   📱 From other devices:  http://$SERVER_IP:3003"
+    echo ""
+    echo -e "${YELLOW}💡 Backend API is internal only - displays connect via frontend${NC}"
 else
     echo "   📱 Web Interface: http://localhost:3003 (if local)"
     echo "   📱 From network:  http://YOUR_SERVER_IP:3003 (replace with your server's IP)"
-    echo "   🔌 Backend API:   http://YOUR_SERVER_IP:8001/api"
 fi
-echo ""
-echo -e "${YELLOW}💡 For headless/remote servers:${NC}"
-echo "   Find your server IP: ${GREEN}hostname -I${NC}"
-echo "   Access from any device: ${GREEN}http://<SERVER_IP>:3003${NC}"
 echo ""
 echo -e "${BLUE}📚 Next steps:${NC}"
 echo "   1. Open the web interface in your browser"
-echo "   2. Complete the setup wizard"
-echo "   3. Create an admin account"
+echo "   2. Create an admin account (Docker auto-setup)"
+echo "   3. Login with your admin credentials"
 echo "   4. Upload images and create playlists"
 echo "   5. Register display devices from any device on your network"
 echo ""
 echo -e "${BLUE}💾 Data Storage:${NC}"
-echo "   Database:  ./data/mysql/"
+echo "   Database:  Docker volume 'mysql_data' (managed by Docker)"
+echo "   Redis:     Docker volume 'redis_data' (managed by Docker)"
 echo "   Images:    ./data/uploads/"
-echo "   Backup:    tar -czf backup.tar.gz data/"
+echo "   Backup:    docker compose exec glowworm-mysql mysqldump -u root -p glowworm > backup.sql"
 echo ""
 echo -e "${BLUE}💡 Useful commands:${NC}"
 echo "   View logs:    $DOCKER_COMPOSE -f $COMPOSE_FILE logs -f"
