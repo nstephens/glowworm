@@ -82,8 +82,8 @@ services:
       USE_CELERY: ${USE_CELERY:-true}
     volumes:
       - ./data/uploads:/app/uploads
-    ports:
-      - "${BACKEND_PORT:-8001}:8001"
+    # No ports exposed - backend is internal only
+    # Frontend proxies all API requests to displays/clients
     depends_on:
       glowworm-mysql:
         condition: service_healthy

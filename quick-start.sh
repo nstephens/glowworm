@@ -220,7 +220,6 @@ SECRET_KEY=$SECRET_KEY
 # This is used internally by the backend for URL generation
 # The frontend proxies all API requests, so displays connect via DISPLAY_NETWORK_INTERFACE above
 SERVER_BASE_URL=http://localhost:8001
-BACKEND_PORT=8001
 FRONTEND_PORT=3003
 
 # Application settings
