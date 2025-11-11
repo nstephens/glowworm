@@ -217,7 +217,7 @@ if [ "$TOKEN_DETECTED" = true ]; then
 # Semi-auto configured: Token from browser, URL from user
 backend_url = $SERVER_URL
 device_token = $DEVICE_TOKEN
-poll_interval = 30
+poll_interval = 5
 log_level = INFO
 
 [cec]

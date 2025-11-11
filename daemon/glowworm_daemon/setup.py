@@ -56,7 +56,7 @@ def setup_wizard() -> None:
     # Poll interval
     print("\n⏱️  Polling Configuration")
     print("-" * 40)
-    poll_interval = input("Poll interval in seconds [30]: ").strip() or "30"
+    poll_interval = input("Poll interval in seconds [5]: ").strip() or "5"
     config['poll_interval'] = poll_interval
     
     # Log level

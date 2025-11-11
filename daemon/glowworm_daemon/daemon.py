@@ -475,7 +475,7 @@ if __name__ == "__main__":
 [daemon]
 backend_url = http://localhost:8002
 device_token = test-token-123
-poll_interval = 30
+poll_interval = 5
 log_level = DEBUG
 
 [cec]

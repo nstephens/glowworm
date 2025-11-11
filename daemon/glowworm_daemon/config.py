@@ -23,7 +23,7 @@ DEFAULT_CONFIG = {
     "daemon": {
         "backend_url": "http://localhost:3003",  # Frontend URL (proxies /api/ to backend)
         "device_token": "",
-        "poll_interval": "30",
+        "poll_interval": "5",
         "log_level": "INFO",
         "log_file": "/var/log/glowworm/daemon.log",
         "max_retries": "3",
@@ -65,7 +65,7 @@ class DaemonConfig:
         
         # Validate poll_interval is a positive integer
         try:
-            poll_interval = int(self.get("daemon", "poll_interval", "30"))
+            poll_interval = int(self.get("daemon", "poll_interval", "5"))
             if poll_interval < 1:
                 raise ValueError
         except ValueError:
@@ -114,7 +114,7 @@ class DaemonConfig:
     @property
     def poll_interval(self) -> int:
         """Command polling interval in seconds"""
-        return self.get_int("daemon", "poll_interval", 30)
+        return self.get_int("daemon", "poll_interval", 5)
     
     @property
     def log_level(self) -> str:

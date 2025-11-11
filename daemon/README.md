@@ -68,7 +68,7 @@ Configuration file: `/etc/glowworm/daemon.conf`
 # The frontend proxies /api/ requests to the backend
 backend_url = http://10.10.10.2:3003
 device_token = your-device-token-here
-poll_interval = 30
+poll_interval = 5
 log_level = INFO
 
 [cec]
