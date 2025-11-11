@@ -739,12 +739,33 @@ const DisplayView: React.FC = () => {
         `[DisplayView] ✅ Cache preload complete: ${result.successCount}/${result.totalImages} images cached ` +
         `(${(result.bytesDownloaded / (1024*1024)).toFixed(1)}MB in ${(result.durationMs / 1000).toFixed(1)}s)`
       );
+      
+      // Send cache preload status to backend for admin visibility
+      displayDeviceLogger.info('IndexedDB cache preload complete', {
+        playlist_id: currentPlaylist.id,
+        playlist_name: currentPlaylist.name,
+        cached_images: result.successCount,
+        total_images: result.totalImages,
+        failed_images: result.failedCount,
+        cache_size_mb: (result.bytesDownloaded / (1024*1024)).toFixed(1),
+        duration_seconds: (result.durationMs / 1000).toFixed(1),
+        cache_enabled: true
+      });
+      
       if (result.failedCount > 0) {
         console.warn(`[DisplayView] ⚠️ ${result.failedCount} images failed to cache:`, result.failedImageIds);
+        displayDeviceLogger.warning('Some images failed to cache', {
+          failed_count: result.failedCount,
+          failed_ids: result.failedImageIds.slice(0, 10)  // First 10 only
+        });
       }
       setCachePreloadComplete(true);
     }).catch((error) => {
       console.error('[DisplayView] ❌ Cache preload failed:', error);
+      displayDeviceLogger.error('Cache preload failed', {
+        error: error.message,
+        playlist_id: currentPlaylist.id
+      });
       // Continue anyway - will fall back to network
       setCachePreloadComplete(true);
     });
