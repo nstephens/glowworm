@@ -64,6 +64,20 @@ if [ "$CLEAN_INSTALL" = true ]; then
             DOCKER_COMPOSE="docker-compose"
         fi
         $DOCKER_COMPOSE down -v 2>/dev/null || true
+        
+        # Force delete named volumes (sometimes persist after down -v)
+        echo -e "${YELLOW}Force removing named volumes...${NC}"
+        docker volume rm glowworm_mysql_data 2>/dev/null || true
+        docker volume rm glowworm_redis_data 2>/dev/null || true
+        docker volume rm glowworm_uploads_data 2>/dev/null || true
+        
+        # Verify they're gone
+        REMAINING=$(docker volume ls -q | grep -c glowworm || true)
+        if [ "$REMAINING" -gt 0 ]; then
+            echo -e "${YELLOW}⚠️  Some volumes still exist, attempting removal...${NC}"
+            docker volume ls | grep glowworm | awk '{print $2}' | xargs -r docker volume rm 2>/dev/null || true
+        fi
+        
         echo -e "${GREEN}✅ Containers and volumes removed${NC}"
     fi
     
