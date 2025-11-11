@@ -148,6 +148,15 @@ echo -e "${GREEN}✅ System dependencies installed${NC}"
 # Create installation directory
 INSTALL_DIR="/opt/glowworm-daemon"
 echo ""
+
+# Check if installation exists
+if [ -d "$INSTALL_DIR" ]; then
+    echo -e "${YELLOW}⚠️  Existing installation found at $INSTALL_DIR${NC}"
+    echo -e "${BLUE}   Removing old installation for clean setup...${NC}"
+    rm -rf "$INSTALL_DIR"
+    echo -e "${GREEN}✅ Old installation removed${NC}"
+fi
+
 echo -e "${BLUE}📁 Creating installation directory: $INSTALL_DIR${NC}"
 mkdir -p "$INSTALL_DIR"
 

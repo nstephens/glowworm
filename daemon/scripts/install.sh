@@ -74,6 +74,15 @@ echo "✅ System dependencies installed"
 # Create installation directory
 INSTALL_DIR="/opt/glowworm-daemon"
 echo ""
+
+# Check if installation exists
+if [ -d "$INSTALL_DIR" ]; then
+    echo "⚠️  Existing installation found at $INSTALL_DIR"
+    echo "   Removing old installation for clean setup..."
+    rm -rf "$INSTALL_DIR"
+    echo "✅ Old installation removed"
+fi
+
 echo "📁 Creating installation directory: $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
 
@@ -86,7 +95,7 @@ echo "✅ Virtual environment created"
 # Install daemon package in venv
 echo ""
 echo "📦 Installing Glowworm daemon package..."
-"$INSTALL_DIR/venv/bin/pip" install --upgrade pip
+"$INSTALL_DIR/venv/bin/pip" install --quiet --upgrade pip
 "$INSTALL_DIR/venv/bin/pip" install glowworm-daemon
 
 # Create symlink to daemon executable
