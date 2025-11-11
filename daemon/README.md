@@ -11,12 +11,28 @@ Optional daemon service that runs on Raspberry Pi display devices to enable host
 
 ## Installation
 
+### Quick Install (Auto-Configuration)
+
+**For display devices already showing Glowworm slideshows:**
+
 ```bash
-# On Raspberry Pi with FullPageOS
-curl -sSL https://raw.githubusercontent.com/yourusername/glowworm/main/daemon/scripts/install.sh | sudo bash
+# On Raspberry Pi - auto-detects configuration from browser cookies
+curl -sSL https://raw.githubusercontent.com/nstephens/glowworm/unstable/daemon/scripts/install-on-display.sh | sudo bash
 ```
 
-Or manual installation:
+This script:
+- ✅ Auto-detects server URL and device token from browser
+- ✅ Zero manual configuration needed
+- ✅ Perfect for authorized display devices
+
+### Standard Install (Interactive Setup)
+
+```bash
+# On Raspberry Pi with FullPageOS - manual configuration
+curl -sSL https://raw.githubusercontent.com/nstephens/glowworm/unstable/daemon/scripts/install.sh | sudo bash
+```
+
+### Manual Installation
 
 ```bash
 # Create virtual environment (PEP 668 compliant)
