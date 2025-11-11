@@ -264,12 +264,13 @@ else
     
     read -p "Press Enter to continue to setup wizard..."
     
-    glowworm-daemon-setup
+    # Call setup directly through venv to ensure modules are found
+    "$INSTALL_DIR/venv/bin/glowworm-daemon-setup"
     
     if [ $? -ne 0 ]; then
         echo ""
         echo -e "${YELLOW}⚠️  Setup wizard did not complete successfully${NC}"
-        echo "   You can run it again with: sudo glowworm-daemon-setup"
+        echo "   You can run it again with: sudo $INSTALL_DIR/venv/bin/glowworm-daemon-setup"
         echo ""
         exit 1
     fi

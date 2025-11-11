@@ -110,7 +110,8 @@ echo "   Example: http://10.10.10.2:3003 (NOT the backend port 8001/8002)"
 echo "   This should be the same URL you use to access the admin UI."
 echo ""
 
-glowworm-daemon-setup
+# Call setup directly through venv to ensure modules are found
+"$INSTALL_DIR/venv/bin/glowworm-daemon-setup"
 
 # Check if setup completed successfully
 if [ $? -eq 0 ]; then
@@ -136,7 +137,7 @@ if [ $? -eq 0 ]; then
 else
     echo ""
     echo "⚠️  Setup wizard did not complete successfully"
-    echo "   You can run it again with: sudo glowworm-daemon-setup"
+    echo "   You can run it again with: sudo $INSTALL_DIR/venv/bin/glowworm-daemon-setup"
     echo ""
     exit 1
 fi
