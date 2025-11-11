@@ -12,7 +12,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:-glowworm}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
-      - ./data/mysql:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     # No ports exposed - only accessible within Docker network
     # This prevents conflicts with host MySQL and improves security
@@ -25,21 +25,25 @@ services:
       retries: 5
       start_period: 30s
 
-  # Redis (for Celery task queue)
+  # Redis - Message broker for Celery
   glowworm-redis:
     image: redis:7-alpine
     container_name: glowworm-redis
     restart: unless-stopped
+    command: redis-server --appendonly yes
     environment:
       TZ: America/New_York
+    volumes:
+      - redis_data:/data
+    # No ports exposed - only accessible within Docker network
     networks:
       - glowworm-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 3s
       retries: 3
-      start_period: 10s
+      start_period: 5s
 
   # Backend API
   glowworm-backend:
@@ -57,13 +61,6 @@ services:
       MYSQL_USER: ${MYSQL_USER:-glowworm}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       
-      # Redis connection (for Celery)
-      REDIS_HOST: glowworm-redis
-      REDIS_PORT: 6379
-      REDIS_DB: 0
-      CELERY_BROKER_URL: redis://glowworm-redis:6379/0
-      CELERY_RESULT_BACKEND: redis://glowworm-redis:6379/0
-      
       # Application settings
       SECRET_KEY: ${SECRET_KEY}
       SERVER_BASE_URL: ${SERVER_BASE_URL:-http://localhost}
@@ -75,6 +72,14 @@ services:
       
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      
+      # Docker detection
+      DOCKER_MODE: "true"
+      
+      # Celery configuration
+      CELERY_BROKER_URL: redis://glowworm-redis:6379/0
+      CELERY_RESULT_BACKEND: redis://glowworm-redis:6379/0
+      USE_CELERY: ${USE_CELERY:-true}
     volumes:
       - ./data/uploads:/app/uploads
     ports:
@@ -92,102 +97,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  # Celery Worker (background task processing)
-  glowworm-celery-worker:
-    image: nickstephens/glowworm-backend:test
-    container_name: glowworm-celery-worker
-    restart: unless-stopped
-    command: celery -A backend.celery_app worker --loglevel=info --concurrency=2
-    environment:
-      # Timezone
-      TZ: America/New_York
-      
-      # Database connection
-      MYSQL_HOST: glowworm-mysql
-      MYSQL_PORT: 3306
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-glowworm}
-      MYSQL_USER: ${MYSQL_USER:-glowworm}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      
-      # Redis connection (for Celery)
-      REDIS_HOST: glowworm-redis
-      REDIS_PORT: 6379
-      REDIS_DB: 0
-      CELERY_BROKER_URL: redis://glowworm-redis:6379/0
-      CELERY_RESULT_BACKEND: redis://glowworm-redis:6379/0
-      
-      # Application settings
-      SECRET_KEY: ${SECRET_KEY}
-      SERVER_BASE_URL: ${SERVER_BASE_URL:-http://localhost}
-      DEFAULT_DISPLAY_TIME_SECONDS: ${DEFAULT_DISPLAY_TIME_SECONDS:-30}
-      UPLOAD_DIRECTORY: ${UPLOAD_DIRECTORY:-uploads}
-      
-      # Network settings
-      DISPLAY_NETWORK_INTERFACE: ${DISPLAY_NETWORK_INTERFACE:-localhost}
-      
-      # Logging
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    volumes:
-      - ./data/uploads:/app/uploads
-    depends_on:
-      glowworm-mysql:
-        condition: service_healthy
-      glowworm-redis:
-        condition: service_healthy
-    networks:
-      - glowworm-network
-    healthcheck:
-      test: ["CMD-SHELL", "celery -A backend.celery_app inspect ping -d celery@$$HOSTNAME"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  # Celery Beat (scheduled task scheduler)
-  glowworm-celery-beat:
-    image: nickstephens/glowworm-backend:test
-    container_name: glowworm-celery-beat
-    restart: unless-stopped
-    command: celery -A backend.celery_app beat --loglevel=info
-    environment:
-      # Timezone
-      TZ: America/New_York
-      
-      # Database connection
-      MYSQL_HOST: glowworm-mysql
-      MYSQL_PORT: 3306
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-glowworm}
-      MYSQL_USER: ${MYSQL_USER:-glowworm}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      
-      # Redis connection (for Celery)
-      REDIS_HOST: glowworm-redis
-      REDIS_PORT: 6379
-      REDIS_DB: 0
-      CELERY_BROKER_URL: redis://glowworm-redis:6379/0
-      CELERY_RESULT_BACKEND: redis://glowworm-redis:6379/0
-      
-      # Application settings
-      SECRET_KEY: ${SECRET_KEY}
-      SERVER_BASE_URL: ${SERVER_BASE_URL:-http://localhost}
-      DEFAULT_DISPLAY_TIME_SECONDS: ${DEFAULT_DISPLAY_TIME_SECONDS:-30}
-      UPLOAD_DIRECTORY: ${UPLOAD_DIRECTORY:-uploads}
-      
-      # Network settings
-      DISPLAY_NETWORK_INTERFACE: ${DISPLAY_NETWORK_INTERFACE:-localhost}
-      
-      # Logging
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-    volumes:
-      - ./data/uploads:/app/uploads
-    depends_on:
-      glowworm-mysql:
-        condition: service_healthy
-      glowworm-redis:
-        condition: service_healthy
-    networks:
-      - glowworm-network
 
   # Frontend Web Interface
   glowworm-frontend:
@@ -210,6 +119,47 @@ services:
       retries: 3
       start_period: 30s
 
+  # Celery Worker - Background task processing (includes Beat for scheduled tasks)
+  glowworm-celery-worker:
+    image: nickstephens/glowworm-backend:test
+    container_name: glowworm-celery-worker
+    restart: unless-stopped
+    command: celery -A celery_app worker --beat --loglevel=info --concurrency=4 --queues=high_priority,normal_priority,low_priority
+    environment:
+      # Timezone
+      TZ: America/New_York
+      
+      # Database connection
+      MYSQL_HOST: glowworm-mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-glowworm}
+      MYSQL_USER: ${MYSQL_USER:-glowworm}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      
+      # Celery configuration
+      CELERY_BROKER_URL: redis://glowworm-redis:6379/0
+      CELERY_RESULT_BACKEND: redis://glowworm-redis:6379/0
+      
+      # Application settings
+      SECRET_KEY: ${SECRET_KEY}
+      UPLOAD_DIRECTORY: ${UPLOAD_DIRECTORY:-uploads}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data/uploads:/app/uploads
+    depends_on:
+      glowworm-mysql:
+        condition: service_healthy
+      glowworm-redis:
+        condition: service_healthy
+    networks:
+      - glowworm-network
+
 networks:
   glowworm-network:
     driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
