@@ -14,6 +14,7 @@ NC='\033[0m' # No Color
 
 # Default values
 PUSH_TO_HUB=false
+PUSH_TEST=false
 LOCAL_ONLY=false
 CUSTOM_VERSION=""
 DOCKER_USERNAME="nickstephens"
@@ -25,6 +26,10 @@ while [[ $# -gt 0 ]]; do
             PUSH_TO_HUB=true
             shift
             ;;
+        --push-test)
+            PUSH_TEST=true
+            shift
+            ;;
         --local-only)
             LOCAL_ONLY=true
             shift
@@ -34,8 +39,9 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -h|--help)
-            echo "Usage: $0 [--push] [--local-only] [--version X.Y.Z]"
-            echo "  --push       Push images to Docker Hub after building"
+            echo "Usage: $0 [--push] [--push-test] [--local-only] [--version X.Y.Z]"
+            echo "  --push       Push :latest and :VERSION to Docker Hub (production)"
+            echo "  --push-test  Push :test tag to Docker Hub (unstable branch)"
             echo "  --local-only Only build locally, don't push"
             echo "  --version    Use a specific version instead of auto-incrementing"
             exit 0
@@ -232,11 +238,13 @@ fi
 echo -e "${YELLOW}🐳 Docker Username: ${DOCKER_USERNAME}${NC}"
 
 if [ "$PUSH_TO_HUB" = true ]; then
-    echo -e "${YELLOW}📤 Will push to Docker Hub${NC}"
+    echo -e "${YELLOW}📤 Will push :latest and :VERSION to Docker Hub (production)${NC}"
+elif [ "$PUSH_TEST" = true ]; then
+    echo -e "${YELLOW}📤 Will push :test to Docker Hub (unstable branch)${NC}"
 elif [ "$LOCAL_ONLY" = true ]; then
     echo -e "${YELLOW}🏠 Local build only${NC}"
 else
-    echo -e "${YELLOW}🏠 Local build (use --push to also push to hub)${NC}"
+    echo -e "${YELLOW}🏠 Local build (use --push or --push-test to push to hub)${NC}"
 fi
 
 echo ""
@@ -262,35 +270,57 @@ echo -e "${GREEN}✅ Frontend image built${NC}"
 
 # Push to Docker Hub if requested
 if [ "$PUSH_TO_HUB" = true ]; then
-    echo -e "${BLUE}📤 Pushing to Docker Hub...${NC}"
+    echo -e "${BLUE}📤 Pushing production images to Docker Hub...${NC}"
     
     # Push backend
     echo -e "${YELLOW}📤 Pushing backend...${NC}"
     docker push ${DOCKER_USERNAME}/glowworm-backend:latest
     docker push ${DOCKER_USERNAME}/glowworm-backend:${VERSION}
-    docker push ${DOCKER_USERNAME}/glowworm-backend:test
     
     # Push frontend
     echo -e "${YELLOW}📤 Pushing frontend...${NC}"
     docker push ${DOCKER_USERNAME}/glowworm-frontend:latest
     docker push ${DOCKER_USERNAME}/glowworm-frontend:${VERSION}
+    
+    echo -e "${GREEN}✅ Production images pushed to Docker Hub${NC}"
+    echo -e "${BLUE}  Tags: :latest, :${VERSION}${NC}"
+fi
+
+# Push test tags for unstable branch if requested
+if [ "$PUSH_TEST" = true ]; then
+    echo -e "${BLUE}📤 Pushing :test tags to Docker Hub (unstable branch)...${NC}"
+    
+    # Push backend :test
+    echo -e "${YELLOW}📤 Pushing backend:test...${NC}"
+    docker push ${DOCKER_USERNAME}/glowworm-backend:test
+    
+    # Push frontend :test
+    echo -e "${YELLOW}📤 Pushing frontend:test...${NC}"
     docker push ${DOCKER_USERNAME}/glowworm-frontend:test
     
-    echo -e "${GREEN}✅ All images pushed to Docker Hub${NC}"
-    echo -e "${BLUE}  Including :test tags for unstable branch${NC}"
+    echo -e "${GREEN}✅ Test images pushed to Docker Hub${NC}"
+    echo -e "${BLUE}  Tags: :test (for unstable branch testing)${NC}"
 fi
 
 echo ""
 echo -e "${GREEN}🎉 Build complete!${NC}"
-echo -e "${BLUE}📋 Images created:${NC}"
+echo -e "${BLUE}📋 Images created locally:${NC}"
 echo "  - ${DOCKER_USERNAME}/glowworm-backend:latest"
 echo "  - ${DOCKER_USERNAME}/glowworm-backend:${VERSION}"
 echo "  - ${DOCKER_USERNAME}/glowworm-backend:test"
 echo "  - ${DOCKER_USERNAME}/glowworm-frontend:latest"
 echo "  - ${DOCKER_USERNAME}/glowworm-frontend:${VERSION}"
 echo "  - ${DOCKER_USERNAME}/glowworm-frontend:test"
+echo "  - glowworm-backend-local (for docker-publish dev)"
+echo "  - glowworm-frontend-local (for docker-publish dev)"
 
 if [ "$PUSH_TO_HUB" = true ]; then
     echo ""
-    echo -e "${GREEN}🚀 Images are now available on Docker Hub!${NC}"
+    echo -e "${GREEN}🚀 Production images (:latest, :${VERSION}) pushed to Docker Hub!${NC}"
+fi
+
+if [ "$PUSH_TEST" = true ]; then
+    echo ""
+    echo -e "${GREEN}🧪 Test images (:test) pushed to Docker Hub!${NC}"
+    echo -e "${BLUE}  Ready for unstable branch testing${NC}"
 fi
