@@ -297,10 +297,13 @@ echo ""
 echo -e "${YELLOW}📁 Creating uploads directory...${NC}"
 mkdir -p data/uploads
 
-# Set permissions for container user (backend runs as UID 1000 'glowworm')
-echo -e "${YELLOW}Setting directory permissions...${NC}"
-chmod 777 data/uploads
-echo -e "${GREEN}✅ Data directory created with proper permissions${NC}"
+# Set ownership for container user (backend runs as UID 1000 'glowworm')
+echo -e "${YELLOW}Setting directory ownership...${NC}"
+chown -R 1000:1000 data/uploads 2>/dev/null || sudo chown -R 1000:1000 data/uploads 2>/dev/null || {
+    echo -e "${YELLOW}⚠️  Could not set ownership, using fallback permissions${NC}"
+    chmod 755 data/uploads
+}
+echo -e "${GREEN}✅ Data directory created with proper ownership${NC}"
 echo ""
 
 # Download required files if they don't exist
