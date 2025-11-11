@@ -117,10 +117,21 @@ if [ "$TOKEN_DETECTED" = false ]; then
     echo ""
 fi
 
+# Check for systemd
+echo -e "${BLUE}🔍 Checking system requirements...${NC}"
+if ! command -v systemctl &> /dev/null; then
+    echo -e "${RED}❌ systemd is required but not found${NC}"
+    echo "   This script requires systemd to manage the daemon service."
+    echo "   Most Raspberry Pi OS installations have systemd by default."
+    echo ""
+    exit 1
+fi
+echo -e "${GREEN}✅ systemd detected${NC}"
+
 # Install system dependencies
+echo ""
 echo -e "${BLUE}📦 Installing system dependencies...${NC}"
 
-# Install sqlite3 for future cookie reading
 apt-get update -qq
 apt-get install -y -qq \
     python3 \
@@ -129,7 +140,6 @@ apt-get install -y -qq \
     cec-utils \
     libcec6 \
     python3-cec \
-    systemd \
     sqlite3 \
     curl
 

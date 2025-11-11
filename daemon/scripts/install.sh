@@ -44,6 +44,18 @@ fi
 
 echo "✅ Python version: $PYTHON_VERSION"
 
+# Check for systemd
+echo ""
+echo "🔍 Checking system requirements..."
+if ! command -v systemctl &> /dev/null; then
+    echo "❌ systemd is required but not found"
+    echo "   This script requires systemd to manage the daemon service."
+    echo "   Most Raspberry Pi OS installations have systemd by default."
+    echo ""
+    exit 1
+fi
+echo "✅ systemd detected"
+
 # Install system dependencies
 echo ""
 echo "📦 Installing system dependencies..."
@@ -55,8 +67,7 @@ apt-get install -y -qq \
     python3-full \
     cec-utils \
     libcec6 \
-    python3-cec \
-    systemd
+    python3-cec
 
 echo "✅ System dependencies installed"
 
