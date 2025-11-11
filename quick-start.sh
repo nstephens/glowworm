@@ -6,7 +6,7 @@
 set -e
 
 # Configuration
-REPO_BASE="https://raw.githubusercontent.com/nstephens/glowworm/main"
+REPO_BASE="https://raw.githubusercontent.com/nstephens/glowworm/unstable"
 
 # Parse command line arguments
 CLEAN_INSTALL=false
