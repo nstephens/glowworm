@@ -1,21 +1,13 @@
 -- MySQL initialization script for Glowworm
--- This script sets up the database and user
+-- This script sets up the database schema
+--
+-- NOTE: The 'glowworm' user and database are created automatically by MySQL
+-- via MYSQL_USER, MYSQL_PASSWORD, and MYSQL_DATABASE environment variables
+-- in docker-compose.yml. No need to create them here.
 
--- Create the database
-CREATE DATABASE IF NOT EXISTS glowworm CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- Create the application user
-CREATE USER IF NOT EXISTS 'glowworm'@'%' IDENTIFIED BY 'asfkakdkakas93ikkass';
-
--- Grant privileges
-GRANT ALL PRIVILEGES ON glowworm.* TO 'glowworm'@'%';
-
--- Flush privileges
-FLUSH PRIVILEGES;
-
--- Use the database
+-- Use the database (already created by MySQL from MYSQL_DATABASE env var)
 USE glowworm;
 
--- Create initial tables will be handled by Alembic migrations
--- This script just ensures the database and user exist
+-- Database schema will be created by Alembic migrations on backend startup
+-- This init.sql can contain any custom SQL for initial setup if needed
 
