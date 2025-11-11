@@ -290,17 +290,7 @@ echo ""
 if [ ! -f docker-compose.yml ]; then
     echo -e "${YELLOW}📥 Downloading docker-compose.yml...${NC}"
     curl -sS -o docker-compose.yml "$REPO_BASE/docker-compose.yml"
-fi
-
-# Download docker config files if they don't exist
-if [ ! -f docker/mysql/init.sql ]; then
-    echo -e "${YELLOW}📥 Downloading docker configuration files...${NC}"
-    mkdir -p docker/{mysql,scripts}
-    curl -sS -o docker/mysql/init.sql "$REPO_BASE/docker/mysql/init.sql"
-    curl -sS -o docker/scripts/wait-for-mysql.sh "$REPO_BASE/docker/scripts/wait-for-mysql.sh"
-    curl -sS -o docker/scripts/start-backend.sh "$REPO_BASE/docker/scripts/start-backend.sh"
-    chmod +x docker/scripts/wait-for-mysql.sh docker/scripts/start-backend.sh
-    echo -e "${GREEN}✅ Configuration files downloaded${NC}"
+    echo -e "${GREEN}✅ docker-compose.yml downloaded${NC}"
 fi
 
 # Check which docker-compose file to use

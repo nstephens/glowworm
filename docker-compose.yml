@@ -13,7 +13,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    # No init.sql needed - MySQL auto-creates database/user from env vars
     # No ports exposed - only accessible within Docker network
     # This prevents conflicts with host MySQL and improves security
     networks:
