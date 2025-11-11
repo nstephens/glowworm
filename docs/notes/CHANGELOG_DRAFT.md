@@ -76,8 +76,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Installation & Setup**
 - One-command installation script for Raspberry Pi devices
+- **NEW: Semi-automatic configuration script** that extracts device token from browser
+  - Auto-extracts device token from browser cookies (no manual lookup!)
+  - Prompts only for server URL (minimal user input)
+  - Much faster than full manual setup
+  - Perfect for authorized display devices
 - Automatic systemd service configuration for reliable background operation
-- Interactive setup wizard for daemon configuration
+- Interactive setup wizard for daemon configuration (fallback)
 - Built-in health monitoring and automatic error recovery
 
 **Admin Interface**

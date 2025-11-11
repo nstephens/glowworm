@@ -11,18 +11,19 @@ Optional daemon service that runs on Raspberry Pi display devices to enable host
 
 ## Installation
 
-### Quick Install (Auto-Configuration)
+### Quick Install (Semi-Automatic)
 
 **For display devices already showing Glowworm slideshows:**
 
 ```bash
-# On Raspberry Pi - auto-detects configuration from browser cookies
+# On Raspberry Pi - extracts device token from browser
 curl -sSL https://raw.githubusercontent.com/nstephens/glowworm/unstable/daemon/scripts/install-on-display.sh | sudo bash
 ```
 
 This script:
-- ✅ Auto-detects server URL and device token from browser
-- ✅ Zero manual configuration needed
+- ✅ Auto-extracts device token from browser cookies
+- ✅ Prompts only for server URL (you know this already!)
+- ✅ Minimal configuration - just paste your admin UI URL
 - ✅ Perfect for authorized display devices
 
 ### Standard Install (Interactive Setup)

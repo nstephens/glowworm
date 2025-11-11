@@ -73,12 +73,11 @@ fi
 echo -e "${GREEN}✅ Python version: $PYTHON_VERSION${NC}"
 echo ""
 
-# Try to auto-detect configuration from browser
-echo -e "${BLUE}🔍 Attempting to auto-detect configuration from browser...${NC}"
+# Try to auto-detect device token from browser
+echo -e "${BLUE}🔍 Attempting to auto-detect device token from browser...${NC}"
 echo ""
 
-AUTO_DETECTED=false
-SERVER_URL=""
+TOKEN_DETECTED=false
 DEVICE_TOKEN=""
 
 # Check for Chromium cookie database
@@ -97,22 +96,10 @@ for COOKIE_PATH in "${CHROMIUM_COOKIES_PATHS[@]}"; do
             # Get device token from cookie
             DEVICE_TOKEN=$(sqlite3 "$COOKIE_PATH" "SELECT value FROM cookies WHERE name='device_token' LIMIT 1;" 2>/dev/null || echo "")
             
-            # Get server URL from cookie host
-            COOKIE_HOST=$(sqlite3 "$COOKIE_PATH" "SELECT host_key FROM cookies WHERE name='device_token' LIMIT 1;" 2>/dev/null || echo "")
-            
-            if [ -n "$DEVICE_TOKEN" ] && [ -n "$COOKIE_HOST" ]; then
-                # Clean up host (remove leading dot if present)
-                COOKIE_HOST=$(echo "$COOKIE_HOST" | sed 's/^\.//g')
-                
-                # Construct server URL (assume port 3003)
-                SERVER_URL="http://${COOKIE_HOST}:3003"
-                
-                echo -e "${GREEN}✅ Auto-detected configuration:${NC}"
-                echo "   Server URL: $SERVER_URL"
-                echo "   Device Token: $DEVICE_TOKEN"
+            if [ -n "$DEVICE_TOKEN" ]; then
+                echo -e "${GREEN}✅ Device token found: $DEVICE_TOKEN${NC}"
                 echo ""
-                
-                AUTO_DETECTED=true
+                TOKEN_DETECTED=true
                 break
             fi
         else
@@ -121,14 +108,12 @@ for COOKIE_PATH in "${CHROMIUM_COOKIES_PATHS[@]}"; do
     fi
 done
 
-if [ "$AUTO_DETECTED" = false ]; then
-    echo -e "${YELLOW}⚠️  Could not auto-detect configuration${NC}"
+if [ "$TOKEN_DETECTED" = false ]; then
+    echo -e "${YELLOW}⚠️  Could not auto-detect device token${NC}"
     echo "   This is normal if:"
     echo "   - Browser not running as Glowworm display"
     echo "   - Device not yet authorized"
     echo "   - Different browser used"
-    echo ""
-    echo -e "${BLUE}Will run interactive setup wizard instead${NC}"
     echo ""
 fi
 
@@ -182,9 +167,25 @@ echo -e "${GREEN}✅ Glowworm daemon installed${NC}"
 echo ""
 
 # Configuration
-if [ "$AUTO_DETECTED" = true ]; then
-    echo -e "${BLUE}🔧 Configuring daemon with auto-detected settings...${NC}"
+if [ "$TOKEN_DETECTED" = true ]; then
+    echo -e "${BLUE}🔧 Semi-automatic configuration (token detected)...${NC}"
     echo ""
+    echo -e "${GREEN}✅ Device token detected: $DEVICE_TOKEN${NC}"
+    echo ""
+    echo -e "${YELLOW}⚠️  Server URL needed${NC}"
+    echo "   Enter your Glowworm frontend URL (same as admin UI)"
+    echo "   Example: http://10.10.10.2:3003"
+    echo "   NOT the backend port (8001/8002)"
+    echo ""
+    
+    # Prompt for server URL
+    read -p "Server URL: " SERVER_URL
+    
+    # Validate URL format
+    if [[ ! "$SERVER_URL" =~ ^https?:// ]]; then
+        echo -e "${RED}❌ Invalid URL format (must start with http:// or https://)${NC}"
+        exit 1
+    fi
     
     # Create config directory
     mkdir -p /etc/glowworm
@@ -192,7 +193,7 @@ if [ "$AUTO_DETECTED" = true ]; then
     # Create configuration file
     cat > /etc/glowworm/daemon.conf << EOF
 [daemon]
-# Auto-configured from display device browser cookies
+# Semi-auto configured: Token from browser, URL from user
 backend_url = $SERVER_URL
 device_token = $DEVICE_TOKEN
 poll_interval = 30
@@ -207,6 +208,7 @@ adapter = /dev/cec0
 config_path = /boot/firmware/fullpageos.txt
 EOF
     
+    echo ""
     echo -e "${GREEN}✅ Configuration file created: /etc/glowworm/daemon.conf${NC}"
     echo ""
     echo -e "${BLUE}📋 Configuration:${NC}"
@@ -297,8 +299,9 @@ echo ""
 echo -e "${BLUE}Daemon installed successfully!${NC}"
 echo ""
 
-if [ "$AUTO_DETECTED" = true ]; then
-    echo -e "${GREEN}✨ Auto-configuration successful!${NC}"
+if [ "$TOKEN_DETECTED" = true ]; then
+    echo -e "${GREEN}✨ Semi-automatic configuration successful!${NC}"
+    echo "   (Device token extracted from browser)"
     echo ""
 fi
 
