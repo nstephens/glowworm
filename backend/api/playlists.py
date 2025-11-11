@@ -852,12 +852,17 @@ async def generate_all_playlist_variants(
 ):
     """Queue all playlist images for variant regeneration using Celery or BackgroundTasks"""
     try:
+        print("🔄 [DEBUG] generate-all-variants endpoint called", flush=True)
         logger.info("🔄 Queueing playlist images for variant regeneration...")
+        print("🔄 [DEBUG] After logger.info", flush=True)
         
         # Get all unique images that are in playlists
+        print("🔄 [DEBUG] About to query images", flush=True)
         images_in_playlists = db.query(Image).filter(Image.playlist_id.isnot(None)).distinct().all()
+        print(f"🔄 [DEBUG] Found {len(images_in_playlists)} images", flush=True)
         
         if not images_in_playlists:
+            print("🔄 [DEBUG] No images found, returning early", flush=True)
             return {
                 "message": "No playlist images found to regenerate",
                 "data": {"total_images": 0, "queued": 0},
@@ -865,8 +870,10 @@ async def generate_all_playlist_variants(
             }
         
         use_celery = os.getenv('USE_CELERY', 'true').lower() == 'true'
+        print(f"🔄 [DEBUG] use_celery={use_celery}", flush=True)
         
         # Reset variant status for all playlist images
+        print("🔄 [DEBUG] Resetting image statuses", flush=True)
         for image in images_in_playlists:
             image.variant_status = 'pending'
             image.processing_status = 'pending'
@@ -874,7 +881,9 @@ async def generate_all_playlist_variants(
             image.processing_attempts = 0
             image.last_processing_attempt = None
         
+        print("🔄 [DEBUG] About to commit", flush=True)
         db.commit()
+        print("🔄 [DEBUG] Commit successful", flush=True)
         
         # Queue tasks using Celery or fallback
         queued_count = 0
@@ -914,7 +923,12 @@ async def generate_all_playlist_variants(
         }
         
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ [DEBUG] Exception in generate-all-variants: {e}", flush=True)
+        print(f"❌ [DEBUG] Traceback:\n{error_trace}", flush=True)
         logger.error(f"Generate all playlist variants error: {e}")
+        logger.error(f"Traceback: {error_trace}")
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
