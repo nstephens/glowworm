@@ -221,16 +221,16 @@ else
     
     VERSION=$(increment_version "$BASE_VERSION")
     echo -e "${YELLOW}📦 New version: ${VERSION}${NC}"
-    
-    # Update package.json version to match Docker version
-    echo -e "${BLUE}📝 Updating package.json version to ${VERSION}...${NC}"
-    if [ -f "../frontend/package.json" ]; then
-        # Use sed to update the version in package.json
-        sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/" ../frontend/package.json
-        echo -e "${GREEN}✅ Updated frontend/package.json to version ${VERSION}${NC}"
-    else
-        echo -e "${YELLOW}⚠️  frontend/package.json not found, skipping version update${NC}"
-    fi
+fi
+
+# Update package.json version to match Docker version (always, regardless of --version flag)
+echo -e "${BLUE}📝 Updating package.json version to ${VERSION}...${NC}"
+if [ -f "../frontend/package.json" ]; then
+    # Use sed to update the version in package.json
+    sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/" ../frontend/package.json
+    echo -e "${GREEN}✅ Updated frontend/package.json to version ${VERSION}${NC}"
+else
+    echo -e "${YELLOW}⚠️  frontend/package.json not found, skipping version update${NC}"
 fi
 
 # Docker Hub username
