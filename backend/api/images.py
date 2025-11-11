@@ -268,8 +268,27 @@ async def upload_image(
             file_hash=image_metadata['file_hash'],
             exif_data=image_metadata['exif'],
             album_id=album_id,
-            playlist_id=playlist_id
+            playlist_id=None  # Set to None initially, will be added via service if needed
         )
+        
+        # If uploading to a playlist, properly add it and update the sequence
+        if playlist_id:
+            from services.playlist_service import PlaylistService
+            from services.playlist_variant_service import PlaylistVariantService
+            
+            playlist_service = PlaylistService(db)
+            playlist_service.add_image_to_playlist(playlist_id, image.id)
+            logger.info(f"Added image {image.id} to playlist {playlist_id} with sequence update")
+            
+            # Auto-regenerate playlist variants so new images are included
+            try:
+                variant_service = PlaylistVariantService(db)
+                variant_service.generate_variants_for_playlist(playlist_id)
+                db.commit()
+                logger.info(f"Auto-regenerated playlist variants for playlist {playlist_id}")
+            except Exception as e:
+                logger.warning(f"Auto playlist variant generation failed (non-fatal): {e}")
+                # Don't fail the upload if variant generation fails
         
         # Queue background processing via Celery
         use_celery = os.getenv('USE_CELERY', 'true').lower() == 'true'
