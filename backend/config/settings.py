@@ -91,7 +91,7 @@ def get_fresh_settings() -> Settings:
     """Get a fresh Settings instance with current configuration from file or environment"""
     try:
         # For Docker deployments, use environment variables
-        if os.getenv('MYSQL_PASSWORD') and os.getenv('SECRET_KEY'):
+        if os.getenv('DOCKER_MODE') == 'true' or (os.getenv('MYSQL_PASSWORD') and os.getenv('SECRET_KEY')):
             # Running in Docker with environment variables
             return Settings(
                 mysql_host=os.getenv("MYSQL_HOST", "localhost"),
@@ -119,7 +119,13 @@ def get_fresh_settings() -> Settings:
 
 def is_configured() -> bool:
     """Check if the application is properly configured"""
-    # For Docker deployments, check if we have environment variables set
+    # For Docker deployments, check DOCKER_MODE flag first
+    if os.getenv('DOCKER_MODE') == 'true':
+        # Running in Docker - bootstrap is always configured via environment variables
+        # Only need to check if admin user exists (done separately)
+        return True
+    
+    # Legacy check: environment variables set (for backward compatibility)
     if os.getenv('MYSQL_PASSWORD') and os.getenv('SECRET_KEY'):
         # Running in Docker with environment variables - consider bootstrap configured
         # The database connection test will be done separately to determine if admin user exists
