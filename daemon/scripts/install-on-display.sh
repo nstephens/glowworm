@@ -141,7 +141,8 @@ apt-get install -y -qq \
     libcec6 \
     python3-cec \
     sqlite3 \
-    curl
+    curl \
+    git
 
 echo -e "${GREEN}✅ System dependencies installed${NC}"
 
@@ -170,7 +171,8 @@ echo -e "${GREEN}✅ Virtual environment created${NC}"
 echo ""
 echo -e "${BLUE}📦 Installing Glowworm daemon package...${NC}"
 "$INSTALL_DIR/venv/bin/pip" install --quiet --upgrade pip
-"$INSTALL_DIR/venv/bin/pip" install --quiet glowworm-daemon
+# Install from GitHub (unstable branch) until published to PyPI
+"$INSTALL_DIR/venv/bin/pip" install --quiet git+https://github.com/nstephens/glowworm.git@unstable#subdirectory=daemon
 
 # Create symlink to daemon executable
 ln -sf "$INSTALL_DIR/venv/bin/glowworm-daemon" /usr/local/bin/glowworm-daemon
