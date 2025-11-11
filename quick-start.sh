@@ -297,7 +297,10 @@ echo ""
 echo -e "${YELLOW}📁 Creating uploads directory...${NC}"
 mkdir -p data/uploads
 
-echo -e "${GREEN}✅ Data directory created${NC}"
+# Set permissions for container user (backend runs as UID 1000 'glowworm')
+echo -e "${YELLOW}Setting directory permissions...${NC}"
+chmod 777 data/uploads
+echo -e "${GREEN}✅ Data directory created with proper permissions${NC}"
 echo ""
 
 # Download required files if they don't exist
