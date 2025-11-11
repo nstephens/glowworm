@@ -1628,6 +1628,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
       {settings.showInfo && !shouldShowSplitScreen && (
         <div className="absolute bottom-4 right-4 bg-gray-800 bg-opacity-90 text-white px-3 py-2 rounded-lg">
           <div className="space-y-1">
+            <p className="text-xs text-gray-400 font-mono">ID: {currentImage.id}</p>
             <p className="text-sm font-medium leading-tight">{currentImage.original_filename}</p>
             {displayResolution ? (
               <p className="text-xs text-gray-300">
@@ -1667,6 +1668,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
           {/* Top Image Info */}
           <div className="absolute top-4 left-4 bg-gray-800 bg-opacity-90 text-white px-3 py-2 rounded-lg" style={{ marginTop: '56px' }}>
             <div className="space-y-1">
+              <p className="text-xs text-gray-400 font-mono">ID: {currentImage?.id}</p>
               <p className="text-sm font-medium leading-tight">{currentImage?.original_filename}</p>
               {displayResolution ? (
                 <p className="text-xs text-gray-300">
@@ -1700,6 +1702,7 @@ export const FullscreenSlideshowOptimized: React.FC<FullscreenSlideshowProps> = 
           {/* Bottom Image Info */}
           <div className="absolute bottom-4 right-4 bg-gray-800 bg-opacity-90 text-white px-3 py-2 rounded-lg">
             <div className="space-y-1">
+              <p className="text-xs text-gray-400 font-mono">ID: {nextImageData.id}</p>
               <p className="text-sm font-medium leading-tight">{nextImageData.original_filename}</p>
               {displayResolution ? (
                 <p className="text-xs text-gray-300">
