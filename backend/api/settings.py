@@ -218,7 +218,6 @@ async def get_variant_status_by_resolution(
             images_eligible_for_scaling = 0
             
             upload_path = Path(config_settings.upload_path)
-            scaled_dir = upload_path / "scaled"
             
             for image in images:
                 # Only count images that are large enough to be scaled to this resolution
@@ -229,16 +228,44 @@ async def get_variant_status_by_resolution(
                 
                 images_eligible_for_scaling += 1
                 
-                # Check if scaled file exists
+                # Check if scaled file exists (search in both old 'scaled/' and new date-organized structure)
                 if image.filename:
                     stem = Path(image.filename).stem
                     suffix = Path(image.filename).suffix
-                    # Scaled images are stored as: originalname_1080x1920.jpg in /uploads/scaled/
                     scaled_filename = f"{stem}_{resolution_str}{suffix}"
-                    scaled_path = scaled_dir / scaled_filename
                     
-                    if scaled_path.exists():
+                    # Check old flat structure first
+                    scaled_path_old = upload_path / "scaled" / scaled_filename
+                    if scaled_path_old.exists():
                         images_with_variants += 1
+                        continue
+                    
+                    # Search in date-organized structure (uploads/YEAR/MONTH/user_X/)
+                    found = False
+                    for year_dir in upload_path.iterdir():
+                        if not year_dir.is_dir() or year_dir.name in ['thumbnails', 'scaled', 'optimized']:
+                            continue
+                        for month_dir in year_dir.iterdir():
+                            if not month_dir.is_dir():
+                                continue
+                            for user_dir in month_dir.iterdir():
+                                if not user_dir.is_dir():
+                                    continue
+                                scaled_path = user_dir / scaled_filename
+                                if scaled_path.exists():
+                                    images_with_variants += 1
+                                    found = True
+                                    break
+                            if found:
+                                break
+                            # Also check month dir directly (no user subdirectory)
+                            scaled_path = month_dir / scaled_filename
+                            if scaled_path.exists():
+                                images_with_variants += 1
+                                found = True
+                                break
+                        if found:
+                            break
             
             # Update total to reflect only eligible images for this resolution
             total_images_for_resolution = images_eligible_for_scaling
