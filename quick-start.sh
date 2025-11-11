@@ -131,6 +131,29 @@ if [ ! -f .env ]; then
     echo -e "${GREEN}✅ Passwords generated${NC}"
     echo ""
     
+    # Detect network interfaces
+    echo -e "${BLUE}🔍 Detecting network interfaces...${NC}"
+    DETECTED_IPS=$(hostname -I 2>/dev/null || echo "")
+    
+    # Try to intelligently guess the best interface
+    SUGGESTED_IP="localhost"
+    if [ -n "$DETECTED_IPS" ]; then
+        # Filter for typical LAN addresses, excluding Docker subnets
+        for ip in $DETECTED_IPS; do
+            # Check if it's a private IP and not a Docker default subnet
+            if [[ $ip =~ ^192\.168\. ]] || [[ $ip =~ ^10\. ]] || [[ $ip =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]]; then
+                # Exclude common Docker subnets
+                if [[ ! $ip =~ ^172\.17\. ]] && [[ ! $ip =~ ^172\.18\. ]]; then
+                    SUGGESTED_IP=$ip
+                    break
+                fi
+            fi
+        done
+    fi
+    
+    echo -e "${GREEN}✅ Detected interfaces${NC}"
+    echo ""
+    
     # Create .env with generated passwords
     cat > .env << EOF
 # Glowworm Docker Environment Configuration
@@ -139,13 +162,49 @@ if [ ! -f .env ]; then
 # Generated: $(date)
 
 # ===========================================
+# 🌐 NETWORK CONFIGURATION - REVIEW THIS!
+# ===========================================
+# This is the IP address that display devices use to connect to Glowworm
+# 
+# Detected network interfaces on this server:
+EOF
+
+    # Add detected IPs as commented options
+    if [ -n "$DETECTED_IPS" ]; then
+        for ip in $DETECTED_IPS; do
+            if [ "$ip" = "$SUGGESTED_IP" ]; then
+                echo "# - $ip  ← Recommended (typical LAN address)" >> .env
+            elif [[ $ip =~ ^127\. ]]; then
+                echo "# - $ip  (localhost - only works on this machine)" >> .env
+            elif [[ $ip =~ ^172\.17\. ]] || [[ $ip =~ ^172\.18\. ]]; then
+                echo "# - $ip  (Docker network - not recommended)" >> .env
+            else
+                echo "# - $ip" >> .env
+            fi
+        done
+    else
+        echo "# (No interfaces detected - using localhost)" >> .env
+    fi
+    
+    cat >> .env << EOF
+#
+# Choose the interface where display devices will connect:
+DISPLAY_NETWORK_INTERFACE=$SUGGESTED_IP
+
+# ===========================================
+# ⚙️  ADVANCED SETTINGS (rarely need changes)
+# ===========================================
+# You probably don't need to change anything below this line unless you have
+# specific requirements or are troubleshooting connection issues.
+
+# ===========================================
 # MYSQL CONFIGURATION
 # ===========================================
 # Secure passwords auto-generated
 MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASS
 MYSQL_PASSWORD=$MYSQL_APP_PASS
 
-# Database settings
+# Database settings (internal Docker network)
 MYSQL_DATABASE=glowworm
 MYSQL_USER=glowworm
 MYSQL_HOST=glowworm-mysql
@@ -157,9 +216,9 @@ MYSQL_PORT=3306
 # Secure secret key auto-generated for JWT tokens
 SECRET_KEY=$SECRET_KEY
 
-# Server settings
-# IMPORTANT: Set SERVER_BASE_URL to your server's IP address or domain
-# Example: http://192.168.1.100:8001 or http://myserver.local:8001
+# Server settings (internal use only - backend is not directly exposed)
+# This is used internally by the backend for URL generation
+# The frontend proxies all API requests, so displays connect via DISPLAY_NETWORK_INTERFACE above
 SERVER_BASE_URL=http://localhost:8001
 BACKEND_PORT=8001
 FRONTEND_PORT=3003
@@ -169,34 +228,32 @@ DEFAULT_DISPLAY_TIME_SECONDS=30
 UPLOAD_DIRECTORY=uploads
 
 # ===========================================
-# NETWORK CONFIGURATION
-# ===========================================
-# Change these to your actual network interface IP if needed
-# For local development, localhost should work fine
-DISPLAY_NETWORK_INTERFACE=localhost
-
-# ===========================================
 # DEVELOPMENT SETTINGS (Optional)
 # ===========================================
-# Uncomment for development
+# Uncomment for development/debugging
 # DEBUG=true
 # LOG_LEVEL=DEBUG
 EOF
     
     echo -e "${GREEN}✅ Secure passwords generated and saved to .env${NC}"
     echo ""
-    echo -e "${YELLOW}📝 Please review and update these settings if needed:${NC}"
+    echo -e "${YELLOW}📝 Network Configuration:${NC}"
     echo ""
-    echo -e "${BLUE}RECOMMENDED for remote/headless servers:${NC}"
-    echo "  SERVER_BASE_URL - Set to your server's IP address"
-    echo "     Example: http://192.168.1.100:8001"
-    echo ""
-    echo -e "${YELLOW}💡 Find your server's IP address:${NC}"
-    echo "  hostname -I"
-    echo ""
-    echo -e "${BLUE}For headless servers:${NC}"
-    echo "  Set SERVER_BASE_URL to http://YOUR_SERVER_IP:8001"
-    echo "  This allows displays and clients to connect from other devices"
+    if [ "$SUGGESTED_IP" != "localhost" ]; then
+        echo -e "${GREEN}✅ Auto-detected network interface: $SUGGESTED_IP${NC}"
+        echo "   This should work for display devices on your network."
+        echo ""
+        echo -e "${BLUE}If displays can't connect, you may need to update:${NC}"
+        echo "   DISPLAY_NETWORK_INTERFACE in .env file"
+        echo "   (See commented options at the top of .env)"
+    else
+        echo -e "${YELLOW}⚠️  Network interface set to 'localhost'${NC}"
+        echo "   This only works if displays run on the same machine."
+        echo ""
+        echo -e "${BLUE}For remote displays, update in .env:${NC}"
+        echo "   DISPLAY_NETWORK_INTERFACE - Set to your server's IP"
+        echo "   (See detected interfaces at the top of .env)"
+    fi
     echo ""
     
     # Open editor
