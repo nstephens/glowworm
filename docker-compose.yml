@@ -43,7 +43,7 @@ services:
 
   # Backend API
   glowworm-backend:
-    image: nickstephens/glowworm-backend:latest
+    image: nickstephens/glowworm-backend:test
     container_name: glowworm-backend
     restart: unless-stopped
     environment:
@@ -95,7 +95,7 @@ services:
 
   # Celery Worker (background task processing)
   glowworm-celery-worker:
-    image: nickstephens/glowworm-backend:latest
+    image: nickstephens/glowworm-backend:test
     container_name: glowworm-celery-worker
     restart: unless-stopped
     command: celery -A backend.celery_app worker --loglevel=info --concurrency=2
@@ -146,7 +146,7 @@ services:
 
   # Celery Beat (scheduled task scheduler)
   glowworm-celery-beat:
-    image: nickstephens/glowworm-backend:latest
+    image: nickstephens/glowworm-backend:test
     container_name: glowworm-celery-beat
     restart: unless-stopped
     command: celery -A backend.celery_app beat --loglevel=info
@@ -191,7 +191,7 @@ services:
 
   # Frontend Web Interface
   glowworm-frontend:
-    image: nickstephens/glowworm-frontend:latest
+    image: nickstephens/glowworm-frontend:test
     container_name: glowworm-frontend
     restart: unless-stopped
     environment:
