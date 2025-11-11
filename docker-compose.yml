@@ -105,6 +105,7 @@ services:
     restart: unless-stopped
     environment:
       TZ: America/New_York
+      VITE_BACKEND_URL: http://glowworm-backend:8001
     ports:
       - "${FRONTEND_PORT:-3003}:3003"
     depends_on:
