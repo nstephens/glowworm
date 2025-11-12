@@ -255,10 +255,13 @@ export class WebSocketClient extends EventEmitter {
     this.stopReconnect();
     this.reconnectTimer = setTimeout(() => {
       this.reconnectAttempts++;
-      websocketLogger.info(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+      const maxAttemptsDisplay = this.maxReconnectAttempts === Infinity ? '∞' : this.maxReconnectAttempts;
+      websocketLogger.info(`Attempting to reconnect (${this.reconnectAttempts}/${maxAttemptsDisplay})...`);
+      this.emit('connecting');
       this.connect().catch(error => {
         websocketLogger.error('Reconnection failed:', error);
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+          websocketLogger.error('Max reconnection attempts reached, giving up.');
           this.emit('max_reconnect_attempts_reached');
         }
       });
@@ -291,8 +294,8 @@ export class DeviceWebSocketClient extends WebSocketClient {
     
     super({
       url: wsBaseUrl,
-      reconnectInterval: 5000,
-      maxReconnectAttempts: 10,
+      reconnectInterval: 30000, // 30 seconds between reconnect attempts
+      maxReconnectAttempts: Infinity, // Never give up reconnecting for display devices
       heartbeatInterval: 30000
     });
     this.deviceToken = deviceToken;
