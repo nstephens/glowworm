@@ -658,6 +658,22 @@ export class PreloadManager {
       );
     }
 
+    // Validate blob size - check if it's reasonable
+    if (blob.size === 0) {
+      throw new Error(`Zero-size blob received for ${item.id} - variant may still be generating`);
+    }
+
+    // CRITICAL: Validate that the blob is a valid, loadable image BEFORE caching
+    // This prevents caching corrupted/partial images that were still being written
+    try {
+      await this.validateImageBlob(blob, item.id);
+    } catch (validationError) {
+      throw new Error(
+        `Image validation failed for ${item.id}: ${validationError instanceof Error ? validationError.message : 'Invalid image data'}. ` +
+        `The variant may still be generating on the server.`
+      );
+    }
+
     // Store in cache (only if validation passed)
     await imageCacheService.storeImage(
       item.id,
@@ -670,6 +686,52 @@ export class PreloadManager {
     );
 
     return blob;
+  }
+
+  /**
+   * Validate that a blob is a valid, loadable image
+   * 
+   * This prevents caching corrupted or incomplete images that were
+   * fetched while the server was still writing the variant to disk.
+   * 
+   * @param blob - Image blob to validate
+   * @param imageId - Image ID for logging
+   * @throws Error if image cannot be loaded
+   */
+  private async validateImageBlob(blob: Blob, imageId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Create object URL from blob
+      const objectUrl = URL.createObjectURL(blob);
+
+      // Try to load the image
+      const img = new Image();
+      
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        
+        // Check if image has valid dimensions
+        if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+          reject(new Error(`Image ${imageId} has zero dimensions - corrupted or incomplete`));
+          return;
+        }
+        
+        // Image loaded successfully and has valid dimensions
+        resolve();
+      };
+
+      img.onerror = (error) => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error(`Image ${imageId} failed to load - blob may be corrupted or incomplete`));
+      };
+
+      // Set timeout for validation (5 seconds)
+      setTimeout(() => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error(`Image ${imageId} validation timeout - image may be too large or corrupted`));
+      }, 5000);
+
+      img.src = objectUrl;
+    });
   }
 
   /**
