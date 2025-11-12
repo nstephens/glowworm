@@ -109,3 +109,7 @@ cleanup_for_publish.sh
 docs/notes/
 docs/prd/
 wiki/
+
+# Root-level markdown files (except README.md)
+/*.md
+!README.md
