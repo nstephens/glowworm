@@ -97,8 +97,8 @@ echo "✅ Virtual environment created"
 echo ""
 echo "📦 Installing Glowworm daemon package..."
 "$INSTALL_DIR/venv/bin/pip" install --quiet --upgrade pip
-# Install from GitHub (unstable branch) until published to PyPI
-"$INSTALL_DIR/venv/bin/pip" install git+https://github.com/nstephens/glowworm.git@unstable#subdirectory=daemon
+# Install from GitHub main branch
+"$INSTALL_DIR/venv/bin/pip" install git+https://github.com/nstephens/glowworm.git@main#subdirectory=daemon
 
 # Create symlink to daemon executable
 ln -sf "$INSTALL_DIR/venv/bin/glowworm-daemon" /usr/local/bin/glowworm-daemon
