@@ -33,6 +33,7 @@ GlowWorm transforms any display into an elegant photo frame with powerful featur
 **Scheduling System**
 - Time-based playlist switching (new in v2.0)
 - Day-of-week scheduling for different content
+- Automatic power on/off for display devices
 - Perfect for businesses or themed displays
 - Set-and-forget automation
 
