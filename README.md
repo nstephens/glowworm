@@ -11,6 +11,26 @@ GlowWorm transforms any display into an elegant photo frame with powerful featur
   [Youtube demo of display device playing a slideshow]
 </p>
 
+## Screenshots
+
+| Dashboard | Images |
+|-----------|---------|
+| ![Glowworm Dashboard](docs/screenshots/1.%20dashboard.png) | ![Glowworm Images](docs/screenshots/2.%20images.png) |
+
+| Playlists | Displays |
+|-----------|----------|
+| ![Glowworm Playlists](docs/screenshots/3.%20playlists.png) | ![Glowworm Displays](docs/screenshots/4.displays.png) |
+
+| Settings |
+|----------|
+| ![Glowworm Settings](docs/screenshots/5.%20settings.png) |
+
+### End to End Installation and Usage Example
+
+[![GlowWorm Installation and Usage Demo](https://img.youtube.com/vi/euAhnJv0RoE/0.jpg)](https://www.youtube.com/watch?v=euAhnJv0RoE)
+
+Watch the complete walkthrough: [GlowWorm Installation and Usage on YouTube](https://www.youtube.com/watch?v=euAhnJv0RoE)
+
 ## Features
 
 **Image Management**
@@ -67,27 +87,7 @@ GlowWorm transforms any display into an elegant photo frame with powerful featur
 - Live display status dashboard
 - System logs and monitoring
 
-## Screenshots
 
-| Dashboard | Images |
-|-----------|---------|
-| ![Glowworm Dashboard](docs/screenshots/1.%20dashboard.png) | ![Glowworm Images](docs/screenshots/2.%20images.png) |
-
-| Playlists | Displays |
-|-----------|----------|
-| ![Glowworm Playlists](docs/screenshots/3.%20playlists.png) | ![Glowworm Displays](docs/screenshots/4.displays.png) |
-
-| Settings |
-|----------|
-| ![Glowworm Settings](docs/screenshots/5.%20settings.png) |
-
-### End to End Installation and Usage Example
-
-[![GlowWorm Installation and Usage Demo](https://img.youtube.com/vi/euAhnJv0RoE/0.jpg)](https://www.youtube.com/watch?v=euAhnJv0RoE)
-
-Watch the complete walkthrough: [GlowWorm Installation and Usage on YouTube](https://www.youtube.com/watch?v=euAhnJv0RoE)
-
----
 
 ## Compatibility
 
@@ -184,28 +184,6 @@ For detailed documentation, please visit the **[GlowWorm Wiki](https://github.co
 
 ---
 
-## Technology Stack
-
-**Backend:**
-- Python FastAPI with SQLAlchemy ORM
-- MySQL 8.0+ database
-- WebSocket for real-time communication
-- Celery for background task processing
-- Pillow for image processing
-
-**Frontend:**
-- React with TypeScript
-- Tailwind CSS with shadcn/ui components
-- Vite dev server with API proxy
-- IndexedDB for client-side caching
-
-**Deployment:**
-- Docker Compose multi-container setup
-- Optimized for Raspberry Pi displays
-- Works on any Linux server
-
----
-
 ## Contributing
 
 We welcome contributions! Please see the [Contributing Guide](https://github.com/nstephens/glowworm/wiki/Contributing) in the wiki for:
@@ -213,30 +191,6 @@ We welcome contributions! Please see the [Contributing Guide](https://github.com
 - Coding standards
 - Testing guidelines
 - Pull request process
-
----
-
-## Use Cases
-
-**Home Photo Displays**
-- Turn old monitors into beautiful digital photo frames
-- Display family memories with EXIF dates
-- Organize by events, people, or time periods
-
-**Art Galleries**
-- Display rotating art collections
-- Multiple playlists for different exhibitions
-- Real-time updates during events
-
-**Business Displays**
-- Show product photos, menus, or promotional content
-- Scheduled content switching (morning/evening themes)
-- Multiple displays with different content
-
-**Event Displays**
-- Weddings, parties, conferences
-- Guest photo submissions via album sharing
-- Live playlist updates during events
 
 ---
 
