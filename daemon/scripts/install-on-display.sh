@@ -4,7 +4,7 @@
 # Automatically configures daemon using display device's existing authorization
 #
 # Usage (on Raspberry Pi display device):
-#   curl -sSL https://raw.githubusercontent.com/nstephens/glowworm/unstable/daemon/scripts/install-on-display.sh | sudo bash
+#   curl -sSL https://raw.githubusercontent.com/nstephens/glowworm/main/daemon/scripts/install-on-display.sh | sudo bash
 #
 # This script:
 # - Detects if already authorized as display device
@@ -171,8 +171,8 @@ echo -e "${GREEN}✅ Virtual environment created${NC}"
 echo ""
 echo -e "${BLUE}📦 Installing Glowworm daemon package...${NC}"
 "$INSTALL_DIR/venv/bin/pip" install --quiet --upgrade pip
-# Install from GitHub (unstable branch) until published to PyPI
-"$INSTALL_DIR/venv/bin/pip" install --quiet git+https://github.com/nstephens/glowworm.git@unstable#subdirectory=daemon
+# Install from GitHub main branch
+"$INSTALL_DIR/venv/bin/pip" install --quiet git+https://github.com/nstephens/glowworm.git@main#subdirectory=daemon
 
 # Create symlink to daemon executable
 ln -sf "$INSTALL_DIR/venv/bin/glowworm-daemon" /usr/local/bin/glowworm-daemon

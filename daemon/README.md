@@ -17,7 +17,7 @@ Optional daemon service that runs on Raspberry Pi display devices to enable host
 
 ```bash
 # On Raspberry Pi - extracts device token from browser
-curl -sSL https://raw.githubusercontent.com/nstephens/glowworm/unstable/daemon/scripts/install-on-display.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/nstephens/glowworm/main/daemon/scripts/install-on-display.sh | sudo bash
 ```
 
 This script:
@@ -30,7 +30,7 @@ This script:
 
 ```bash
 # On Raspberry Pi with FullPageOS - manual configuration
-curl -sSL https://raw.githubusercontent.com/nstephens/glowworm/unstable/daemon/scripts/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/nstephens/glowworm/main/daemon/scripts/install.sh | sudo bash
 ```
 
 ### Manual Installation
