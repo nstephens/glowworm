@@ -183,14 +183,37 @@ class ConnectionManager:
         """
         await self.send_to_all_admins(event_payload)
     
-    async def send_device_command(self, device_token: str, command: str, data: dict = None):
-        """Send a command to a specific device"""
+    async def send_device_command(
+        self,
+        device_token: str,
+        command: str,
+        data: dict = None,
+        request_id: str = None,
+    ):
+        """
+        Send a command to a specific device.
+
+        Supports both legacy browser devices and Pi3D daemon format.
+        Pi3D daemon expects: {type: "command", payload: {command, params, request_id}}
+        """
+        # Use Pi3D daemon format with legacy fallback fields
         message = {
             "type": "command",
+            # Pi3D daemon format
+            "payload": {
+                "command": command,
+                "params": data or {},
+            },
+            # Legacy format (for browser devices)
             "command": command,
             "data": data or {},
             "timestamp": datetime.now().isoformat()
         }
+
+        if request_id:
+            message["payload"]["request_id"] = request_id
+            message["request_id"] = request_id
+
         await self.send_to_device(device_token, message)
     
     async def send_device_playlist_update(self, device_token: str, playlist_data: dict):

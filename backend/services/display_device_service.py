@@ -194,3 +194,54 @@ class DisplayDeviceService:
         
         logger.info(f"Assigned playlist {playlist_id} to device {device_id}")
         return device
+
+    def update_device_status(
+        self,
+        device_token: str,
+        status_payload: dict,
+        device_type: str = None,
+    ) -> Optional[DisplayDevice]:
+        """
+        Update device status from Pi3D daemon status report.
+
+        Args:
+            device_token: Device token
+            status_payload: Status payload from daemon
+            device_type: Device type (pi3d or browser)
+
+        Returns:
+            Updated device or None if not found
+        """
+        device = self.get_device_by_token(device_token)
+        if not device:
+            logger.warning(f"Device {device_token[:8]}... not found for status update")
+            return None
+
+        # Update last seen
+        device.last_seen = datetime.utcnow()
+
+        # Update device type if provided
+        if device_type:
+            device.device_type = device_type
+
+        # Extract status fields
+        device.last_state = status_payload.get("state")
+        device.last_image_id = status_payload.get("current_image_id")
+
+        # Cache statistics
+        cache_data = status_payload.get("cache", {})
+        if cache_data:
+            device.last_cache_size_mb = cache_data.get("size_mb")
+            device.last_cache_hit_rate = cache_data.get("hit_rate")
+
+        # Uptime
+        device.last_uptime_seconds = status_payload.get("uptime_seconds")
+
+        # Store full status JSON
+        device.last_status_json = status_payload
+
+        self.db.commit()
+        self.db.refresh(device)
+
+        logger.debug(f"Updated status for device {device_token[:8]}...: state={device.last_state}")
+        return device

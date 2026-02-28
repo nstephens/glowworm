@@ -419,6 +419,7 @@ Based on Rewrite.md, this document breaks down the implementation into concrete 
 
 ### Task 4.4: Backend WebSocket Updates
 **Complexity:** Medium
+**Status:** `passes: true`
 **Description:** Update backend WebSocket handling for Pi3D device protocol.
 
 **Subtasks:**

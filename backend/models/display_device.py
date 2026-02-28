@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Enum, ForeignKey, JSON, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .database import Base
@@ -44,6 +44,15 @@ class DisplayDevice(Base):
     cec_input_name = Column(String(64), nullable=True, comment="Selected CEC input name")
     cec_input_address = Column(String(16), nullable=True, comment="Selected CEC input address")
     daemon_enabled = Column(Boolean, default=False, nullable=False, comment="Whether daemon control is enabled")
+
+    # Pi3D daemon status fields (cached from last WebSocket status)
+    device_type = Column(String(20), nullable=True, default="browser", comment="Device type: browser or pi3d")
+    last_state = Column(String(32), nullable=True, comment="Last reported state: playing, paused, stopped, error")
+    last_image_id = Column(Integer, nullable=True, comment="ID of currently displayed image")
+    last_cache_size_mb = Column(Float, nullable=True, comment="Cache size in MB")
+    last_cache_hit_rate = Column(Float, nullable=True, comment="Cache hit rate 0.0-1.0")
+    last_uptime_seconds = Column(Float, nullable=True, comment="Daemon uptime in seconds")
+    last_status_json = Column(JSON, nullable=True, comment="Full last status payload as JSON")
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -82,4 +91,11 @@ class DisplayDevice(Base):
             "screen_height": self.screen_height,
             "device_pixel_ratio": self.device_pixel_ratio,
             "orientation": self.orientation,
+            # Pi3D daemon status fields
+            "device_type": self.device_type or "browser",
+            "last_state": self.last_state,
+            "last_image_id": self.last_image_id,
+            "last_cache_size_mb": self.last_cache_size_mb,
+            "last_cache_hit_rate": self.last_cache_hit_rate,
+            "last_uptime_seconds": self.last_uptime_seconds,
         }

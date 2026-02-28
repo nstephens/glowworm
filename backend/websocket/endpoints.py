@@ -2,6 +2,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPExce
 from sqlalchemy.orm import Session
 import json
 import logging
+from datetime import datetime
 from typing import Optional
 
 from models.database import get_db
@@ -10,6 +11,13 @@ from services.display_device_service import DisplayDeviceService
 from utils.cookies import cookie_manager
 from utils.middleware import get_current_user
 from .manager import connection_manager
+from .device_status_cache import (
+    store_device_status,
+    remove_device_status,
+    get_device_status,
+    get_all_device_statuses,
+    get_online_device_tokens,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +104,9 @@ async def websocket_device_endpoint(websocket: WebSocket):
     finally:
         if connection_id:
             connection_manager.disconnect(connection_id)
+        if device_token:
+            # Remove status from Redis on disconnect
+            remove_device_status(device_token)
 
 @router.websocket("/admin")
 async def websocket_admin_endpoint(websocket: WebSocket):
@@ -169,37 +180,87 @@ async def websocket_admin_endpoint(websocket: WebSocket):
             connection_manager.disconnect(connection_id)
 
 async def handle_device_message(connection_id: str, device_token: str, message: dict):
-    """Handle messages from display devices"""
+    """Handle messages from display devices (both legacy and Pi3D daemon)"""
     message_type = message.get("type")
-    
+    payload = message.get("payload", message.get("data", {}))
+
     if message_type == "heartbeat":
         await connection_manager.handle_heartbeat(connection_id)
-        
+        # Send heartbeat_ack for Pi3D daemon compatibility
+        await connection_manager.send_to_connection(connection_id, {
+            "type": "heartbeat_ack",
+            "payload": {
+                "timestamp": datetime.now().isoformat()
+            }
+        })
+
+    elif message_type == "auth":
+        # Pi3D daemon authentication - device already connected via cookie
+        # Acknowledge auth success
+        await connection_manager.send_to_connection(connection_id, {
+            "type": "auth_success",
+            "payload": {
+                "device_token": device_token[:8] + "...",
+                "timestamp": datetime.now().isoformat()
+            }
+        })
+        logger.info(f"Pi3D daemon authenticated: {device_token[:8]}...")
+
+    elif message_type == "status":
+        # Pi3D daemon status report (new format)
+        logger.debug(f"Device {device_token[:8]}... status: state={payload.get('state')}")
+
+        # Store status in Redis for quick access
+        store_device_status(device_token, payload)
+
+        # Broadcast to all admins with full status
+        await connection_manager.broadcast_device_status_update({
+            "device_token": device_token,
+            "status": payload,
+            "timestamp": datetime.now().isoformat()
+        })
+
     elif message_type == "status_update":
-        # Device is reporting its status
-        status_data = message.get("data", {})
-        logger.info(f"Device {device_token[:8]}... status update: {status_data}")
-        
+        # Legacy browser device status update
+        logger.info(f"Device {device_token[:8]}... legacy status update: {payload}")
+
+        # Store status in Redis
+        store_device_status(device_token, payload)
+
         # Broadcast to all admins
         await connection_manager.broadcast_device_status_update({
             "device_token": device_token,
-            "status": status_data,
-            "timestamp": message.get("timestamp")
+            "status": payload,
+            "timestamp": message.get("timestamp", datetime.now().isoformat())
         })
-        
+
+    elif message_type == "command_response":
+        # Pi3D daemon command response
+        logger.debug(
+            f"Device {device_token[:8]}... command response: "
+            f"{payload.get('command')} -> {payload.get('status')}"
+        )
+
+        # Broadcast command response to admins
+        await connection_manager.send_to_all_admins({
+            "type": "device_command_response",
+            "device_token": device_token,
+            "response": payload,
+            "timestamp": datetime.now().isoformat()
+        })
+
     elif message_type == "error_report":
         # Device is reporting an error
-        error_data = message.get("data", {})
-        logger.error(f"Device {device_token[:8]}... error: {error_data}")
-        
+        logger.error(f"Device {device_token[:8]}... error: {payload}")
+
         # Broadcast to all admins
         await connection_manager.send_to_all_admins({
             "type": "device_error",
             "device_token": device_token,
-            "error": error_data,
-            "timestamp": message.get("timestamp")
+            "error": payload,
+            "timestamp": message.get("timestamp", datetime.now().isoformat())
         })
-        
+
     else:
         logger.warning(f"Unknown device message type: {message_type}")
 
@@ -260,14 +321,18 @@ async def handle_admin_message(connection_id: str, message: dict):
         device_token = message.get("device_token")
         command = message.get("command")
         command_data = message.get("data", {})
-        
+        request_id = message.get("request_id")
+
         if device_token and command:
-            await connection_manager.send_device_command(device_token, command, command_data)
-            
+            await connection_manager.send_device_command(
+                device_token, command, command_data, request_id
+            )
+
             await connection_manager.send_to_connection(connection_id, {
                 "type": "command_sent",
                 "device_token": device_token,
                 "command": command,
+                "request_id": request_id,
                 "success": True
             })
             
@@ -306,16 +371,52 @@ async def broadcast_to_devices(message: dict):
 
 @router.post("/device/{device_token}/command")
 async def send_device_command_endpoint(
-    device_token: str, 
-    command: str = Query(..., description="Command to send to device (e.g., 'refresh_browser')"),
-    data: dict = None
+    device_token: str,
+    command: str = Query(..., description="Command to send to device (e.g., 'next', 'pause', 'resume')"),
+    data: dict = None,
+    request_id: str = Query(None, description="Optional request ID for tracking command response"),
 ):
     """Send a command to a specific device via HTTP"""
     logger.info(f"Sending command '{command}' to device {device_token[:8]}...")
-    await connection_manager.send_device_command(device_token, command, data or {})
+    await connection_manager.send_device_command(device_token, command, data or {}, request_id)
     return {
         "message": "Command sent",
         "device_token": device_token,
         "command": command,
+        "request_id": request_id,
         "is_connected": connection_manager.get_device_connection_status(device_token)
+    }
+
+
+@router.get("/device/{device_token}/status")
+async def get_device_status_endpoint(device_token: str):
+    """Get cached status for a specific device"""
+    status = get_device_status(device_token)
+    is_connected = connection_manager.get_device_connection_status(device_token)
+
+    return {
+        "device_token": device_token,
+        "is_connected": is_connected,
+        "status": status,
+    }
+
+
+@router.get("/devices/status")
+async def get_all_devices_status_endpoint():
+    """Get cached status for all online devices"""
+    statuses = get_all_device_statuses()
+    connected_tokens = connection_manager.get_connected_devices()
+    online_tokens = get_online_device_tokens()
+
+    return {
+        "connected_count": len(connected_tokens),
+        "online_count": len(online_tokens),
+        "devices": [
+            {
+                "device_token": token,
+                "is_connected": token in connected_tokens,
+                "status": status,
+            }
+            for token, status in statuses.items()
+        ]
     }

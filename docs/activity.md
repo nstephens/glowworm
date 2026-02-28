@@ -1533,3 +1533,76 @@ await handler.handle_message("command", {
 
 ### Next Task
 Task 4.4: Backend WebSocket Updates
+
+## 2026-02-28 18:00 - Task 4.4: Backend WebSocket Updates
+
+### What Changed
+Updated backend WebSocket handling to support Pi3D daemon protocol alongside legacy browser devices.
+
+### Files Created
+- `backend/websocket/device_status_cache.py` - Redis caching for device status:
+  - `store_device_status()` - Store status with TTL (5 min default)
+  - `get_device_status()` - Retrieve cached status
+  - `get_all_device_statuses()` - Get all online device statuses
+  - `remove_device_status()` - Remove status on disconnect
+  - `get_online_device_tokens()` - List online device tokens
+  - Uses Redis SET for tracking online devices
+
+- `backend/tests/test_websocket_pi3d.py` - 13 tests covering:
+  - ConnectionManager Pi3D command format
+  - Device status cache operations
+  - Pi3D message protocol handling
+  - DisplayDevice model Pi3D fields
+  - DisplayDeviceService status updates
+
+### Files Modified
+- `backend/websocket/endpoints.py`:
+  - Added handling for Pi3D daemon messages (auth, status, command_response)
+  - Added heartbeat_ack response for daemon heartbeat compatibility
+  - Added Redis status caching on status updates
+  - Added status cleanup on device disconnect
+  - Added new HTTP endpoints:
+    - `GET /api/ws/device/{token}/status` - Get cached device status
+    - `GET /api/ws/devices/status` - Get all device statuses
+
+- `backend/websocket/manager.py`:
+  - Updated `send_device_command()` to use Pi3D daemon format
+  - Added request_id support for command tracking
+  - Maintains legacy format for browser device compatibility
+
+- `backend/models/display_device.py`:
+  - Added Pi3D status fields: device_type, last_state, last_image_id
+  - Added cache statistics: last_cache_size_mb, last_cache_hit_rate
+  - Added uptime tracking: last_uptime_seconds
+  - Added full status JSON: last_status_json
+  - Updated `to_dict()` to include new fields
+
+- `backend/services/display_device_service.py`:
+  - Added `update_device_status()` method for Pi3D daemon status updates
+
+### Protocol Support
+The backend now supports both:
+- **Legacy browser devices**: message types `status_update`, `heartbeat`, `error_report`
+- **Pi3D daemon devices**: message types `auth`, `status`, `command_response`, `heartbeat`
+
+Pi3D daemon protocol:
+- Device sends `auth` → Backend responds `auth_success`
+- Device sends `status` → Backend caches in Redis, broadcasts to admins
+- Device sends `heartbeat` → Backend responds `heartbeat_ack`
+- Admin sends command → Backend forwards to device in Pi3D format
+
+### Verification
+- All 13 new Pi3D WebSocket tests pass
+- All 46 backend tests pass
+- Redis caching tested with mocked client
+- Device model fields validated
+- Command format includes both Pi3D and legacy formats for compatibility
+
+### Notes
+- Device status TTL is 5 minutes (configurable)
+- Status is removed from Redis when device disconnects
+- Commands include both `payload.command` (Pi3D) and `command` (legacy) for compatibility
+- Database migration needed to add new device model fields
+
+### Next Task
+Task 4.5: Integration Testing - WebSocket
