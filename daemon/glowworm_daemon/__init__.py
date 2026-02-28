@@ -43,6 +43,14 @@ from .playlist_manager import (
     PlaylistNotFoundError,
     create_playlist_manager,
 )
+from .preload_manager import (
+    PreloadManager,
+    PreloadManagerConfig,
+    PreloadStatus,
+    PreloadEntry,
+    PreloadStats,
+    create_preload_manager,
+)
 
 __all__ = [
     "GlowwormDaemon",
@@ -73,5 +81,12 @@ __all__ = [
     "PlaylistError",
     "PlaylistNotFoundError",
     "create_playlist_manager",
+    # Preload Manager
+    "PreloadManager",
+    "PreloadManagerConfig",
+    "PreloadStatus",
+    "PreloadEntry",
+    "PreloadStats",
+    "create_preload_manager",
 ]
 

@@ -669,3 +669,96 @@ async with PlaylistManager(config) as manager:
 
 ### Next Task
 Task 2.4: Preloading Logic
+
+## 2026-02-28 17:45 - Task 2.4: Preloading Logic
+
+### What Changed
+Implemented the PreloadManager class for background preloading of upcoming images with priority-based scheduling and cancellation support.
+
+### Files Created
+- `daemon/glowworm_daemon/preload_manager.py` - PreloadManager class with:
+  - `PreloadStatus` enum (PENDING, DOWNLOADING, COMPLETE, CACHED, FAILED, CANCELLED)
+  - `PreloadEntry` dataclass for queue entries with priority
+  - `PreloadManagerConfig` dataclass for configuration
+  - `PreloadStats` dataclass for statistics
+  - `PreloadManager` class with:
+    - Background worker task for processing preload queue
+    - Priority-based scheduling (lower number = higher priority)
+    - Concurrent download limiting (configurable)
+    - `update_preload_queue()` - Update queue from playlist position
+    - `preload_images()` - Queue specific images for preload
+    - `cancel_preload()` - Cancel specific image preload
+    - Automatic cancellation of outdated preloads when playlist changes
+    - Skip already-cached images
+    - Progress callback support
+    - Statistics tracking (pending, downloading, completed, failed, cancelled)
+
+- `daemon/tests/test_preload_manager.py` - 27 unit tests covering:
+  - Configuration defaults
+  - Priority comparison for sorting
+  - Manager lifecycle (start/stop/context manager)
+  - Queue management (add, skip cached, priority ordering)
+  - Concurrent download limit enforcement
+  - Cancellation (specific, nonexistent, all on stop)
+  - Playlist queue updates
+  - Outdated preload cancellation
+  - Priority updates for existing items
+  - Empty playlist clearing queue
+  - Status checking methods
+  - Progress callbacks
+  - Error handling (failed/cancelled downloads)
+  - Full preload cycle integration test
+  - No duplicate downloads verification
+
+### Files Modified
+- `daemon/glowworm_daemon/__init__.py` - Added exports for PreloadManager, PreloadManagerConfig, PreloadStatus, PreloadEntry, PreloadStats, create_preload_manager
+
+### Verification
+- All 27 preload manager tests pass
+- All 122 daemon tests pass: `pytest daemon/tests/ -v`
+- Imports work correctly: `from glowworm_daemon import PreloadManager, PreloadManagerConfig`
+
+### API Summary
+```python
+from glowworm_daemon import PreloadManager, PreloadManagerConfig
+
+# Configuration
+config = PreloadManagerConfig(
+    preload_count=3,           # Number of images to preload ahead
+    max_concurrent_downloads=2, # Max concurrent downloads
+    retry_delay=5.0,           # Delay before retrying failed downloads
+    max_retries=2,             # Max retries for failed downloads
+)
+
+# Usage with ImageManager
+async with PreloadManager(image_manager, config) as preloader:
+    # Update queue from playlist position
+    await preloader.update_preload_queue(playlist_manager)
+
+    # Or preload specific images
+    await preloader.preload_images([image1, image2, image3])
+
+    # Cancel specific preload
+    await preloader.cancel_preload(image_id=123)
+
+    # Check status
+    if preloader.is_preloading(123):
+        print("Image 123 is currently downloading")
+
+    # Get statistics
+    stats = preloader.get_stats()
+    print(f"Pending: {stats.pending_count}")
+    print(f"Downloading: {stats.downloading_count}")
+    print(f"Total preloaded: {stats.total_preloaded}")
+```
+
+### Notes
+- Background worker uses asyncio for non-blocking operation
+- Priority 0 = next image (highest priority), 1 = second next, etc.
+- Cancelled preloads are tracked in statistics
+- Worker wakes up when downloads complete to start next items
+- Queue is cleared when PreloadManager is stopped
+- Integrates seamlessly with ImageManager for actual downloads
+
+### Next Task
+Task 2.5: Integration Testing - Image Management
