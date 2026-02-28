@@ -59,6 +59,13 @@ from .display_controller import (
     IPCResponse,
     create_display_controller,
 )
+from .slideshow_orchestrator import (
+    SlideshowOrchestrator,
+    SlideshowConfig,
+    SlideshowState,
+    SlideshowStats,
+    create_slideshow_orchestrator,
+)
 
 __all__ = [
     "GlowwormDaemon",
@@ -103,5 +110,11 @@ __all__ = [
     "IPCClient",
     "IPCResponse",
     "create_display_controller",
+    # Slideshow Orchestrator
+    "SlideshowOrchestrator",
+    "SlideshowConfig",
+    "SlideshowState",
+    "SlideshowStats",
+    "create_slideshow_orchestrator",
 ]
 

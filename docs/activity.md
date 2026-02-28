@@ -913,3 +913,109 @@ async with DisplayController(config) as controller:
 
 ### Next Task
 Task 3.2: Slideshow Orchestration
+
+## 2026-02-28 19:30 - Task 3.2: Slideshow Orchestration
+
+### What Changed
+Implemented the SlideshowOrchestrator class that coordinates playlist, image cache, and display controller for slideshow operation.
+
+### Files Created
+- `daemon/glowworm_daemon/slideshow_orchestrator.py` - SlideshowOrchestrator implementation with:
+  - `SlideshowState` enum (STOPPED, STARTING, PLAYING, PAUSED, TRANSITIONING, ERROR)
+  - `SlideshowConfig` dataclass for configuration
+  - `SlideshowStats` dataclass for statistics tracking
+  - `SlideshowOrchestrator` class with:
+    - Main slideshow loop with configurable image timing
+    - Transition triggering via DisplayController IPC
+    - Next/previous/go_to command handling with immediate response
+    - Pause/resume state management
+    - Missing image handling (skip with error logging)
+    - Offline operation using cached images
+    - Background preloading via PreloadManager integration
+    - Periodic playlist update checking
+    - State change callbacks
+    - Comprehensive status reporting
+    - Async context manager support
+  - `create_slideshow_orchestrator()` factory function
+
+- `daemon/tests/test_slideshow_orchestrator.py` - 25 comprehensive tests covering:
+  - Configuration defaults and custom values
+  - Initial state verification
+  - Start/stop lifecycle
+  - Start failures (no playlist, display not running)
+  - Pause/resume functionality
+  - Next/previous/go_to navigation
+  - Image display to DisplayController
+  - Automatic advance timing
+  - Missing image skipping
+  - Preloader queue updates
+  - State change callbacks
+  - Status reporting
+  - Statistics tracking
+  - Context manager usage
+  - Playlist reload
+  - Next when paused auto-resumes
+
+### Files Modified
+- `daemon/glowworm_daemon/__init__.py` - Added exports for SlideshowOrchestrator, SlideshowConfig, SlideshowState, SlideshowStats, create_slideshow_orchestrator
+
+### Verification
+- All 25 new tests pass
+- All 189 daemon tests pass: `pytest daemon/tests/ -v`
+- Imports work correctly: `from glowworm_daemon import SlideshowOrchestrator, SlideshowConfig`
+
+### API Summary
+```python
+from glowworm_daemon import SlideshowOrchestrator, SlideshowConfig
+
+# Configuration
+config = SlideshowConfig(
+    default_display_time=30.0,
+    transition_duration=1.0,
+    scale_mode="fit",
+    preload_count=3,
+)
+
+# Usage (requires initialized components)
+orchestrator = SlideshowOrchestrator(
+    display=display_controller,
+    playlist=playlist_manager,
+    images=image_manager,
+    preloader=preload_manager,
+    config=config,
+)
+
+async with orchestrator:
+    # Control
+    await orchestrator.next()
+    await orchestrator.previous()
+    await orchestrator.go_to(5)
+    await orchestrator.pause()
+    await orchestrator.resume()
+
+    # Reload playlist
+    await orchestrator.reload_playlist()
+
+    # Status
+    status = orchestrator.get_status()
+```
+
+### Features
+- **Image Timing**: Images advance at playlist's `display_time_seconds` or configurable default
+- **Transition Triggering**: Uses DisplayController.load_image() with configurable transition duration
+- **Navigation**: next/previous/go_to commands work immediately and auto-resume if paused
+- **Missing Images**: Failed images are skipped with error logging, slideshow continues
+- **Offline Mode**: Works entirely from cached images when backend unavailable
+- **Preloading**: Automatically updates PreloadManager queue after each image
+- **Playlist Updates**: Periodic check for playlist changes (configurable interval)
+- **State Management**: Full state machine with callbacks for state transitions
+
+### Notes
+- Slideshow loop uses asyncio for non-blocking wait with advance event
+- Manual navigation (next/previous) wakes up the loop immediately
+- Pause preserves remaining display time for smooth resume
+- State callbacks fire synchronously on state changes
+- Statistics track images displayed, skipped, transitions completed, errors
+
+### Next Task
+Task 3.3: Configuration Unification

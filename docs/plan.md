@@ -296,6 +296,7 @@ Based on Rewrite.md, this document breaks down the implementation into concrete 
 
 ### Task 3.2: Slideshow Orchestration
 **Complexity:** Medium
+**Status:** `passes: true`
 **Description:** Coordinate playlist, image cache, and display controller for slideshow.
 
 **Subtasks:**
