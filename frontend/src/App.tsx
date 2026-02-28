@@ -12,7 +12,6 @@ import HomePage from './pages/HomePage';
 import SetupWizard from './pages/SetupWizard';
 import AdminSetup from './pages/AdminSetup';
 import AdminDashboard from './pages/AdminDashboard';
-import DisplayView from './pages/DisplayView';
 import DisplayRegistration from './pages/DisplayRegistration';
 import Login from './pages/Login';
 import { Images } from './pages/Images';
@@ -175,7 +174,6 @@ function AppContent() {
             <Route path="/admin/system/utilities" element={<AdminProtectedRoute><AdminLayout headerContent={<SettingsHeader />}><Settings /></AdminLayout></AdminProtectedRoute>} />
             <Route path="/admin/settings" element={<AdminProtectedRoute><Navigate to="/admin/system/general" replace /></AdminProtectedRoute>} />
             <Route path="/display" element={<DisplayRegistration />} />
-            <Route path="/display/:slug" element={<DisplayView />} />
             {/* Redirect setup routes to home if already configured */}
             <Route path="/setup" element={<HomePage />} />
             <Route path="/setup/admin" element={<HomePage />} />

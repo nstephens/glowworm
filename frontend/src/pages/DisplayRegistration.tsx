@@ -1,363 +1,117 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { apiService } from '../services/api';
-import { applyDeviceOptimizations } from '../utils/deviceDetection';
-import { urlResolver } from '../services/urlResolver';
+import React from 'react';
 
-interface DeviceStatus {
-  id: number;
-  device_token: string;
-  device_name?: string;
-  device_identifier?: string;
-  status: 'pending' | 'authorized' | 'rejected' | 'offline';
-  authorized_at?: string;
-  last_seen: string;
-  created_at: string;
-  updated_at: string;
-  playlist_id?: number;
-  playlist_name?: string;
-}
-
+/**
+ * Display Registration Page
+ *
+ * Shows Pi3D setup instructions. Browser-based display has been removed
+ * in favor of the more robust Pi3D daemon-based display system.
+ */
 const DisplayRegistration: React.FC = () => {
-  const navigate = useNavigate();
-  const [deviceStatus, setDeviceStatus] = useState<DeviceStatus | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Add display-mode class to body for frameless display and apply device optimizations
-  useEffect(() => {
-    document.body.classList.add('display-mode');
-    const deviceInfo = applyDeviceOptimizations();
-    console.log('Applied device optimizations:', deviceInfo);
-    
-    return () => {
-      document.body.classList.remove('display-mode', 'pi-mode', 'low-power-mode');
-    };
-  }, []);
-
-  // Check if device is already registered, auto-register if needed
-  useEffect(() => {
-    checkDeviceStatus();
-  }, []);
-
-  // Auto-register device if not already registered
-  useEffect(() => {
-    if (!isLoading && !deviceStatus && !isRegistering && !error) {
-      registerDevice();
-    }
-  }, [isLoading, deviceStatus, isRegistering, error]);
-
-  // Auto-check status for pending devices and retry for rejected devices
-  useEffect(() => {
-    if (deviceStatus?.status === 'pending' || deviceStatus?.status === 'rejected') {
-      const interval = setInterval(() => {
-        if (deviceStatus?.status === 'rejected') {
-          // For rejected devices, try to re-register
-          setDeviceStatus(null);
-          setError(null);
-        } else {
-          // For pending devices, just check status
-          checkDeviceStatus(false); // Don't show loading spinner for background checks
-        }
-      }, 10000); // Check every 10 seconds for rejected, 5 seconds for pending
-
-      return () => clearInterval(interval);
-    }
-  }, [deviceStatus?.status]);
-
-  const checkDeviceStatus = async (showLoading = true) => {
-    try {
-      if (showLoading) {
-        setIsLoading(true);
-      }
-      setError(null);
-      
-      // First validate any existing cookies to handle old/invalid cookies gracefully
-      const validateResponse = await fetch(urlResolver.getApiUrl('/display-devices/validate-cookie'), {
-        credentials: 'include',
-      });
-
-      if (validateResponse.ok) {
-        const validateData = await validateResponse.json();
-        console.log('Cookie validation result:', validateData);
-        
-        if (validateData.valid) {
-          // Cookie is valid, get device status
-          const response = await fetch(urlResolver.getApiUrl('/display-devices/status'), {
-            credentials: 'include',
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            setDeviceStatus(data);
-            
-            // If device is authorized, redirect to its display page
-            if (data.status === 'authorized') {
-              const deviceSlug = data.device_name?.toLowerCase().replace(/\s+/g, '-') || `device-${data.id}`;
-              navigate(`/display/${deviceSlug}`);
-              return;
-            }
-          } else {
-            throw new Error('Failed to get device status');
-          }
-        } else if (validateData.needs_reregistration) {
-          // Cookie is invalid or device needs re-registration
-          console.log('Device cookie invalid or needs re-registration:', validateData.message);
-          setDeviceStatus(null);
-        }
-      } else {
-        // Validation failed, device not registered
-        console.log('Cookie validation failed, device not registered');
-        setDeviceStatus(null);
-      }
-    } catch (err) {
-      console.error('Error checking device status:', err);
-      setError('Failed to check device status');
-    } finally {
-      if (showLoading) {
-        setIsLoading(false);
-      }
-    }
-  };
-
-  const registerDevice = async () => {
-    try {
-      setIsRegistering(true);
-      setError(null);
-
-      const userAgent = navigator.userAgent;
-      const response = await fetch(urlResolver.getApiUrl('/display-devices/register'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          user_agent: userAgent,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setDeviceStatus({
-          id: data.device_id,
-          device_token: data.device_token,
-          status: data.status,
-          last_seen: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-      } else {
-        throw new Error('Failed to register device');
-      }
-    } catch (err) {
-      console.error('Error registering device:', err);
-      setError('Failed to register device. Please try again.');
-    } finally {
-      setIsRegistering(false);
-    }
-  };
-
-  const getStatusMessage = () => {
-    if (!deviceStatus) return null;
-
-    switch (deviceStatus.status) {
-      case 'pending':
-        return {
-          title: 'Waiting for Authorization',
-          message: 'Your device has been registered and is waiting for administrator approval.',
-          color: 'text-yellow-600',
-          bgColor: 'bg-yellow-50',
-          borderColor: 'border-yellow-200',
-        };
-      case 'authorized':
-        return {
-          title: 'Device Authorized',
-          message: 'Your device has been approved. Redirecting to display...',
-          color: 'text-green-600',
-          bgColor: 'bg-green-50',
-          borderColor: 'border-green-200',
-        };
-      case 'rejected':
-        return {
-          title: 'Device Rejected',
-          message: 'This device has been rejected by an administrator.',
-          color: 'text-red-600',
-          bgColor: 'bg-red-50',
-          borderColor: 'border-red-200',
-        };
-      case 'offline':
-        return {
-          title: 'Device Offline',
-          message: 'This device appears to be offline.',
-          color: 'text-gray-600',
-          bgColor: 'bg-gray-50',
-          borderColor: 'border-gray-200',
-        };
-      default:
-        return null;
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center text-white">
-          <div className="flex items-center justify-center space-x-3 mb-6">
-            <img 
-              src="/glowworm-logo.svg" 
-              alt="Glowworm Logo" 
-              className="w-12 h-12 object-contain"
-            />
-            <h1 className="text-2xl font-bold">Glowworm Display</h1>
-          </div>
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-          <p>Checking device status...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const statusInfo = getStatusMessage();
-
   return (
-    <div className="frameless-display bg-gray-900 flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full">
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <p className="text-red-600">{error}</p>
-          </div>
-        )}
-
-        {!deviceStatus ? (
-          // Device not registered - show auto-registration status and Pi3D instructions
-          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-            <div className="mb-6">
-              <div className="flex items-center justify-center space-x-3 mb-4">
-                <img
-                  src="/glowworm-logo.svg"
-                  alt="Glowworm Logo"
-                  className="w-10 h-10 object-contain"
-                />
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {isRegistering ? 'Initializing Display Device' : 'Device Registration'}
-                </h1>
-              </div>
-              <p className="text-gray-600">
-                {isRegistering ? 'Registering device...' : 'Choose your registration method below.'}
-              </p>
-            </div>
-
-            {isRegistering ? (
-              <div className="flex justify-center mb-6">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Browser Registration Section */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                  <h2 className="text-lg font-semibold text-blue-900 mb-2">Browser Display</h2>
-                  <p className="text-sm text-blue-700 mb-4">
-                    Register this browser as a display device. Best for testing or temporary displays.
-                  </p>
-                  <button
-                    onClick={registerDevice}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Register Browser
-                  </button>
-                </div>
-
-                {/* Pi3D Registration Section */}
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
-                  <h2 className="text-lg font-semibold text-purple-900 mb-2">Pi3D Display (Recommended)</h2>
-                  <p className="text-sm text-purple-700 mb-4">
-                    For Raspberry Pi devices with GPU-accelerated display. Registration is handled by the GlowWorm daemon.
-                  </p>
-                  <div className="text-left bg-white border border-purple-200 rounded p-4 text-sm">
-                    <p className="font-medium text-purple-900 mb-2">Setup Instructions:</p>
-                    <ol className="list-decimal list-inside space-y-2 text-purple-800">
-                      <li>Install GlowWorm on your Raspberry Pi:
-                        <code className="block bg-purple-100 p-2 mt-1 rounded text-xs">
-                          curl -sSL https://glowworm.example.com/install.sh | bash
-                        </code>
-                      </li>
-                      <li>The Pi will display a 4-character registration code</li>
-                      <li>Go to <strong>Admin → Devices</strong> to authorize the device</li>
-                      <li>The slideshow will start automatically after authorization</li>
-                    </ol>
-                  </div>
-                  <p className="text-xs text-purple-600 mt-4">
-                    Pi3D provides smooth 30+ FPS transitions and uses less memory than browser displays.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="text-sm text-gray-500 mt-6">
-              <p>Both registration methods will create a pending device for administrator approval.</p>
-            </div>
-          </div>
-        ) : (
-          // Device registered - show status
-          <div className={`rounded-lg shadow-lg p-8 text-center border ${statusInfo?.borderColor} ${statusInfo?.bgColor}`}>
-            <div className="mb-6">
-              <h1 className={`text-2xl font-bold mb-2 ${statusInfo?.color}`}>
-                {statusInfo?.title}
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+      <div className="max-w-2xl w-full">
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center space-x-3 mb-4">
+              <img
+                src="/glowworm-logo.svg"
+                alt="GlowWorm Logo"
+                className="w-12 h-12 object-contain"
+              />
+              <h1 className="text-2xl font-bold text-gray-900">
+                GlowWorm Display Setup
               </h1>
-              <p className="text-gray-600">
-                {statusInfo?.message}
-              </p>
             </div>
-
-            {deviceStatus.status === 'pending' && (
-              <div className="space-y-8">
-                <div className="animate-pulse">
-                  <div className="h-2 bg-yellow-200 rounded-full"></div>
-                </div>
-                
-                {/* Device ID Display */}
-                <div className="bg-gray-50 border-2 border-gray-300 rounded-lg p-4 sm:p-6">
-                  <p className="text-xl sm:text-2xl font-semibold text-gray-700 mb-2 text-center">Device ID:</p>
-                  <div className="text-4xl sm:text-5xl lg:text-6xl font-mono font-bold text-gray-900 text-center">
-                    {deviceStatus.id}
-                  </div>
-                </div>
-                
-            {/* Authorization Token Display */}
-            <div className="bg-card border border-border rounded-xl p-6 sm:p-8 shadow-lg backdrop-blur-sm">
-              <p className="text-xl sm:text-2xl font-medium text-foreground mb-4 text-center">
-                Authorization Code
-              </p>
-              <div className="text-7xl sm:text-8xl lg:text-9xl font-mono font-bold text-foreground text-center tracking-wider leading-none">
-                {deviceStatus.device_token}
-              </div>
-              <p className="text-base sm:text-lg text-muted-foreground mt-4 text-center">
-                Provide this code to an administrator for approval
-              </p>
-            </div>
-                
-                <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
-                  <p className="text-sm text-primary text-center">
-                    This page will automatically update when the device is approved
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {deviceStatus.status === 'rejected' && (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-500">
-                  Please contact an administrator for assistance.
-                </p>
-                <p className="text-sm text-gray-500">
-                  This device will automatically retry registration in case the rejection was temporary.
-                </p>
-              </div>
-            )}
+            <p className="text-gray-600">
+              Set up a Raspberry Pi as a GlowWorm display device with GPU-accelerated slideshows.
+            </p>
           </div>
-        )}
+
+          {/* Pi3D Setup Instructions */}
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 mb-6">
+            <h2 className="text-lg font-semibold text-purple-900 mb-4">
+              Raspberry Pi Setup
+            </h2>
+
+            <div className="space-y-4">
+              <div className="bg-white border border-purple-200 rounded p-4">
+                <p className="font-medium text-purple-900 mb-3">1. Install GlowWorm on your Raspberry Pi:</p>
+                <code className="block bg-gray-900 text-green-400 p-3 rounded text-sm font-mono overflow-x-auto">
+                  curl -sSL https://your-server/install.sh | sudo bash
+                </code>
+                <p className="text-xs text-gray-500 mt-2">
+                  Replace "your-server" with your GlowWorm server address.
+                </p>
+              </div>
+
+              <div className="bg-white border border-purple-200 rounded p-4">
+                <p className="font-medium text-purple-900 mb-2">2. Enter your server URL when prompted</p>
+                <p className="text-sm text-purple-700">
+                  The installer will ask for your GlowWorm server URL (e.g., <code className="bg-purple-100 px-1 rounded">http://192.168.1.100:3003</code>)
+                </p>
+              </div>
+
+              <div className="bg-white border border-purple-200 rounded p-4">
+                <p className="font-medium text-purple-900 mb-2">3. Note the 4-character registration code</p>
+                <p className="text-sm text-purple-700">
+                  The Pi will display a registration code on screen. You'll need this to authorize the device.
+                </p>
+              </div>
+
+              <div className="bg-white border border-purple-200 rounded p-4">
+                <p className="font-medium text-purple-900 mb-2">4. Authorize in Admin Panel</p>
+                <p className="text-sm text-purple-700">
+                  Go to <strong>Admin → Devices</strong> and authorize the device using the registration code.
+                </p>
+              </div>
+
+              <div className="bg-white border border-purple-200 rounded p-4">
+                <p className="font-medium text-purple-900 mb-2">5. Assign a playlist</p>
+                <p className="text-sm text-purple-700">
+                  Once authorized, assign a playlist and the slideshow will start automatically.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Features */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
+            <h3 className="font-semibold text-gray-900 mb-3">Pi3D Display Features</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start">
+                <span className="text-green-500 mr-2">✓</span>
+                GPU-accelerated transitions at 30+ FPS
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-500 mr-2">✓</span>
+                Low memory usage (&lt;200MB RAM)
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-500 mr-2">✓</span>
+                Auto-restart on crash
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-500 mr-2">✓</span>
+                Offline image caching
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-500 mr-2">✓</span>
+                WebSocket remote control
+              </li>
+              <li className="flex items-start">
+                <span className="text-green-500 mr-2">✓</span>
+                Automatic playlist updates
+              </li>
+            </ul>
+          </div>
+
+          {/* Compatible Devices */}
+          <div className="text-center text-sm text-gray-500">
+            <p className="font-medium mb-1">Compatible Devices:</p>
+            <p>Raspberry Pi 3B+, 4, or 5 with Raspberry Pi OS</p>
+          </div>
+        </div>
       </div>
     </div>
   );

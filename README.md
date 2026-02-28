@@ -98,11 +98,8 @@ Watch the complete walkthrough: [GlowWorm Installation and Usage on YouTube](htt
 - Linux distributions with Docker support - Expected to work
 
 **Display Devices:**
-- Raspberry Pi with FullPageOS - Fully tested and working
-- Firefox browser (desktop) - Fully tested and working
-- Chrome browser (desktop) - Fully tested and working
-- Chromium-based browsers - Expected to work
-- WebKit-based browsers - Expected to work
+- Raspberry Pi 3B+/4/5 with Pi3D daemon - Fully tested and working (recommended)
+- GPU-accelerated slideshows at 30+ FPS with low memory usage
 
 ### Untested Environments
 

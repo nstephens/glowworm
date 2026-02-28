@@ -1,83 +1,83 @@
-# Glowworm Display Device Daemon
+# GlowWorm Pi3D Display Daemon
 
-Optional daemon service that runs on Raspberry Pi display devices to enable host-level control.
+The GlowWorm display daemon runs on Raspberry Pi devices to provide GPU-accelerated photo slideshows with smooth transitions.
 
 ## Features
 
-- Remote browser URL updates (FullPageOS configuration)
-- HDMI CEC display control (power on/off, input switching)
-- Integration with Glowworm scheduler for automated display management
-- Secure communication with Glowworm backend
+- GPU-accelerated display using Pi3D
+- Smooth cross-fade transitions at 30+ FPS
+- Low memory usage (<200MB RAM)
+- Offline image caching with LRU eviction
+- WebSocket connection for real-time control
+- Automatic crash recovery and restart
+- Remote control via admin panel
+- HDMI CEC display control (power on/off)
+
+## Requirements
+
+- Raspberry Pi 3B+, 4, or 5
+- Raspberry Pi OS (64-bit recommended)
+- Python 3.10+
+- Display connected via HDMI
 
 ## Installation
 
-### Quick Install (Semi-Automatic)
-
-**For display devices already showing Glowworm slideshows:**
+### Quick Install (Recommended)
 
 ```bash
-# On Raspberry Pi - extracts device token from browser
-curl -sSL https://raw.githubusercontent.com/nstephens/glowworm/main/daemon/scripts/install-on-display.sh | sudo bash
+curl -sSL https://your-server/install.sh | sudo bash
 ```
 
-This script:
-- ✅ Auto-extracts device token from browser cookies
-- ✅ Prompts only for server URL (you know this already!)
-- ✅ Minimal configuration - just paste your admin UI URL
-- ✅ Perfect for authorized display devices
-
-### Standard Install (Interactive Setup)
-
-```bash
-# On Raspberry Pi with FullPageOS - manual configuration
-curl -sSL https://raw.githubusercontent.com/nstephens/glowworm/main/daemon/scripts/install.sh | sudo bash
-```
+The installer will:
+- Install Pi3D and dependencies
+- Set up the GlowWorm daemon service
+- Configure display settings
+- Prompt for your GlowWorm server URL
+- Display a 4-character registration code
 
 ### Manual Installation
 
 ```bash
-# Create virtual environment (PEP 668 compliant)
-sudo mkdir -p /opt/glowworm-daemon
-sudo python3 -m venv /opt/glowworm-daemon/venv
+# Create virtual environment
+sudo mkdir -p /opt/glowworm
+sudo python3 -m venv /opt/glowworm/venv
 
-# Install in venv
-sudo /opt/glowworm-daemon/venv/bin/pip install glowworm-daemon
-
-# Create symlinks
-sudo ln -sf /opt/glowworm-daemon/venv/bin/glowworm-daemon /usr/local/bin/
-sudo ln -sf /opt/glowworm-daemon/venv/bin/glowworm-daemon-setup /usr/local/bin/
+# Install packages
+sudo /opt/glowworm/venv/bin/pip install glowworm-daemon glowworm-display
 
 # Run setup
-sudo glowworm-daemon-setup
+sudo /opt/glowworm/venv/bin/glowworm-daemon-setup
 ```
-
-## Requirements
-
-- Python 3.10+
-- Raspberry Pi with FullPageOS
-- cec-utils (for HDMI CEC control)
-- systemd
 
 ## Configuration
 
-Configuration file: `/etc/glowworm/daemon.conf`
+Configuration file: `/etc/glowworm/config.yaml`
 
-```ini
-[daemon]
-# Use the frontend URL (same as admin UI), NOT the backend URL
-# The frontend proxies /api/ requests to the backend
-backend_url = http://10.10.10.2:3003
-device_token = your-device-token-here
-poll_interval = 5
-log_level = INFO
+```yaml
+backend:
+  url: "http://your-server:3003"
+  device_token: ""  # Set during registration
 
-[cec]
-enabled = true
-display_address = 0
-adapter = /dev/cec0
+display:
+  orientation: portrait  # portrait or landscape
+  rotation: 0  # 0, 90, 180, 270
+  background_color: "#000000"
+  fps_target: 30
 
-[fullpageos]
-config_path = /boot/firmware/fullpageos.txt
+slideshow:
+  display_time: 30.0  # seconds per image
+  transition_duration: 2.0
+  scale_mode: fit  # fit, fill, stretch
+  preload_count: 3
+
+cache:
+  directory: /var/cache/glowworm/images
+  max_size_mb: 500
+  min_free_space_mb: 100
+
+cec:
+  enabled: true
+  display_address: 0
 ```
 
 ## Usage
@@ -96,28 +96,46 @@ sudo systemctl status glowworm-daemon
 sudo journalctl -u glowworm-daemon -f
 ```
 
+## Registration Process
+
+1. Install the daemon on your Raspberry Pi
+2. The Pi will display a 4-character registration code
+3. In the GlowWorm admin panel, go to **Devices**
+4. Authorize the device using the registration code
+5. Assign a playlist to the device
+6. The slideshow starts automatically
+
+## Remote Control
+
+From the admin panel, you can:
+- Play/pause the slideshow
+- Skip to next/previous image
+- Reload the playlist
+- Clear the image cache
+- Monitor connection status
+- View cache statistics
+
 ## Development
 
 ```bash
 # Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 
 # Install in development mode
-pip install -e .
-pip install -e ".[dev]"
+pip install -e daemon/
+pip install -e display/
 
 # Run tests
-pytest tests/
+pytest daemon/tests/
+pytest display/tests/
 
-# Run locally (for testing)
-python -m glowworm_daemon.main
-
-# Deactivate when done
-deactivate
+# Run daemon in mock mode (no Pi3D hardware required)
+glowworm-daemon --mock
 ```
 
 ## Documentation
 
-Full documentation available in `docs/DAEMON_GUIDE.md`
-
+- [Installation Guide](https://github.com/nstephens/glowworm/wiki/Raspberry-Pi-Setup)
+- [Configuration Reference](https://github.com/nstephens/glowworm/wiki/Configuration)
+- [Troubleshooting](https://github.com/nstephens/glowworm/wiki/Troubleshooting)
