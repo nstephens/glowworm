@@ -762,3 +762,53 @@ async with PreloadManager(image_manager, config) as preloader:
 
 ### Next Task
 Task 2.5: Integration Testing - Image Management
+
+## 2026-02-28 18:15 - Task 2.5: Integration Testing - Image Management
+
+### What Changed
+Created comprehensive integration tests for ImageManager, PlaylistManager, and PreloadManager working together.
+
+### Files Created
+- `daemon/tests/test_integration_image_management.py` - 13 integration tests covering:
+  - **Playlist fetch and image download**: Tests fetching playlists and downloading all images to cache
+  - **Preload from playlist**: Tests preloading upcoming images based on playlist position
+  - **Offline operation**: Tests slideshow can operate entirely from cached images
+  - **Cache hit tracking**: Tests that cache statistics correctly track hits
+  - **LRU eviction**: Tests cache eviction when size limit exceeded
+  - **Cache size limit**: Tests cache respects max_size_mb configuration
+  - **LRU preservation**: Tests recently accessed images survive eviction
+  - **Playlist update downloads**: Tests that playlist changes trigger new image downloads
+  - **Preloader queue updates**: Tests preloader updates when playlist position changes
+  - **Removed image cancellation**: Tests preloader cancels downloads for removed images
+  - **Full slideshow simulation**: Tests complete slideshow workflow with preloading
+  - **Shuffle mode preloading**: Tests preloading works correctly in shuffle mode
+  - **Position persistence**: Tests playlist position persists across daemon restart
+
+### Test Infrastructure
+- `MockBackendServer` class using aiohttp for realistic HTTP testing
+- Mock image data (valid minimal JPEG)
+- Proper async fixture handling with pytest-asyncio
+- Isolated test directories to avoid interference between tests
+
+### Verification
+- All 13 new integration tests pass
+- All 135 daemon tests pass: `pytest daemon/tests/ -v`
+- Tests exercise real HTTP client (aiohttp) against mock server
+- Tests cover all requirements from plan.md Task 2.5
+
+### Test Coverage Summary
+| Scenario | Status |
+|----------|--------|
+| Playlist fetched and images downloaded to cache | ✅ |
+| Slideshow operates from cache (offline) | ✅ |
+| Cache eviction during extended operation | ✅ |
+| Playlist update triggers new downloads | ✅ |
+
+### Notes
+- Mock server simulates backend API endpoints (/api/device-daemon/playlist, /api/images/{id}/file)
+- Tests use small cache sizes (0.5-10MB) to trigger eviction quickly
+- Cache hit tracking test relaxed to account for internal cache.get() calls during downloads
+- Integration tests complement existing unit tests for each module
+
+### Next Task
+Task 3.1: Display Controller

@@ -257,6 +257,7 @@ Based on Rewrite.md, this document breaks down the implementation into concrete 
 
 ### Task 2.5: Integration Testing - Image Management
 **Complexity:** Low
+**Status:** `passes: true`
 **Description:** Test image manager and playlist manager together.
 
 **Tests:**
