@@ -1,0 +1,483 @@
+"""
+Renderer Main Loop for GlowWorm Display Engine.
+
+Manages image display, transitions, and state machine for the slideshow.
+"""
+
+import logging
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import TYPE_CHECKING, Callable
+
+from glowworm_display.display import Display
+from glowworm_display.image_loader import ImageLoader, ImageLoadError, ScaleMode
+from glowworm_display.transitions import CrossfadeTransition, Transition, TransitionState
+
+if TYPE_CHECKING:
+    import pi3d
+    from glowworm_display.image_loader import MockSprite
+
+logger = logging.getLogger(__name__)
+
+
+class RendererState(str, Enum):
+    """State of the renderer."""
+
+    IDLE = "idle"  # No image loaded, showing background
+    DISPLAYING = "displaying"  # Showing a static image
+    TRANSITIONING = "transitioning"  # Transitioning between images
+    PAUSED = "paused"  # Paused, not updating display
+
+
+@dataclass
+class RenderStats:
+    """Statistics about rendering performance."""
+
+    frame_count: int = 0
+    total_render_time: float = 0.0
+    last_frame_time: float = 0.0
+    min_frame_time: float = float("inf")
+    max_frame_time: float = 0.0
+    transition_count: int = 0
+    images_displayed: int = 0
+
+    @property
+    def avg_frame_time(self) -> float:
+        """Average frame render time in seconds."""
+        if self.frame_count == 0:
+            return 0.0
+        return self.total_render_time / self.frame_count
+
+    @property
+    def avg_fps(self) -> float:
+        """Average frames per second."""
+        if self.avg_frame_time == 0:
+            return 0.0
+        return 1.0 / self.avg_frame_time
+
+
+@dataclass
+class QueuedImage:
+    """An image queued for display."""
+
+    path: str
+    scale_mode: ScaleMode = ScaleMode.FIT
+    transition_duration: float = 1.0
+
+
+# Callback types
+StateChangeCallback = Callable[[RendererState, RendererState], None]
+
+
+class Renderer:
+    """
+    Main renderer for the GlowWorm display engine.
+
+    Manages the render loop, image display, transitions, and state machine.
+    Receives commands to load images and handles the display lifecycle.
+
+    Attributes:
+        display: The Pi3D display instance
+        image_loader: Image loader for creating sprites
+        state: Current renderer state
+        stats: Rendering statistics
+    """
+
+    def __init__(
+        self,
+        display: Display,
+        image_loader: ImageLoader,
+        default_transition_duration: float = 1.0,
+        on_state_change: StateChangeCallback | None = None,
+    ) -> None:
+        """
+        Initialize the renderer.
+
+        Args:
+            display: Initialized Pi3D display
+            image_loader: Image loader for creating sprites
+            default_transition_duration: Default transition duration in seconds
+            on_state_change: Optional callback when state changes
+        """
+        self.display = display
+        self.image_loader = image_loader
+        self.default_transition_duration = default_transition_duration
+        self.on_state_change = on_state_change
+
+        # State management
+        self._state = RendererState.IDLE
+        self._paused_state: RendererState | None = None  # State before pause
+
+        # Current and queued images
+        self._current_sprite: "MockSprite | pi3d.Sprite | None" = None
+        self._next_sprite: "MockSprite | pi3d.Sprite | None" = None
+        self._image_queue: list[QueuedImage] = []
+
+        # Current transition (if any)
+        self._transition: Transition | None = None
+
+        # Statistics
+        self.stats = RenderStats()
+
+        # Running flag
+        self._running = False
+
+        logger.info("Renderer initialized")
+
+    @property
+    def state(self) -> RendererState:
+        """Get current renderer state."""
+        return self._state
+
+    @property
+    def is_running(self) -> bool:
+        """Check if render loop is running."""
+        return self._running
+
+    @property
+    def is_paused(self) -> bool:
+        """Check if renderer is paused."""
+        return self._state == RendererState.PAUSED
+
+    @property
+    def current_image_path(self) -> str | None:
+        """Get path of currently displayed image, if any."""
+        if self._current_sprite and hasattr(self._current_sprite, "texture"):
+            texture = self._current_sprite.texture
+            if hasattr(texture, "file_path"):
+                return texture.file_path
+        return None
+
+    @property
+    def queue_length(self) -> int:
+        """Get number of images in the queue."""
+        return len(self._image_queue)
+
+    def _set_state(self, new_state: RendererState) -> None:
+        """
+        Set renderer state and invoke callback.
+
+        Args:
+            new_state: The new state to set
+        """
+        if new_state == self._state:
+            return
+
+        old_state = self._state
+        self._state = new_state
+        logger.debug(f"State changed: {old_state.value} -> {new_state.value}")
+
+        if self.on_state_change:
+            try:
+                self.on_state_change(old_state, new_state)
+            except Exception as e:
+                logger.warning(f"State change callback error: {e}")
+
+    def queue_image(
+        self,
+        path: str,
+        scale_mode: ScaleMode = ScaleMode.FIT,
+        transition_duration: float | None = None,
+    ) -> None:
+        """
+        Add an image to the display queue.
+
+        The image will be displayed after any currently queued images.
+
+        Args:
+            path: Path to the image file
+            scale_mode: How to scale the image
+            transition_duration: Override default transition duration
+        """
+        duration = (
+            transition_duration
+            if transition_duration is not None
+            else self.default_transition_duration
+        )
+
+        queued = QueuedImage(
+            path=path,
+            scale_mode=scale_mode,
+            transition_duration=duration,
+        )
+        self._image_queue.append(queued)
+        logger.info(f"Image queued: {path} (queue length: {len(self._image_queue)})")
+
+    def load_image_immediate(
+        self,
+        path: str,
+        scale_mode: ScaleMode = ScaleMode.FIT,
+        transition_duration: float | None = None,
+    ) -> bool:
+        """
+        Load an image immediately, interrupting any current transition.
+
+        Clears the queue and starts transitioning to the new image.
+
+        Args:
+            path: Path to the image file
+            scale_mode: How to scale the image
+            transition_duration: Override default transition duration
+
+        Returns:
+            True if image load started, False if failed
+        """
+        duration = (
+            transition_duration
+            if transition_duration is not None
+            else self.default_transition_duration
+        )
+
+        # Clear queue and cancel any in-progress transition
+        self._image_queue.clear()
+        if self._transition and self._transition.is_running:
+            self._transition.cancel()
+            logger.debug("Cancelled in-progress transition")
+
+        # Load the new image
+        try:
+            self._next_sprite = self.image_loader.load_image(path, scale_mode)
+        except ImageLoadError as e:
+            logger.error(f"Failed to load image: {e}")
+            return False
+
+        # Start transition
+        self._start_transition(duration)
+        return True
+
+    def _start_transition(self, duration: float) -> None:
+        """Start a transition to the next sprite."""
+        if self._next_sprite is None:
+            logger.warning("No next sprite to transition to")
+            return
+
+        self._transition = CrossfadeTransition(duration=duration)
+        self._transition.start()
+        self._set_state(RendererState.TRANSITIONING)
+        self.stats.transition_count += 1
+        logger.debug(f"Started transition: duration={duration}s")
+
+    def _process_queue(self) -> None:
+        """Process the next image in the queue if ready."""
+        if self._state == RendererState.TRANSITIONING:
+            # Already transitioning, wait
+            return
+
+        if self._state == RendererState.PAUSED:
+            # Paused, don't process queue
+            return
+
+        if not self._image_queue:
+            return
+
+        # Get next queued image
+        queued = self._image_queue.pop(0)
+        logger.debug(f"Processing queued image: {queued.path}")
+
+        # Load the image
+        try:
+            self._next_sprite = self.image_loader.load_image(
+                queued.path, queued.scale_mode
+            )
+        except ImageLoadError as e:
+            logger.error(f"Failed to load queued image: {e}")
+            # Try next in queue
+            self._process_queue()
+            return
+
+        # Start transition
+        self._start_transition(queued.transition_duration)
+
+    def _update_transition(self) -> None:
+        """Update the current transition state."""
+        if self._transition is None:
+            return
+
+        progress = self._transition.update()
+
+        if self._transition.state == TransitionState.COMPLETED:
+            # Transition complete - swap sprites
+            self._current_sprite = self._next_sprite
+            self._next_sprite = None
+            self._transition = None
+            self._set_state(RendererState.DISPLAYING)
+            self.stats.images_displayed += 1
+            logger.debug("Transition complete, now displaying new image")
+
+        elif self._transition.state == TransitionState.CANCELLED:
+            # Transition cancelled - keep current sprite
+            self._next_sprite = None
+            self._transition = None
+            if self._current_sprite:
+                self._set_state(RendererState.DISPLAYING)
+            else:
+                self._set_state(RendererState.IDLE)
+            logger.debug("Transition cancelled")
+
+    def _render_frame(self) -> None:
+        """Render a single frame."""
+        if self._state == RendererState.IDLE:
+            # Nothing to draw, just background
+            pass
+
+        elif self._state == RendererState.DISPLAYING:
+            # Draw current image
+            if self._current_sprite:
+                self._current_sprite.set_alpha(1.0)
+                self._current_sprite.draw()
+
+        elif self._state == RendererState.TRANSITIONING:
+            # Render transition
+            if self._transition:
+                self._transition.render(self._current_sprite, self._next_sprite)
+
+        elif self._state == RendererState.PAUSED:
+            # Draw current image (frozen)
+            if self._current_sprite:
+                self._current_sprite.set_alpha(1.0)
+                self._current_sprite.draw()
+
+    def pause(self) -> None:
+        """
+        Pause the renderer.
+
+        Stops processing queue and freezes display on current image.
+        """
+        if self._state == RendererState.PAUSED:
+            logger.debug("Already paused")
+            return
+
+        self._paused_state = self._state
+        self._set_state(RendererState.PAUSED)
+        logger.info("Renderer paused")
+
+    def resume(self) -> None:
+        """
+        Resume the renderer from paused state.
+
+        Continues from where it was paused. If we were transitioning,
+        the transition continues from where it left off.
+        """
+        if self._state != RendererState.PAUSED:
+            logger.debug("Not paused, nothing to resume")
+            return
+
+        # Restore previous state
+        restored_state = self._paused_state or RendererState.IDLE
+        self._paused_state = None
+
+        # If we were transitioning and still have a transition, keep transitioning
+        if restored_state == RendererState.TRANSITIONING:
+            if self._transition and self._transition.is_running:
+                # Transition is still valid, continue it
+                pass
+            elif self._current_sprite:
+                restored_state = RendererState.DISPLAYING
+            else:
+                restored_state = RendererState.IDLE
+
+        self._set_state(restored_state)
+        logger.info(f"Renderer resumed: {restored_state.value}")
+
+    def clear(self) -> None:
+        """
+        Clear the current display.
+
+        Removes current image and clears queue.
+        """
+        self._image_queue.clear()
+        self._current_sprite = None
+        self._next_sprite = None
+
+        if self._transition:
+            self._transition.cancel()
+            self._transition = None
+
+        self._set_state(RendererState.IDLE)
+        logger.info("Renderer cleared")
+
+    def run_once(self) -> bool:
+        """
+        Run a single iteration of the render loop.
+
+        This is the main entry point for the render loop.
+        Should be called repeatedly in the main loop.
+
+        Returns:
+            True if rendering should continue, False if display stopped
+        """
+        if not self.display.is_running:
+            return False
+
+        frame_start = time.time()
+
+        # Update transition if active
+        if self._state == RendererState.TRANSITIONING:
+            self._update_transition()
+
+        # Process queue if idle or displaying
+        if self._state in (RendererState.IDLE, RendererState.DISPLAYING):
+            self._process_queue()
+
+        # Render frame
+        with self.display.frame():
+            self._render_frame()
+
+        # Update statistics
+        frame_time = time.time() - frame_start
+        self.stats.frame_count += 1
+        self.stats.total_render_time += frame_time
+        self.stats.last_frame_time = frame_time
+        self.stats.min_frame_time = min(self.stats.min_frame_time, frame_time)
+        self.stats.max_frame_time = max(self.stats.max_frame_time, frame_time)
+
+        return True
+
+    def run(self) -> None:
+        """
+        Run the main render loop.
+
+        Blocks until display is stopped or stop() is called.
+        """
+        logger.info("Starting render loop")
+        self._running = True
+
+        try:
+            while self._running and self.display.is_running:
+                if not self.run_once():
+                    break
+        except KeyboardInterrupt:
+            logger.info("Render loop interrupted")
+        finally:
+            self._running = False
+            logger.info(
+                f"Render loop ended: {self.stats.frame_count} frames, "
+                f"{self.stats.avg_fps:.1f} avg FPS"
+            )
+
+    def stop(self) -> None:
+        """Stop the render loop."""
+        self._running = False
+        logger.info("Renderer stop requested")
+
+    def get_status(self) -> dict:
+        """
+        Get current renderer status.
+
+        Returns:
+            Dict with current state and statistics
+        """
+        return {
+            "state": self._state.value,
+            "is_running": self._running,
+            "is_paused": self.is_paused,
+            "current_image": self.current_image_path,
+            "queue_length": self.queue_length,
+            "stats": {
+                "frame_count": self.stats.frame_count,
+                "avg_fps": round(self.stats.avg_fps, 1),
+                "images_displayed": self.stats.images_displayed,
+                "transition_count": self.stats.transition_count,
+            },
+        }

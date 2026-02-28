@@ -13,6 +13,7 @@ from pathlib import Path
 from glowworm_display.config import DisplayConfig, load_config
 from glowworm_display.display import Display
 from glowworm_display.image_loader import ImageLoader, ImageLoadError, ScaleMode
+from glowworm_display.renderer import Renderer, RendererState
 from glowworm_display.transitions import CrossfadeTransition
 
 logger = logging.getLogger(__name__)
@@ -99,6 +100,11 @@ def parse_args() -> argparse.Namespace:
         help="Transition duration in seconds (default: 1.0)",
     )
     parser.add_argument(
+        "--test-renderer",
+        action="store_true",
+        help="Test the renderer with queued images (use with --test-image and --test-transition)",
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__import__('glowworm_display').__version__}",
@@ -181,7 +187,80 @@ def main() -> int:
             display.cleanup()
             return 1
 
-    # Test transition mode
+    # Test renderer mode - uses the Renderer class with image queue
+    if args.test_renderer:
+        if not args.test_image:
+            logger.error("--test-renderer requires --test-image")
+            display.cleanup()
+            return 1
+
+        logger.info("Testing renderer with image queue...")
+
+        # Create renderer
+        def on_state_change(old_state: RendererState, new_state: RendererState) -> None:
+            logger.info(f"Renderer state: {old_state.value} -> {new_state.value}")
+
+        renderer = Renderer(
+            display=display,
+            image_loader=image_loader,
+            default_transition_duration=args.transition_duration,
+            on_state_change=on_state_change,
+        )
+
+        # Queue the test image(s)
+        renderer.queue_image(args.test_image, scale_mode=scale_mode)
+        if args.test_transition:
+            renderer.queue_image(args.test_transition, scale_mode=scale_mode)
+
+        logger.info(f"Queued {renderer.queue_length} images")
+
+        # Run renderer until queued images are displayed
+        max_frames = args.test_frames if args.test_frames > 0 else 10000
+        frame_count = 0
+        pause_tested = False
+
+        logger.info(f"Running renderer for up to {max_frames} frames...")
+
+        while frame_count < max_frames and renderer.run_once():
+            frame_count += 1
+
+            # Test pause/resume during first transition
+            if (
+                not pause_tested
+                and renderer.state == RendererState.TRANSITIONING
+                and renderer.stats.transition_count == 1
+            ):
+                pause_tested = True
+                logger.info("Testing pause during transition...")
+                renderer.pause()
+                # Run a few paused frames
+                for _ in range(10):
+                    renderer.run_once()
+                logger.info("Testing resume...")
+                renderer.resume()
+
+            # Stop once all images have been displayed and queue is empty
+            if (
+                renderer.state == RendererState.DISPLAYING
+                and renderer.queue_length == 0
+                and renderer.stats.images_displayed >= 2
+            ):
+                logger.info("All queued images displayed, stopping...")
+                break
+
+        # Log final stats
+        status = renderer.get_status()
+        logger.info(f"Renderer test complete: {status}")
+        logger.info(
+            f"Stats: {renderer.stats.frame_count} frames, "
+            f"{renderer.stats.avg_fps:.1f} avg FPS, "
+            f"{renderer.stats.images_displayed} images displayed"
+        )
+
+        display.cleanup()
+        return 0
+
+    # Test transition mode (legacy, direct transition without renderer)
     if args.test_transition and test_sprite and test_sprite2:
         logger.info(f"Testing cross-fade transition: {args.transition_duration}s duration")
 
@@ -251,18 +330,22 @@ def main() -> int:
         return 0
 
     # TODO: Start IPC server (Task 1.6)
-    # TODO: Enter main render loop (Task 1.5)
 
-    # Placeholder for main loop - run until stopped
-    logger.info("Entering main render loop (placeholder)...")
+    # Create renderer for main loop
+    renderer = Renderer(
+        display=display,
+        image_loader=image_loader,
+        default_transition_duration=args.transition_duration,
+    )
+
+    logger.info("Entering main render loop...")
     try:
-        while display.is_running:
-            with display.frame():
-                # Nothing to draw yet - just background color
-                pass
+        renderer.run()
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
     finally:
+        status = renderer.get_status()
+        logger.info(f"Final status: {status}")
         display.cleanup()
 
     return 0

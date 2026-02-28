@@ -153,3 +153,54 @@ Implemented the cross-fade transition system with a base Transition class and Cr
 
 ### Next Task
 Task 1.5: Renderer Main Loop
+
+## 2026-02-28 14:45 - Task 1.5: Renderer Main Loop
+
+### What Changed
+Implemented the Renderer class that manages the main render loop, image queue, state machine, and pause/resume functionality.
+
+### Files Created
+- `display/glowworm_display/renderer.py` - Renderer class with:
+  - `RendererState` enum (IDLE, DISPLAYING, TRANSITIONING, PAUSED)
+  - `RenderStats` dataclass for performance statistics (frame count, FPS, timing)
+  - `QueuedImage` dataclass for images in the queue
+  - `Renderer` class with:
+    - State machine managing idle/displaying/transitioning/paused states
+    - Image queue management (queue_image, load_image_immediate)
+    - Main render loop (run, run_once) with frame timing
+    - Pause/resume functionality preserving transition state
+    - State change callbacks for external monitoring
+    - Status reporting (get_status)
+    - Clear functionality to reset state
+
+### Files Modified
+- `display/glowworm_display/__init__.py` - Added exports for `Renderer`, `RendererState`, `RenderStats`
+- `display/glowworm_display/__main__.py`:
+  - Added `--test-renderer` CLI option for testing renderer with queued images
+  - Updated main render loop to use Renderer class instead of placeholder
+  - Test mode exercises pause/resume during transitions
+
+### Verification
+- Imports work correctly: `from glowworm_display import Renderer, RendererState, RenderStats`
+- `glowworm-display --mock` initializes and exits cleanly
+- `glowworm-display --mock --test-renderer --test-image <img1> --test-transition <img2>`:
+  - Queues 2 images successfully
+  - State transitions: idle → transitioning → paused → transitioning → displaying → transitioning → displaying
+  - Pause/resume during transition works correctly (transition continues after resume)
+  - All images displayed, queue empties
+  - Statistics tracked (frame count, avg FPS, images displayed, transition count)
+  - Current image path tracked in status
+- `glowworm-display --version` outputs `3.0.0`
+
+### Notes
+- Mock mode runs at very high FPS (200k+) since no actual GPU rendering occurs
+- Render loop uses `time.time()` for frame timing; transition timing is wall-clock based
+- State machine correctly handles:
+  - Queue processing when idle or displaying
+  - Transition completion and sprite swap
+  - Pause preserving previous state
+  - Resume restoring to correct state (including mid-transition)
+- Memory management: sprites are properly swapped, no accumulation
+
+### Next Task
+Task 1.6: IPC Server
