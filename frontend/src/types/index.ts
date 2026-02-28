@@ -102,6 +102,33 @@ export interface Device {
   current_playlist_id?: number;
 }
 
+export type DeviceType = 'browser' | 'pi3d';
+
+export interface DisplayDevice {
+  id: number;
+  device_token: string;
+  device_name?: string;
+  device_identifier?: string;
+  status: 'pending' | 'authorized' | 'rejected' | 'offline';
+  authorized_at?: string;
+  last_seen: string;
+  created_at: string;
+  updated_at: string;
+  playlist_id?: number;
+  playlist_name?: string;
+  screen_width?: number;
+  screen_height?: number;
+  device_pixel_ratio?: string;
+  orientation?: string;
+  // Pi3D daemon status fields
+  device_type: DeviceType;
+  last_state?: string;
+  last_image_id?: number;
+  last_cache_size_mb?: number;
+  last_cache_hit_rate?: number;
+  last_uptime_seconds?: number;
+}
+
 export interface LoginCredentials {
   username: string;
   password: string;

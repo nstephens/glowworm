@@ -1818,3 +1818,64 @@ Response:
 
 ### Next Task
 Task 5.3: Frontend Registration Updates
+
+## 2026-02-28 19:45 - Task 5.3: Frontend Registration Updates
+
+### What Changed
+Updated frontend to support Pi3D daemon device registration with device type indicators and appropriate controls.
+
+### Files Modified
+- `frontend/src/types/index.ts`:
+  - Added `DeviceType` type (`'browser' | 'pi3d'`)
+  - Added `DisplayDevice` interface with all device fields including Pi3D daemon status fields (device_type, last_state, last_image_id, cache stats, uptime)
+
+- `frontend/src/pages/DisplaysWebSocket.tsx`:
+  - Added device type imports (Server, Monitor, SkipForward, SkipBack icons)
+  - Updated `DeviceStatus` interface with Pi3D daemon fields
+  - Added `getDeviceTypeBadge()` helper - shows "Pi3D" (purple) or "Browser" (blue) badge
+  - Added `isPi3dDevice()` helper function
+  - Device list now shows device type badge next to device name
+  - Pi3D devices show additional status info (state, cache size)
+  - Authorization dialog confirms device type before authorizing
+  - Updated command buttons:
+    - Pi3D devices: previous, next, resume, pause, reload_playlist (no "Refresh Browser")
+    - Browser devices: start_slideshow, stop_slideshow, reload_playlist, refresh_browser
+  - Commands use appropriate command names for device type (resume/pause for Pi3D, start/stop_slideshow for browser)
+
+- `frontend/src/pages/DisplayRegistration.tsx`:
+  - Redesigned registration page with two clear options:
+    - **Browser Display**: Auto-registers browser (existing behavior)
+    - **Pi3D Display (Recommended)**: Shows setup instructions for Raspberry Pi
+  - Pi3D section includes step-by-step instructions:
+    1. Install script command
+    2. Registration code display explanation
+    3. Admin authorization steps
+    4. Automatic slideshow start
+  - Added visual distinction between registration methods (blue for browser, purple for Pi3D)
+
+### Verification
+- Frontend builds successfully: `npm run build`
+- TypeScript compiles without errors: `npx tsc --noEmit`
+- Device type badge displays correctly for both types
+- Pi3D devices don't show "Refresh Browser" command
+- Browser devices don't show next/previous commands
+- Registration page shows clear instructions for both methods
+
+### Test Coverage Summary
+| Feature | Status |
+|---------|--------|
+| Device type badge in device list | Done |
+| Pi3D status info display (state, cache) | Done |
+| Authorization confirms device type | Done |
+| Pi3D-specific commands (next/prev/pause/resume) | Done |
+| Browser-specific commands hidden for Pi3D | Done |
+| Registration page shows Pi3D instructions | Done |
+
+### Notes
+- Device type defaults to "browser" if not specified (backward compatible)
+- Pi3D devices use `resume`/`pause` commands vs browser's `start_slideshow`/`stop_slideshow`
+- Registration page explains that Pi3D registration happens via daemon, not browser
+- Install script URL placeholder (`glowworm.example.com`) should be updated for production
+
+### Next Task
+Task 5.4: Integration Testing - Registration

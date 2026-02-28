@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Wifi, WifiOff, Play, Pause, Settings, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Wifi, WifiOff, Play, Pause, Settings, RefreshCw, SkipForward, SkipBack, Monitor, Server } from 'lucide-react';
 import { AdminWebSocketClient } from '../services/websocket';
-import type { DisplayDevice } from '../types';
+import type { DisplayDevice, DeviceType } from '../types';
 
 interface DeviceStatus {
   id: number;
@@ -16,6 +16,13 @@ interface DeviceStatus {
   updated_at: string;
   playlist_id?: number;
   playlist_name?: string;
+  // Pi3D daemon fields
+  device_type?: DeviceType;
+  last_state?: string;
+  last_image_id?: number;
+  last_cache_size_mb?: number;
+  last_cache_hit_rate?: number;
+  last_uptime_seconds?: number;
 }
 
 const DisplaysWebSocket: React.FC = () => {
@@ -316,6 +323,26 @@ const DisplaysWebSocket: React.FC = () => {
     }
   };
 
+  const getDeviceTypeBadge = (deviceType?: DeviceType) => {
+    const type = deviceType || 'browser';
+    if (type === 'pi3d') {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+          <Server className="w-3 h-3 mr-1" />
+          Pi3D
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+        <Monitor className="w-3 h-3 mr-1" />
+        Browser
+      </span>
+    );
+  };
+
+  const isPi3dDevice = (device: DeviceStatus) => device.device_type === 'pi3d';
+
   const getConnectionStatus = (deviceToken: string) => {
     return connectedDevices.has(deviceToken);
   };
@@ -442,6 +469,8 @@ const DisplaysWebSocket: React.FC = () => {
                               <WifiOff className="w-4 h-4 text-gray-400" title="Offline" />
                             )}
                           </div>
+                          {/* Device Type Badge */}
+                          {getDeviceTypeBadge(device.device_type)}
                         </div>
                         <p className="text-sm text-gray-500">
                           Token: {device.device_token.substring(0, 12)}...
@@ -449,6 +478,15 @@ const DisplaysWebSocket: React.FC = () => {
                         {device.device_identifier && (
                           <p className="text-sm text-gray-500">
                             ID: {device.device_identifier}
+                          </p>
+                        )}
+                        {/* Pi3D Status Info */}
+                        {isPi3dDevice(device) && device.last_state && (
+                          <p className="text-sm text-gray-500">
+                            State: {device.last_state}
+                            {device.last_cache_size_mb !== undefined && (
+                              <> | Cache: {device.last_cache_size_mb.toFixed(1)} MB</>
+                            )}
                           </p>
                         )}
                       </div>
@@ -470,9 +508,11 @@ const DisplaysWebSocket: React.FC = () => {
                       <>
                         <button
                           onClick={() => {
-                            const name = prompt('Enter device name (optional):');
-                            const identifier = prompt('Enter device identifier (optional):');
-                            if (name !== null || identifier !== null) {
+                            const deviceTypeLabel = isPi3dDevice(device) ? 'Pi3D daemon' : 'browser';
+                            const confirmMsg = `Authorize this ${deviceTypeLabel} device?`;
+                            if (window.confirm(confirmMsg)) {
+                              const name = prompt('Enter device name (optional):');
+                              const identifier = prompt('Enter device identifier (optional):');
                               handleAuthorizeDevice(device.id, name || undefined, identifier || undefined);
                             }
                           }}
@@ -507,21 +547,41 @@ const DisplaysWebSocket: React.FC = () => {
                         >
                           Edit
                         </button>
-                        
+
                         {/* Real-time Commands */}
                         {getConnectionStatus(device.device_token) && (
                           <div className="flex items-center space-x-1">
+                            {/* Pi3D specific controls: next/previous */}
+                            {isPi3dDevice(device) && (
+                              <>
+                                <button
+                                  onClick={() => handleSendCommand(device.id, 'previous')}
+                                  className="bg-gray-600 text-white p-1 rounded text-sm hover:bg-gray-700"
+                                  title="Previous Image"
+                                >
+                                  <SkipBack className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleSendCommand(device.id, 'next')}
+                                  className="bg-gray-600 text-white p-1 rounded text-sm hover:bg-gray-700"
+                                  title="Next Image"
+                                >
+                                  <SkipForward className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                            {/* Common controls: play/pause */}
                             <button
-                              onClick={() => handleSendCommand(device.id, 'start_slideshow')}
+                              onClick={() => handleSendCommand(device.id, isPi3dDevice(device) ? 'resume' : 'start_slideshow')}
                               className="bg-green-600 text-white p-1 rounded text-sm hover:bg-green-700"
-                              title="Start Slideshow"
+                              title={isPi3dDevice(device) ? "Resume Slideshow" : "Start Slideshow"}
                             >
                               <Play className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleSendCommand(device.id, 'stop_slideshow')}
+                              onClick={() => handleSendCommand(device.id, isPi3dDevice(device) ? 'pause' : 'stop_slideshow')}
                               className="bg-red-600 text-white p-1 rounded text-sm hover:bg-red-700"
-                              title="Stop Slideshow"
+                              title={isPi3dDevice(device) ? "Pause Slideshow" : "Stop Slideshow"}
                             >
                               <Pause className="w-4 h-4" />
                             </button>
@@ -532,13 +592,16 @@ const DisplaysWebSocket: React.FC = () => {
                             >
                               <RefreshCw className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleSendCommand(device.id, 'refresh_browser')}
-                              className="bg-orange-600 text-white p-1 rounded text-sm hover:bg-orange-700"
-                              title="Refresh Browser"
-                            >
-                              <RefreshCw className="w-4 h-4" />
-                            </button>
+                            {/* Browser-only: Refresh Browser */}
+                            {!isPi3dDevice(device) && (
+                              <button
+                                onClick={() => handleSendCommand(device.id, 'refresh_browser')}
+                                className="bg-orange-600 text-white p-1 rounded text-sm hover:bg-orange-700"
+                                title="Refresh Browser"
+                              >
+                                <RefreshCw className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         )}
                       </>

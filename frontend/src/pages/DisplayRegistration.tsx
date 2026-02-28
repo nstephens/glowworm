@@ -231,28 +231,72 @@ const DisplayRegistration: React.FC = () => {
         )}
 
         {!deviceStatus ? (
-          // Device not registered - show auto-registration status
+          // Device not registered - show auto-registration status and Pi3D instructions
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <div className="mb-6">
               <div className="flex items-center justify-center space-x-3 mb-4">
-                <img 
-                  src="/glowworm-logo.svg" 
-                  alt="Glowworm Logo" 
+                <img
+                  src="/glowworm-logo.svg"
+                  alt="Glowworm Logo"
                   className="w-10 h-10 object-contain"
                 />
-                <h1 className="text-2xl font-bold text-gray-900">Initializing Display Device</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {isRegistering ? 'Initializing Display Device' : 'Device Registration'}
+                </h1>
               </div>
               <p className="text-gray-600">
-                {isRegistering ? 'Registering device...' : 'Preparing display system...'}
+                {isRegistering ? 'Registering device...' : 'Choose your registration method below.'}
               </p>
             </div>
-            
-            <div className="flex justify-center mb-6">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            </div>
-            
-            <div className="text-sm text-gray-500">
-              <p>This device will be automatically registered and ready for administrator approval.</p>
+
+            {isRegistering ? (
+              <div className="flex justify-center mb-6">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Browser Registration Section */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <h2 className="text-lg font-semibold text-blue-900 mb-2">Browser Display</h2>
+                  <p className="text-sm text-blue-700 mb-4">
+                    Register this browser as a display device. Best for testing or temporary displays.
+                  </p>
+                  <button
+                    onClick={registerDevice}
+                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Register Browser
+                  </button>
+                </div>
+
+                {/* Pi3D Registration Section */}
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+                  <h2 className="text-lg font-semibold text-purple-900 mb-2">Pi3D Display (Recommended)</h2>
+                  <p className="text-sm text-purple-700 mb-4">
+                    For Raspberry Pi devices with GPU-accelerated display. Registration is handled by the GlowWorm daemon.
+                  </p>
+                  <div className="text-left bg-white border border-purple-200 rounded p-4 text-sm">
+                    <p className="font-medium text-purple-900 mb-2">Setup Instructions:</p>
+                    <ol className="list-decimal list-inside space-y-2 text-purple-800">
+                      <li>Install GlowWorm on your Raspberry Pi:
+                        <code className="block bg-purple-100 p-2 mt-1 rounded text-xs">
+                          curl -sSL https://glowworm.example.com/install.sh | bash
+                        </code>
+                      </li>
+                      <li>The Pi will display a 4-character registration code</li>
+                      <li>Go to <strong>Admin → Devices</strong> to authorize the device</li>
+                      <li>The slideshow will start automatically after authorization</li>
+                    </ol>
+                  </div>
+                  <p className="text-xs text-purple-600 mt-4">
+                    Pi3D provides smooth 30+ FPS transitions and uses less memory than browser displays.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="text-sm text-gray-500 mt-6">
+              <p>Both registration methods will create a pending device for administrator approval.</p>
             </div>
           </div>
         ) : (
