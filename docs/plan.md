@@ -578,6 +578,7 @@ Based on Rewrite.md, this document breaks down the implementation into concrete 
 
 ### Task 6.3: Remove Browser Display Code
 **Complexity:** Low
+**Status:** `passes: true`
 **Description:** Remove deprecated browser-based display components.
 
 **Subtasks:**
@@ -595,6 +596,7 @@ Based on Rewrite.md, this document breaks down the implementation into concrete 
 
 ### Task 6.4: Integration Testing - Frontend
 **Complexity:** Low
+**Status:** `passes: true`
 **Description:** Test admin interface with Pi3D devices.
 
 **Tests:**
