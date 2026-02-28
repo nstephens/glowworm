@@ -465,3 +465,113 @@ async with ImageManager(config) as manager:
 
 ### Next Task
 Task 2.2: Image Manager - Local Cache
+
+## 2026-02-28 16:45 - Task 2.2: Image Manager - Local Cache
+
+### What Changed
+Implemented persistent local file cache with SQLite metadata storage, LRU eviction, and disk space management.
+
+### Files Created
+- `daemon/glowworm_daemon/cache.py` - ImageCache class with:
+  - `CacheConfig` dataclass for cache configuration
+  - `CacheEntryMetadata` dataclass for entry metadata
+  - `CacheStats` dataclass for statistics reporting
+  - `ImageCache` class with:
+    - SQLite database for persistent metadata storage
+    - LRU eviction when cache size exceeds `max_size_mb`
+    - Minimum free space protection (`min_free_space_mb`)
+    - Cache statistics tracking (hits, misses, hit rate, evictions)
+    - Reconciliation with filesystem on startup (removes stale entries)
+    - Thread-safe operations with locking
+    - `get()`, `put()`, `remove()`, `clear()` methods
+    - `contains()`, `get_path()`, `touch()` utility methods
+    - `list_entries()` for cache listing
+
+- `daemon/tests/test_cache.py` - 33 unit tests covering:
+  - Cache initialization and database setup
+  - Put/get operations
+  - LRU eviction behavior
+  - Free space protection
+  - Cache statistics tracking
+  - Cache clearing
+  - Cache reconciliation with filesystem
+  - Utility methods
+
+### Files Modified
+- `daemon/glowworm_daemon/__init__.py` - Added exports for ImageCache, CacheConfig, CacheEntryMetadata, CacheStats, create_cache
+- `daemon/glowworm_daemon/image_manager.py`:
+  - Added `max_cache_size_mb` and `min_free_space_mb` config options
+  - ImageManager now accepts optional `cache` parameter
+  - Automatically creates ImageCache on `start()` if not provided
+  - `get_cached_path()` uses persistent cache
+  - `is_cached()` uses persistent cache
+  - `download_image()` stores entries in persistent cache
+  - `clear_cache_entry()` uses persistent cache
+  - `clear_all_cache()` new method to clear entire cache
+  - `get_cache_stats()` returns full statistics from persistent cache
+- `daemon/tests/test_image_manager.py` - Updated 5 tests to disable persistent cache for in-memory testing
+
+### Verification
+- All 60 tests pass: `pytest daemon/tests/ -v`
+- Cache statistics correctly track hits, misses, evictions
+- LRU eviction removes oldest-accessed entries when size limit exceeded
+- Free space protection prevents filling disk
+- Cache reconciles with filesystem on startup (removes stale entries)
+- Cache survives daemon restart (metadata persisted in SQLite)
+
+### API Summary
+```python
+from glowworm_daemon import ImageCache, CacheConfig
+
+# Configuration
+config = CacheConfig(
+    cache_dir="/var/cache/glowworm/images",
+    max_size_mb=500,
+    min_free_space_mb=100,
+)
+
+# Create cache
+cache = ImageCache(config)
+
+# Store entry
+cache.put(
+    image_id=123,
+    size="original",
+    local_path="/var/cache/glowworm/images/123.jpg",
+    file_size=1024000,
+    etag='"abc123"',
+    last_modified="Fri, 28 Feb 2026 12:00:00 GMT",
+    content_type="image/jpeg",
+)
+
+# Get entry (updates last_accessed, tracks hit)
+entry = cache.get(123, "original")
+if entry:
+    print(f"Path: {entry.local_path}")
+    print(f"Size: {entry.file_size}")
+
+# Check existence without affecting LRU order
+if cache.contains(123, "original"):
+    path = cache.get_path(123, "original")
+
+# Statistics
+stats = cache.get_stats()
+print(f"Entries: {stats.entry_count}")
+print(f"Size: {stats.total_size_mb}MB / {stats.max_size_mb}MB")
+print(f"Hit rate: {stats.hit_rate:.1%}")
+print(f"Evictions: {stats.evictions}")
+
+# Clear cache
+cache.clear()
+```
+
+### Notes
+- SQLite database stored at `{cache_dir}/cache.db`
+- LRU eviction is triggered before adding new entries when size exceeds limit
+- Free space is checked using `shutil.disk_usage()` on cache partition
+- Cache reconciliation on startup removes entries for deleted files
+- Thread-safe for concurrent access from multiple tasks
+- ImageManager automatically integrates with ImageCache when started
+
+### Next Task
+Task 2.3: Playlist Manager

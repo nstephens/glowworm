@@ -5,6 +5,7 @@ Provides async HTTP client with:
 - ETag/Last-Modified header handling for caching
 - Retry logic with exponential backoff
 - Download progress tracking
+- Persistent local cache with LRU eviction
 """
 import asyncio
 import logging
@@ -13,8 +14,11 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple, TYPE_CHECKING
 from urllib.parse import urljoin
+
+if TYPE_CHECKING:
+    from .cache import ImageCache
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +75,9 @@ class ImageManagerConfig:
     retry_base_delay: float = 1.0  # Base delay for exponential backoff
     retry_max_delay: float = 60.0  # Maximum delay between retries
     chunk_size: int = 65536  # 64KB chunks for streaming downloads
+    # Cache settings
+    max_cache_size_mb: int = 500  # Maximum cache size in MB
+    min_free_space_mb: int = 100  # Minimum free disk space to maintain
 
     def __post_init__(self):
         # Ensure cache directory exists
@@ -105,17 +112,24 @@ class ImageManager:
     - ETag/Last-Modified conditional requests for cache validation
     - Exponential backoff retry on transient failures
     - Progress tracking with callbacks
-    - Automatic cache directory management
+    - Persistent local cache with SQLite metadata
+    - LRU eviction when cache size limit exceeded
+    - Free space protection to avoid filling disk
     """
 
-    def __init__(self, config: ImageManagerConfig):
+    def __init__(
+        self,
+        config: ImageManagerConfig,
+        cache: Optional["ImageCache"] = None
+    ):
         self.config = config
         self._session: Optional["aiohttp.ClientSession"] = None
-        self._cache_metadata: Dict[str, CacheEntry] = {}
+        self._cache_metadata: Dict[str, CacheEntry] = {}  # In-memory fallback
         self._active_downloads: Dict[str, asyncio.Task] = {}
+        self._cache = cache  # Persistent SQLite cache (optional)
 
     async def start(self) -> None:
-        """Initialize the HTTP session."""
+        """Initialize the HTTP session and cache."""
         import aiohttp
 
         timeout = aiohttp.ClientTimeout(
@@ -134,6 +148,17 @@ class ImageManager:
             timeout=timeout,
             headers=headers
         )
+
+        # Initialize persistent cache if not provided
+        if self._cache is None:
+            from .cache import CacheConfig, ImageCache
+            cache_config = CacheConfig(
+                cache_dir=self.config.cache_dir,
+                max_size_mb=self.config.max_cache_size_mb,
+                min_free_space_mb=self.config.min_free_space_mb,
+            )
+            self._cache = ImageCache(cache_config)
+
         logger.info(f"ImageManager started, cache dir: {self.config.cache_dir}")
 
     async def stop(self) -> None:
@@ -183,6 +208,13 @@ class ImageManager:
         Returns:
             Path to cached file, or None if not cached.
         """
+        # Try persistent cache first
+        if self._cache:
+            entry = self._cache.get(image_id, size)
+            if entry:
+                return Path(entry.local_path)
+
+        # Fall back to in-memory cache
         cache_key = self._get_cache_key(image_id, size)
         entry = self._cache_metadata.get(cache_key)
 
@@ -195,6 +227,9 @@ class ImageManager:
 
     def is_cached(self, image_id: int, size: str = "original") -> bool:
         """Check if an image is in the local cache."""
+        # Use contains() for persistent cache (doesn't affect LRU)
+        if self._cache:
+            return self._cache.contains(image_id, size)
         return self.get_cached_path(image_id, size) is not None
 
     async def download_image(
@@ -233,8 +268,28 @@ class ImageManager:
         cache_key = self._get_cache_key(image_id, size)
 
         # Check cache unless forced
-        cache_entry = self._cache_metadata.get(cache_key)
-        cached_path = self.get_cached_path(image_id, size)
+        # Try persistent cache first, then in-memory fallback
+        cache_entry = None
+        cached_path = None
+
+        if self._cache:
+            persistent_entry = self._cache.get(image_id, size)
+            if persistent_entry:
+                cache_entry = CacheEntry(
+                    etag=persistent_entry.etag,
+                    last_modified=persistent_entry.last_modified,
+                    local_path=persistent_entry.local_path,
+                    content_type=persistent_entry.content_type,
+                    file_size=persistent_entry.file_size,
+                    cached_at=persistent_entry.cached_at,
+                )
+                cached_path = Path(persistent_entry.local_path)
+        else:
+            cache_entry = self._cache_metadata.get(cache_key)
+            if cache_entry and cache_entry.local_path:
+                path = Path(cache_entry.local_path)
+                if path.exists():
+                    cached_path = path
 
         progress = DownloadProgress(
             url=url,
@@ -337,13 +392,26 @@ class ImageManager:
                         raise
 
                     # Update cache metadata
-                    self._cache_metadata[cache_key] = CacheEntry(
-                        etag=etag,
-                        last_modified=last_modified,
-                        local_path=str(local_path),
-                        content_type=content_type,
-                        file_size=progress.bytes_downloaded
-                    )
+                    if self._cache:
+                        # Use persistent cache with LRU eviction
+                        self._cache.put(
+                            image_id=image_id,
+                            size=size,
+                            local_path=str(local_path),
+                            file_size=progress.bytes_downloaded,
+                            etag=etag,
+                            last_modified=last_modified,
+                            content_type=content_type,
+                        )
+                    else:
+                        # Fall back to in-memory cache
+                        self._cache_metadata[cache_key] = CacheEntry(
+                            etag=etag,
+                            last_modified=last_modified,
+                            local_path=str(local_path),
+                            content_type=content_type,
+                            file_size=progress.bytes_downloaded
+                        )
 
                     progress.status = DownloadStatus.COMPLETE
                     progress.progress_percent = 100.0
@@ -527,6 +595,11 @@ class ImageManager:
         Returns:
             True if entry was cleared, False if not cached.
         """
+        # Try persistent cache first
+        if self._cache:
+            return self._cache.remove(image_id, size)
+
+        # Fall back to in-memory cache
         cache_key = self._get_cache_key(image_id, size)
         entry = self._cache_metadata.pop(cache_key, None)
 
@@ -539,8 +612,52 @@ class ImageManager:
 
         return False
 
+    def clear_all_cache(self) -> int:
+        """
+        Clear all cached images.
+
+        Returns:
+            Number of entries cleared.
+        """
+        if self._cache:
+            return self._cache.clear()
+
+        # Fall back to in-memory cache clear
+        count = 0
+        cache_dir = Path(self.config.cache_dir)
+        if cache_dir.exists():
+            for f in cache_dir.iterdir():
+                if f.is_file() and not f.suffix == ".tmp" and not f.suffix == ".db":
+                    try:
+                        f.unlink()
+                        count += 1
+                    except OSError:
+                        pass
+
+        self._cache_metadata.clear()
+        logger.info(f"Cleared all cache: {count} files deleted")
+        return count
+
     def get_cache_stats(self) -> Dict:
         """Get cache statistics."""
+        if self._cache:
+            stats = self._cache.get_stats()
+            return {
+                "entries": stats.entry_count,
+                "files": stats.entry_count,
+                "total_size_bytes": stats.total_size_bytes,
+                "total_size_mb": stats.total_size_mb,
+                "max_size_mb": stats.max_size_mb,
+                "usage_percent": stats.usage_percent,
+                "hits": stats.hits,
+                "misses": stats.misses,
+                "hit_rate": stats.hit_rate,
+                "evictions": stats.evictions,
+                "free_space_mb": stats.free_space_mb,
+                "cache_dir": self.config.cache_dir,
+            }
+
+        # Fall back to basic stats
         total_size = 0
         file_count = 0
 

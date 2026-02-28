@@ -24,9 +24,17 @@ from .image_manager import (
     CacheEntry,
     create_image_manager,
 )
+from .cache import (
+    ImageCache,
+    CacheConfig,
+    CacheEntryMetadata,
+    CacheStats,
+    create_cache,
+)
 
 __all__ = [
     "GlowwormDaemon",
+    # Image Manager
     "ImageManager",
     "ImageManagerConfig",
     "ImageManagerError",
@@ -36,5 +44,11 @@ __all__ = [
     "DownloadProgress",
     "CacheEntry",
     "create_image_manager",
+    # Image Cache
+    "ImageCache",
+    "CacheConfig",
+    "CacheEntryMetadata",
+    "CacheStats",
+    "create_cache",
 ]
 
