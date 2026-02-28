@@ -456,6 +456,7 @@ Based on Rewrite.md, this document breaks down the implementation into concrete 
 
 ### Task 5.1: Daemon Registration Mode
 **Complexity:** Medium
+**Status:** `passes: true`
 **Description:** Daemon starts in registration mode when no token configured.
 
 **Subtasks:**

@@ -108,6 +108,13 @@ from .command_handler import (
     CommandResult,
     create_command_handler,
 )
+from .registration_manager import (
+    RegistrationManager,
+    RegistrationConfig,
+    RegistrationState,
+    RegistrationResult,
+    create_registration_manager,
+)
 
 __all__ = [
     "GlowwormDaemon",
@@ -196,5 +203,11 @@ __all__ = [
     "CommandStatus",
     "CommandResult",
     "create_command_handler",
+    # Registration Manager (v3.0)
+    "RegistrationManager",
+    "RegistrationConfig",
+    "RegistrationState",
+    "RegistrationResult",
+    "create_registration_manager",
 ]
 

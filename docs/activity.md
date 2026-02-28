@@ -1665,3 +1665,73 @@ Created comprehensive integration tests for full WebSocket communication flow be
 
 ### Next Task
 Task 5.1: Daemon Registration Mode
+
+## 2026-02-28 18:10 - Task 5.1: Daemon Registration Mode
+
+### What Changed
+Implemented the RegistrationManager class for handling device registration flow when no token is configured.
+
+### Files Created
+- `daemon/glowworm_daemon/registration_manager.py` - RegistrationManager implementation with:
+  - `RegistrationState` enum (IDLE, CHECKING, REQUESTING_CODE, DISPLAYING_CODE, AUTHORIZED, REJECTED, ERROR, COMPLETED)
+  - `RegistrationConfig` dataclass for configuration options
+  - `RegistrationResult` dataclass for registration outcomes
+  - `RegistrationManager` class with:
+    - `needs_registration()` - Check if device token is missing
+    - `run_registration()` - Full registration flow execution
+    - `_request_registration_code()` - Request code from backend API
+    - `_poll_for_authorization()` - Poll backend for authorization status
+    - `_save_token()` - Save device token to config file
+    - `cancel()` - Cancel ongoing registration
+    - State change callbacks for external monitoring
+    - Async context manager support
+  - `create_registration_manager()` factory function
+
+- `daemon/tests/test_registration_manager.py` - 32 comprehensive tests covering:
+  - Configuration defaults and custom values
+  - RegistrationResult dataclass states
+  - Manager initialization with/without token
+  - Token detection (empty, whitespace)
+  - State callbacks
+  - Registration code request (success, failure, alternative fields)
+  - Authorization polling (success, rejected, timeout, cancelled, expired code)
+  - Token saving to config file
+  - Full registration flow (success, rejection, failure)
+  - Factory function
+
+### Files Modified
+- `daemon/glowworm_daemon/__init__.py` - Added exports for:
+  - RegistrationManager, RegistrationConfig, RegistrationState, RegistrationResult
+  - create_registration_manager
+
+### Registration Flow
+1. Daemon checks `needs_registration()` on startup
+2. If no token, calls `run_registration(display_controller)`
+3. Requests registration code from `POST /api/devices/register`
+4. Displays code on Pi3D via `show_registration` IPC command
+5. Polls `GET /api/devices/register/{code}/status` for authorization
+6. On AUTHORIZED: saves token to config file, switches to normal mode
+7. On REJECTED: returns rejected result for retry handling
+
+### API Endpoints (consumed by daemon, implemented in Task 5.2)
+- `POST /api/devices/register` - Request registration code
+  - Request: `{ device_type, daemon_version, capabilities }`
+  - Response: `{ code, device_id }`
+- `GET /api/devices/register/{code}/status` - Poll for authorization
+  - Response: `{ status: "PENDING" | "AUTHORIZED" | "REJECTED", device_token? }`
+
+### Verification
+- All 32 registration manager tests pass
+- All 382 daemon tests pass: `pytest daemon/tests/ -v`
+- Imports work correctly: `from glowworm_daemon import RegistrationManager, RegistrationConfig`
+
+### Notes
+- Uses aiohttp for async HTTP requests
+- Exponential backoff on request failures (2s base, 30s max)
+- Authorization timeout configurable (default 10 minutes)
+- Poll interval configurable (default 5 seconds)
+- Token saved to YAML config file, preserving existing settings
+- Backend endpoints will be implemented in Task 5.2
+
+### Next Task
+Task 5.2: Backend Registration Endpoints
