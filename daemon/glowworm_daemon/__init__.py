@@ -100,6 +100,14 @@ from .status_reporter import (
     ReporterState,
     create_status_reporter,
 )
+from .command_handler import (
+    CommandHandler,
+    CommandHandlerConfig,
+    CommandType,
+    CommandStatus,
+    CommandResult,
+    create_command_handler,
+)
 
 __all__ = [
     "GlowwormDaemon",
@@ -181,5 +189,12 @@ __all__ = [
     "DeviceStatus",
     "ReporterState",
     "create_status_reporter",
+    # Command Handler (v3.0)
+    "CommandHandler",
+    "CommandHandlerConfig",
+    "CommandType",
+    "CommandStatus",
+    "CommandResult",
+    "create_command_handler",
 ]
 

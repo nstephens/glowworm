@@ -1422,3 +1422,114 @@ async with reporter:
 
 ### Next Task
 Task 4.3: Command Reception
+
+## 2026-02-28 17:30 - Task 4.3: Command Reception
+
+### What Changed
+Implemented CommandHandler class for receiving and executing commands from backend via WebSocket.
+
+### Files Created
+- `daemon/glowworm_daemon/command_handler.py` - CommandHandler implementation with:
+  - `CommandType` enum for supported command types (next, previous, pause, resume, play, reload_playlist, go_to, clear, status)
+  - `CommandStatus` enum (SUCCESS, FAILED, ERROR, UNKNOWN_COMMAND)
+  - `CommandResult` dataclass for command execution results
+  - `CommandHandlerConfig` dataclass for configuration
+  - `CommandHandler` class with:
+    - Command message parsing from WebSocket
+    - Routing to appropriate slideshow/playlist handlers
+    - Command acknowledgment/result sending
+    - Error handling for unknown commands
+    - Statistics tracking (commands received, succeeded, failed, unknown)
+    - Command callbacks for external monitoring
+    - Async context manager support
+  - `create_command_handler()` factory function
+
+- `daemon/tests/test_command_handler.py` - 30 comprehensive tests covering:
+  - Configuration defaults and custom values
+  - CommandResult serialization
+  - Handler initialization and lifecycle
+  - All command handlers (next, previous, pause, resume, play, reload_playlist, go_to, clear, status)
+  - Unknown command handling
+  - Commands when slideshow not available
+  - Failed command handling
+  - Non-command message filtering
+  - Request ID preservation
+  - Command callbacks
+  - Statistics tracking
+  - Acknowledgment disabling
+  - Response priority
+  - Case insensitivity
+
+### Files Modified
+- `daemon/glowworm_daemon/__init__.py` - Added exports for:
+  - CommandHandler, CommandHandlerConfig, CommandType, CommandStatus, CommandResult
+  - create_command_handler
+
+### Verification
+- All 30 CommandHandler tests pass
+- All 333 daemon tests pass: `pytest daemon/tests/ -v`
+- Imports work correctly: `from glowworm_daemon import CommandHandler, CommandType`
+
+### API Summary
+```python
+from glowworm_daemon import CommandHandler, CommandHandlerConfig, CommandType
+
+# Create handler
+handler = CommandHandler(
+    websocket=ws_client,
+    slideshow=slideshow_orchestrator,
+    playlist=playlist_manager,
+    config=CommandHandlerConfig(
+        send_acknowledgment=True,
+        response_priority=3,
+        command_timeout=30.0,
+    ),
+)
+
+# Register as WebSocket message handler and start
+async with handler:
+    # Handler automatically processes messages when:
+    # ws_client calls handler.handle_message("command", {...})
+    pass
+
+# Or manual handling
+await handler.handle_message("command", {
+    "command": "next",
+    "params": {},
+    "request_id": "req-123",
+})
+```
+
+### Supported Commands
+| Command | Parameters | Description |
+|---------|------------|-------------|
+| `next` | - | Advance to next image |
+| `previous` | - | Go to previous image |
+| `pause` | - | Pause slideshow |
+| `resume` / `play` | - | Resume slideshow |
+| `reload_playlist` | - | Reload playlist from backend |
+| `go_to` | `position: int` | Jump to specific position |
+| `clear` | - | Clear display |
+| `status` | - | Get comprehensive status |
+
+### Response Format
+```python
+{
+    "command": "next",
+    "status": "success",  # or "failed", "error", "unknown_command"
+    "message": "Advanced to next image",
+    "data": {"position": 5},
+    "request_id": "req-123",  # if provided in request
+    "timestamp": 1709150400.123,
+}
+```
+
+### Notes
+- Commands are case-insensitive (NEXT, Next, next all work)
+- `play` is an alias for `resume` for consistency with common media controls
+- Unknown commands return `unknown_command` status but don't crash
+- Statistics tracked: received, succeeded, failed, unknown
+- Response priority (3) is higher than status messages (5) for faster delivery
+
+### Next Task
+Task 4.4: Backend WebSocket Updates
