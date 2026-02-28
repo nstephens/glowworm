@@ -51,6 +51,14 @@ from .preload_manager import (
     PreloadStats,
     create_preload_manager,
 )
+from .display_controller import (
+    DisplayController,
+    DisplayControllerConfig,
+    DisplayState,
+    IPCClient,
+    IPCResponse,
+    create_display_controller,
+)
 
 __all__ = [
     "GlowwormDaemon",
@@ -88,5 +96,12 @@ __all__ = [
     "PreloadEntry",
     "PreloadStats",
     "create_preload_manager",
+    # Display Controller
+    "DisplayController",
+    "DisplayControllerConfig",
+    "DisplayState",
+    "IPCClient",
+    "IPCResponse",
+    "create_display_controller",
 ]
 

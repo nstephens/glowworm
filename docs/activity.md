@@ -812,3 +812,104 @@ Created comprehensive integration tests for ImageManager, PlaylistManager, and P
 
 ### Next Task
 Task 3.1: Display Controller
+
+## 2026-02-28 18:45 - Task 3.1: Display Controller
+
+### What Changed
+Implemented the DisplayController class for managing the Pi3D display as a subprocess with health monitoring, IPC communication, crash detection, and auto-restart.
+
+### Files Created
+- `daemon/glowworm_daemon/display_controller.py` - DisplayController implementation with:
+  - `DisplayState` enum (STOPPED, STARTING, RUNNING, STOPPING, CRASHED, RESTARTING)
+  - `DisplayControllerConfig` dataclass for configuration
+  - `IPCResponse` dataclass for IPC call results
+  - `IPCClient` class for JSON-RPC 2.0 communication over Unix sockets:
+    - Async connection/disconnection
+    - Request/response handling with notification support
+    - Timeout handling
+    - Error handling for connection issues
+  - `DisplayController` class with:
+    - Subprocess spawning with proper environment
+    - IPC client management
+    - Health monitoring with configurable intervals
+    - Crash detection (process exit, health check failures)
+    - Auto-restart with exponential backoff
+    - Graceful shutdown with timeout
+    - State change callbacks
+    - Notification callbacks
+    - Command methods: get_status, load_image, queue_image, pause, resume, clear, show_registration, hide_registration
+    - Async context manager support
+  - `create_display_controller()` factory function
+
+- `daemon/tests/test_display_controller.py` - 29 comprehensive tests covering:
+  - Configuration defaults and custom values
+  - IPCClient connection, disconnection, and calls
+  - DisplayController initialization and state management
+  - State and notification callbacks
+  - All IPC commands (load_image, queue_image, pause, resume, clear, show/hide_registration)
+  - Commands when not running
+  - Health check failure detection
+  - Process crash detection
+  - Manual restart
+  - Context manager usage
+  - Factory function
+
+### Files Modified
+- `daemon/glowworm_daemon/__init__.py` - Added exports for DisplayController, DisplayControllerConfig, DisplayState, IPCClient, IPCResponse, create_display_controller
+
+### Verification
+- All 29 new tests pass
+- All 164 daemon tests pass: `pytest daemon/tests/ -v`
+- Imports work correctly: `from glowworm_daemon import DisplayController, DisplayState, ...`
+
+### API Summary
+```python
+from glowworm_daemon import DisplayController, DisplayControllerConfig
+
+# Configuration
+config = DisplayControllerConfig(
+    socket_path="/run/glowworm/display.sock",
+    mock_mode=True,
+    health_check_interval=5.0,
+    auto_restart=True,
+    max_restart_attempts=5,
+)
+
+# Usage
+async with DisplayController(config) as controller:
+    # Check status
+    status = await controller.get_status()
+
+    # Load images
+    await controller.load_image("/path/to/image.jpg", scale_mode="fit")
+    await controller.queue_image("/path/to/image2.jpg")
+
+    # Control playback
+    await controller.pause()
+    await controller.resume()
+    await controller.clear()
+
+    # Registration mode
+    await controller.show_registration("ABCD")
+    await controller.hide_registration()
+```
+
+### Features
+- **Subprocess Management**: Spawns glowworm-display as subprocess with configurable command and environment
+- **IPC Communication**: JSON-RPC 2.0 over Unix domain sockets, matching display engine protocol
+- **Health Monitoring**: Periodic get_status calls to detect unresponsive processes
+- **Crash Detection**: Monitors process exit codes and health check failures
+- **Auto-Restart**: Exponential backoff restart with configurable max attempts
+- **Graceful Shutdown**: SIGTERM with timeout, fallback to SIGKILL
+- **State Tracking**: Full state machine with callbacks for state changes
+- **Notification Support**: Callbacks for notifications from display process
+
+### Notes
+- IPC client properly handles interleaved notifications and responses
+- Health check failures threshold configurable (default 3)
+- Restart backoff: 1s, 2s, 4s... up to max_delay (default 60s)
+- Context manager ensures proper cleanup on exit
+- Tests use MockIPCServer to simulate display process
+
+### Next Task
+Task 3.2: Slideshow Orchestration
