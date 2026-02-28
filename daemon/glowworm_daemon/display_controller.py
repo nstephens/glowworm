@@ -72,6 +72,26 @@ class DisplayControllerConfig:
     mock_mode: bool = False
     config_file: str | None = None
 
+    # Display configuration as JSON (from UnifiedConfig.get_display_config_json())
+    # If set, passed via GLOWWORM_DISPLAY_CONFIG environment variable
+    display_config_json: str | None = None
+
+    @classmethod
+    def from_unified_config(cls, unified_config) -> "DisplayControllerConfig":
+        """
+        Create DisplayControllerConfig from a UnifiedConfig instance.
+
+        Args:
+            unified_config: UnifiedConfig instance
+
+        Returns:
+            DisplayControllerConfig with settings from UnifiedConfig
+        """
+        return cls(
+            socket_path=unified_config.ipc.socket_path,
+            display_config_json=unified_config.get_display_config_json(),
+        )
+
 
 # Type for state change callbacks
 StateChangeCallback = Callable[[DisplayState, DisplayState], None]
@@ -424,6 +444,10 @@ class DisplayController:
             # Build environment
             env = os.environ.copy()
             env.update(self.config.extra_env)
+
+            # Pass display config via environment variable if provided
+            if self.config.display_config_json:
+                env["GLOWWORM_DISPLAY_CONFIG"] = self.config.display_config_json
 
             logger.info(f"Starting display process: {' '.join(cmd)}")
 

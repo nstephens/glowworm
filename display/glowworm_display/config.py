@@ -323,6 +323,89 @@ def _apply_env_overrides(display_data: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def load_config_from_env() -> FullConfig | None:
+    """
+    Load configuration from GLOWWORM_DISPLAY_CONFIG environment variable.
+
+    The daemon passes display configuration as JSON via this environment
+    variable when spawning the display subprocess.
+
+    Returns:
+        FullConfig if GLOWWORM_DISPLAY_CONFIG is set and valid, None otherwise
+    """
+    import json
+
+    env_config = os.environ.get("GLOWWORM_DISPLAY_CONFIG")
+    if not env_config:
+        return None
+
+    try:
+        data = json.loads(env_config)
+        logger.info("Loading configuration from GLOWWORM_DISPLAY_CONFIG environment")
+
+        display_data = data.get("display", {})
+        slideshow_data = data.get("slideshow", {})
+        ipc_data = data.get("ipc", {})
+        logging_data = data.get("logging", {})
+
+        return FullConfig(
+            display=DisplayConfig(
+                orientation=display_data.get("orientation", "portrait"),
+                rotation=display_data.get("rotation", 0),
+                background_color=display_data.get("background_color", "#000000"),
+                # Use slideshow transition_duration if available
+                transition_duration=slideshow_data.get(
+                    "transition_duration",
+                    display_data.get("transition_duration", 2.0)
+                ),
+                image_duration=display_data.get("image_duration", 30.0),
+                fps_target=display_data.get("fps_target", 30),
+                fullscreen=display_data.get("fullscreen", True),
+                width=display_data.get("width", 0),
+                height=display_data.get("height", 0),
+            ),
+            ipc=IPCConfig(
+                socket_path=ipc_data.get("socket_path", "/run/glowworm/display.sock"),
+                timeout=ipc_data.get("timeout", 5.0),
+            ),
+            logging=LoggingConfig(
+                level=logging_data.get("level", "INFO"),
+                file=logging_data.get("file"),
+            ),
+        )
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in GLOWWORM_DISPLAY_CONFIG: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Error parsing GLOWWORM_DISPLAY_CONFIG: {e}")
+        return None
+
+
+def load_config_auto(config_path: str | Path | None = None) -> FullConfig:
+    """
+    Load configuration automatically from best available source.
+
+    Order of precedence:
+    1. GLOWWORM_DISPLAY_CONFIG environment variable (from daemon)
+    2. Specified config_path
+    3. Default config file locations
+    4. Built-in defaults
+
+    Args:
+        config_path: Optional path to configuration file
+
+    Returns:
+        FullConfig instance
+    """
+    # Try environment variable first (passed by daemon)
+    env_config = load_config_from_env()
+    if env_config:
+        return env_config
+
+    # Fall back to file-based loading
+    return load_full_config(config_path)
+
+
 if __name__ == "__main__":
     # Test configuration loading
     logging.basicConfig(level=logging.DEBUG)

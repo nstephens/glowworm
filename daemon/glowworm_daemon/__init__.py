@@ -66,6 +66,24 @@ from .slideshow_orchestrator import (
     SlideshowStats,
     create_slideshow_orchestrator,
 )
+from .unified_config import (
+    UnifiedConfig,
+    BackendConfig,
+    DisplayConfig as UnifiedDisplayConfig,
+    SlideshowConfig as UnifiedSlideshowConfig,
+    CacheConfig as UnifiedCacheConfig,
+    StateConfig,
+    IPCConfig,
+    LoggingConfig,
+    CECConfig,
+    Orientation,
+    Rotation,
+    ScaleMode,
+    ConfigurationError,
+    load_config as load_unified_config,
+    create_default_config as create_default_unified_config,
+    save_config as save_unified_config,
+)
 
 __all__ = [
     "GlowwormDaemon",
@@ -116,5 +134,22 @@ __all__ = [
     "SlideshowState",
     "SlideshowStats",
     "create_slideshow_orchestrator",
+    # Unified Configuration (v3.0)
+    "UnifiedConfig",
+    "BackendConfig",
+    "UnifiedDisplayConfig",
+    "UnifiedSlideshowConfig",
+    "UnifiedCacheConfig",
+    "StateConfig",
+    "IPCConfig",
+    "LoggingConfig",
+    "CECConfig",
+    "Orientation",
+    "Rotation",
+    "ScaleMode",
+    "ConfigurationError",
+    "load_unified_config",
+    "create_default_unified_config",
+    "save_unified_config",
 ]
 

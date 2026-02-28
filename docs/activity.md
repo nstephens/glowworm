@@ -1019,3 +1019,107 @@ async with orchestrator:
 
 ### Next Task
 Task 3.3: Configuration Unification
+
+## 2026-02-28 20:15 - Task 3.3: Configuration Unification
+
+### What Changed
+Implemented unified YAML configuration system for both daemon and display settings. The new system provides a single config file at `/etc/glowworm/config.yaml` with all settings organized into logical sections.
+
+### Files Created
+- `daemon/glowworm_daemon/unified_config.py` - Unified configuration system with:
+  - `UnifiedConfig` dataclass containing all configuration sections
+  - `BackendConfig`, `DisplayConfig`, `SlideshowConfig`, `CacheConfig`, `StateConfig`, `IPCConfig`, `LoggingConfig`, `CECConfig` section dataclasses
+  - `Orientation`, `Rotation`, `ScaleMode` enums for type-safe settings
+  - `load_config()` function with YAML loading and environment variable overrides
+  - `create_default_config()` for generating default config files
+  - `save_config()` for persisting configuration changes
+  - `get_display_config_json()` for passing display config to subprocess
+
+- `daemon/tests/test_unified_config.py` - 38 comprehensive tests covering:
+  - Default configuration values
+  - Configuration validation and normalization
+  - YAML file loading
+  - Environment variable overrides
+  - Configuration serialization (to_dict, get_display_config_json)
+  - Default config file creation
+  - Helper methods (effective_websocket_url, background_rgb)
+  - Integration with legacy DaemonConfig
+
+### Files Modified
+- `daemon/glowworm_daemon/config.py` - Updated to support both YAML and INI formats:
+  - `load_config()` now auto-detects format and loads YAML first
+  - `DaemonConfig.from_unified()` creates legacy config from UnifiedConfig
+  - `DaemonConfig.unified` property provides access to underlying UnifiedConfig
+  - Backward compatible with existing INI configuration files
+
+- `daemon/glowworm_daemon/display_controller.py`:
+  - Added `display_config_json` field to `DisplayControllerConfig`
+  - Added `from_unified_config()` factory method
+  - Updated `_start_process()` to pass config via `GLOWWORM_DISPLAY_CONFIG` env var
+
+- `display/glowworm_display/config.py`:
+  - Added `load_config_from_env()` to load config from GLOWWORM_DISPLAY_CONFIG
+  - Added `load_config_auto()` that checks env first, then files, then defaults
+
+- `daemon/glowworm_daemon/__init__.py` - Added exports for unified config classes
+
+### Verification
+- All 38 unified config tests pass
+- All 227 daemon tests pass
+- All 24 display tests pass
+- Configuration loads from YAML files correctly
+- Missing optional values use sensible defaults
+- Invalid configuration raises clear error messages
+- Display receives correct settings via JSON environment variable
+
+### Configuration Format
+```yaml
+# GlowWorm v3.0 Unified Configuration
+backend:
+  url: "https://glowworm.example.com"
+  device_token: ""  # Set during registration
+
+display:
+  orientation: portrait  # portrait or landscape
+  rotation: 0  # 0, 90, 180, 270
+  background_color: "#000000"
+  fps_target: 30
+
+slideshow:
+  display_time: 30.0  # seconds per image
+  transition_duration: 2.0
+  scale_mode: fit  # fit, fill, stretch
+  preload_count: 3
+
+cache:
+  directory: /var/cache/glowworm/images
+  max_size_mb: 500
+  min_free_space_mb: 100
+
+ipc:
+  socket_path: /run/glowworm/display.sock
+
+logging:
+  level: INFO
+  file: /var/log/glowworm/daemon.log
+
+cec:
+  enabled: false
+  display_address: 0
+```
+
+### Environment Variable Overrides
+- `GLOWWORM_BACKEND_URL` - Override backend URL
+- `GLOWWORM_DEVICE_TOKEN` - Override device token
+- `GLOWWORM_DISPLAY_ORIENTATION` - Override display orientation
+- `GLOWWORM_LOG_LEVEL` - Override log level
+- And more...
+
+### Notes
+- YAML format preferred for new installations, INI still supported for backward compatibility
+- Config auto-detection based on file extension (.yaml vs .conf)
+- Display subprocess receives config via GLOWWORM_DISPLAY_CONFIG JSON env var
+- SIGHUP reload not implemented (marked as optional in plan)
+
+### Next Task
+Task 3.4: Integration Testing - Full Slideshow
