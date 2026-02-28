@@ -84,6 +84,15 @@ from .unified_config import (
     create_default_config as create_default_unified_config,
     save_config as save_unified_config,
 )
+from .websocket_client import (
+    WebSocketClient,
+    WebSocketConfig,
+    WebSocketStats,
+    ConnectionState,
+    MessageType,
+    QueuedMessage,
+    create_websocket_client,
+)
 
 __all__ = [
     "GlowwormDaemon",
@@ -151,5 +160,13 @@ __all__ = [
     "load_unified_config",
     "create_default_unified_config",
     "save_unified_config",
+    # WebSocket Client (v3.0)
+    "WebSocketClient",
+    "WebSocketConfig",
+    "WebSocketStats",
+    "ConnectionState",
+    "MessageType",
+    "QueuedMessage",
+    "create_websocket_client",
 ]
 

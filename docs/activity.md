@@ -1175,3 +1175,111 @@ Created comprehensive integration tests for the full slideshow operation with da
 
 ### Next Task
 Task 4.1: WebSocket Client
+
+## 2026-02-28 16:25 - Task 4.1: WebSocket Client
+
+### What Changed
+Implemented persistent WebSocket client for daemon-to-backend communication with authentication, auto-reconnect, heartbeat, and offline message queuing.
+
+### Files Created
+- `daemon/glowworm_daemon/websocket_client.py` - WebSocketClient implementation with:
+  - `ConnectionState` enum (DISCONNECTED, CONNECTING, CONNECTED, AUTHENTICATING, AUTHENTICATED, RECONNECTING, CLOSING, CLOSED, ERROR)
+  - `MessageType` enum for protocol message types (AUTH, STATUS, COMMAND, HEARTBEAT, etc.)
+  - `WebSocketConfig` dataclass for client configuration
+  - `QueuedMessage` dataclass for offline message queue entries
+  - `WebSocketStats` dataclass for connection statistics
+  - `WebSocketClient` class with:
+    - Connection with device token authentication
+    - Auto-reconnect with exponential backoff (configurable base/max delay)
+    - Heartbeat/ping-pong with missed heartbeat detection
+    - Message receive handler with callbacks
+    - Message send with offline queue (priority-based)
+    - Connection state tracking with callbacks
+    - Statistics tracking (messages sent/received, bytes, reconnect count, uptime)
+    - Async context manager support
+  - `create_websocket_client()` factory function
+
+- `daemon/tests/test_websocket_client.py` - 35 comprehensive tests covering:
+  - Configuration defaults and custom values
+  - QueuedMessage and WebSocketStats dataclasses
+  - Client initialization and state management
+  - State change callback handling
+  - Connection and authentication (success and failure)
+  - Disconnection handling
+  - Message sending when connected
+  - Offline message queuing
+  - Queue max size and priority ordering
+  - Queue flushing on reconnect
+  - Message handling callbacks
+  - Heartbeat ack handling
+  - Reconnection attempt tracking
+  - Max reconnect attempts
+  - Exponential backoff calculation
+  - Heartbeat sending
+  - Statistics tracking
+  - Async context manager
+  - Factory function
+
+### Files Modified
+- `daemon/glowworm_daemon/__init__.py` - Added exports for:
+  - WebSocketClient, WebSocketConfig, WebSocketStats
+  - ConnectionState, MessageType, QueuedMessage
+  - create_websocket_client
+
+### Verification
+- All 35 WebSocket client tests pass
+- All 275 daemon tests pass: `pytest daemon/tests/ -v`
+- Imports work correctly: `from glowworm_daemon import WebSocketClient, WebSocketConfig`
+
+### API Summary
+```python
+from glowworm_daemon import WebSocketClient, WebSocketConfig, ConnectionState
+
+# Configuration
+config = WebSocketConfig(
+    url="ws://localhost:3003/ws/device",
+    device_token="device-token-123",
+    auto_reconnect=True,
+    max_reconnect_attempts=0,  # unlimited
+    reconnect_base_delay=1.0,
+    reconnect_max_delay=60.0,
+    heartbeat_interval=30.0,
+    max_queue_size=100,
+)
+
+# Callbacks
+def on_message(msg_type: str, payload: dict):
+    if msg_type == "command":
+        handle_command(payload)
+
+def on_state_change(old: ConnectionState, new: ConnectionState):
+    print(f"State: {old.value} -> {new.value}")
+
+# Usage
+async with WebSocketClient(config, on_message, on_state_change) as client:
+    # Send message
+    await client.send("status", {"current_image": 123})
+
+    # Check state
+    if client.is_connected:
+        stats = client.get_stats()
+        print(f"Messages sent: {stats.messages_sent}")
+```
+
+### Protocol
+- **Authentication**: Send `auth` message with device_token, receive `auth_success` or `auth_failed`
+- **Heartbeat**: Send `heartbeat` every 30s, expect `heartbeat_ack` response
+- **Message Types**:
+  - Outgoing: auth, status, command_response, heartbeat
+  - Incoming: auth_success, auth_failed, command, playlist_update, config_update, heartbeat_ack
+
+### Notes
+- WebSocket uses aiohttp for async communication
+- Auto-reconnect with exponential backoff: 1s, 2s, 4s, 8s... up to max_delay
+- Heartbeat monitors connection health; missed heartbeats trigger reconnect
+- Offline queue stores messages with priority; flushed on reconnect
+- State changes tracked with optional callbacks
+- Connection uptime statistics for monitoring
+
+### Next Task
+Task 4.2: Status Reporting

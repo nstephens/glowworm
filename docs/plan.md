@@ -355,6 +355,7 @@ Based on Rewrite.md, this document breaks down the implementation into concrete 
 
 ### Task 4.1: WebSocket Client
 **Complexity:** High
+**Status:** `passes: true`
 **Description:** Persistent WebSocket connection from daemon to backend.
 
 **Subtasks:**
