@@ -555,6 +555,7 @@ Based on Rewrite.md, this document breaks down the implementation into concrete 
 
 ### Task 6.2: Device Controls
 **Complexity:** Medium
+**Status:** `passes: true`
 **Description:** Control buttons for Pi3D devices.
 
 **Subtasks:**

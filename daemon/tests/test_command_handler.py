@@ -55,6 +55,7 @@ class MockSlideshow:
         self.resume_called = False
         self.reload_playlist_called = False
         self.go_to_position = None
+        self.clear_cache_called = False
 
         # Default return values
         self.next_success = True
@@ -63,6 +64,7 @@ class MockSlideshow:
         self.resume_success = True
         self.reload_playlist_success = True
         self.go_to_success = True
+        self.clear_cache_count = 5  # Default entries to "clear"
 
     async def next(self) -> bool:
         self.next_called = True
@@ -91,6 +93,11 @@ class MockSlideshow:
     async def go_to(self, position: int) -> bool:
         self.go_to_position = position
         return self.go_to_success
+
+    def clear_cache(self) -> int:
+        """Clear cache and return count of cleared entries."""
+        self.clear_cache_called = True
+        return self.clear_cache_count
 
     def get_status(self) -> Dict[str, Any]:
         return {
@@ -372,6 +379,24 @@ async def test_handle_clear_command():
 
     slideshow.display.clear.assert_called_once()
     assert ws.sent_messages[0][1]["status"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_handle_clear_cache_command():
+    """Test handling 'clear_cache' command."""
+    ws = MockWebSocketClient()
+    slideshow = MockSlideshow()
+    slideshow.clear_cache_count = 10
+
+    async with CommandHandler(websocket=ws, slideshow=slideshow) as handler:
+        await handler.handle_message("command", {
+            "command": "clear_cache",
+        })
+
+    assert slideshow.clear_cache_called
+    assert ws.sent_messages[0][1]["status"] == "success"
+    assert ws.sent_messages[0][1]["data"]["entries_cleared"] == 10
+    assert "Cache cleared" in ws.sent_messages[0][1]["message"]
 
 
 @pytest.mark.asyncio

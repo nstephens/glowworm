@@ -455,6 +455,21 @@ class SlideshowOrchestrator:
             logger.error(f"Failed to reload playlist: {e}")
             return False
 
+    def clear_cache(self) -> int:
+        """
+        Clear the image cache.
+
+        Returns:
+            Number of cache entries cleared.
+        """
+        if not self.images:
+            logger.warning("Image manager not available")
+            return 0
+
+        count = self.images.clear_all_cache()
+        logger.info(f"Cache cleared: {count} entries removed")
+        return count
+
     async def _slideshow_loop(self) -> None:
         """Main slideshow loop."""
         logger.debug("Slideshow loop started")

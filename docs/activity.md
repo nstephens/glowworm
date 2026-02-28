@@ -2010,3 +2010,68 @@ Implemented real-time Pi3D device status display in admin interface with thumbna
 
 ### Next Task
 Task 6.2: Device Controls
+
+## 2026-02-28 19:15 - Task 6.2: Device Controls
+
+### What Changed
+Implemented control buttons for Pi3D devices with optimistic UI updates, loading states, error toasts, and a clear cache button.
+
+### Files Modified
+- `daemon/glowworm_daemon/command_handler.py`:
+  - Added `CLEAR_CACHE` to `CommandType` enum
+  - Added `_handle_clear_cache()` method that calls `slideshow.clear_cache()`
+  - Returns success with `entries_cleared` count in response data
+
+- `daemon/glowworm_daemon/slideshow_orchestrator.py`:
+  - Added `clear_cache()` method that calls `images.clear_all_cache()`
+  - Returns count of cleared entries
+
+- `daemon/tests/test_command_handler.py`:
+  - Added `clear_cache_called` and `clear_cache_count` to `MockSlideshow`
+  - Added `clear_cache()` method to `MockSlideshow`
+  - Added `test_handle_clear_cache_command` test
+
+- `frontend/src/pages/DisplaysWebSocket.tsx`:
+  - Added new icons: `Trash2`, `Loader2`, `CheckCircle`, `XCircle`
+  - Added `pendingCommands` state to track in-flight commands per device
+  - Added `commandFeedback` state for toast notifications
+  - Added `isCommandPending()` helper function
+  - Updated `handleSendCommand()` with:
+    - Optimistic UI updates for pause/resume (updates state immediately)
+    - Loading state tracking per device
+    - Success/error toast notifications
+  - Added Command Feedback Toast component (fixed position top-right)
+  - Added Clear Cache button (Trash2 icon, orange) for Pi3D devices
+  - All control buttons now:
+    - Show loading spinner when command is pending
+    - Are disabled while any command is pending for that device
+    - Use `disabled:opacity-50 disabled:cursor-not-allowed` styling
+  - Added "Device offline" indicator when device is not connected
+
+### Features Implemented
+| Feature | Description |
+|---------|-------------|
+| Next/previous image buttons | Shows loading state, disabled while pending |
+| Play/pause toggle button | Optimistic UI update, shows loading state |
+| Force playlist sync button | Reload playlist with loading indicator |
+| Clear cache button | New button for Pi3D devices to clear image cache |
+| Optimistic UI updates | Pause/resume immediately update state indicator |
+| Command failure handling | Toast notification on error with message |
+| Loading states | All buttons show spinner while command is pending |
+| Disabled for offline | Buttons disabled when device is offline |
+
+### Verification
+- Frontend builds successfully: `npm run build`
+- All 31 command handler tests pass (including new clear_cache test)
+- All 25 slideshow orchestrator tests pass
+- TypeScript compiles without errors
+
+### Notes
+- Clear cache requires confirmation dialog before sending
+- Toast notifications auto-dismiss after 2-3 seconds
+- Optimistic updates for pause/resume provide instant feedback
+- All buttons are disabled while any command is pending to prevent race conditions
+- Offline devices show "Device offline" text instead of control buttons
+
+### Next Task
+Task 6.3: Remove Browser Display Code

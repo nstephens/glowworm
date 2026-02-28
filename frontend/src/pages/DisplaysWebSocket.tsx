@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Wifi, WifiOff, Play, Pause, Settings, RefreshCw, SkipForward, SkipBack, Monitor, Server, Image, Database, Clock, Activity, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Wifi, WifiOff, Play, Pause, Settings, RefreshCw, SkipForward, SkipBack, Monitor, Server, Image, Database, Clock, Activity, AlertCircle, Trash2, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { AdminWebSocketClient } from '../services/websocket';
 import type { DisplayDevice, DeviceType } from '../types';
 
@@ -70,6 +70,9 @@ const DisplaysWebSocket: React.FC = () => {
   const [connectedDevices, setConnectedDevices] = useState<Set<string>>(new Set());
   const [realtimeStatuses, setRealtimeStatuses] = useState<Map<string, RealtimeDeviceStatus>>(new Map());
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
+  // Command feedback state
+  const [pendingCommands, setPendingCommands] = useState<Map<string, string>>(new Map()); // deviceToken -> command
+  const [commandFeedback, setCommandFeedback] = useState<{ deviceToken: string; command: string; success: boolean; message?: string } | null>(null);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -382,19 +385,60 @@ const DisplaysWebSocket: React.FC = () => {
 
   const handleSendCommand = async (deviceId: number, command: string, data?: any) => {
     if (!websocketClient || !websocketClient.connected) {
-      setError('WebSocket not connected');
+      setCommandFeedback({ deviceToken: '', command, success: false, message: 'WebSocket not connected' });
+      setTimeout(() => setCommandFeedback(null), 3000);
       return;
     }
 
     const device = devices.find(d => d.id === deviceId);
     if (!device) {
-      setError('Device not found');
+      setCommandFeedback({ deviceToken: '', command, success: false, message: 'Device not found' });
+      setTimeout(() => setCommandFeedback(null), 3000);
       return;
     }
 
+    // Set pending state for visual feedback
+    setPendingCommands(prev => {
+      const updated = new Map(prev);
+      updated.set(device.device_token, command);
+      return updated;
+    });
+
+    // Optimistic UI update for state-changing commands
+    if (command === 'pause' && isPi3dDevice(device)) {
+      setRealtimeStatuses(prev => {
+        const updated = new Map(prev);
+        const current = prev.get(device.device_token) || {};
+        updated.set(device.device_token, { ...current, state: 'paused' });
+        return updated;
+      });
+    } else if ((command === 'resume' || command === 'play') && isPi3dDevice(device)) {
+      setRealtimeStatuses(prev => {
+        const updated = new Map(prev);
+        const current = prev.get(device.device_token) || {};
+        updated.set(device.device_token, { ...current, state: 'playing' });
+        return updated;
+      });
+    }
+
     const success = websocketClient.sendCommand(device.device_token, command, data);
+
+    // Clear pending state after a delay
+    setTimeout(() => {
+      setPendingCommands(prev => {
+        const updated = new Map(prev);
+        updated.delete(device.device_token);
+        return updated;
+      });
+    }, 2000);
+
     if (!success) {
-      setError('Failed to send command');
+      setCommandFeedback({ deviceToken: device.device_token, command, success: false, message: 'Failed to send command' });
+      setTimeout(() => setCommandFeedback(null), 3000);
+    } else {
+      // Show brief success feedback
+      setCommandFeedback({ deviceToken: device.device_token, command, success: true, message: `${command} sent` });
+      setTimeout(() => setCommandFeedback(null), 2000);
     }
   };
 
@@ -553,6 +597,14 @@ const DisplaysWebSocket: React.FC = () => {
     });
   };
 
+  // Check if a command is pending for a device
+  const isCommandPending = (deviceToken: string, command?: string): boolean => {
+    const pending = pendingCommands.get(deviceToken);
+    if (!pending) return false;
+    if (command) return pending === command;
+    return true;
+  };
+
   if (isLoading) {
     return (
       <div className="p-8">
@@ -587,11 +639,29 @@ const DisplaysWebSocket: React.FC = () => {
 
   return (
     <div className="p-8">
+      {/* Command Feedback Toast */}
+      {commandFeedback && (
+        <div className={`fixed top-4 right-4 z-50 flex items-center px-4 py-3 rounded-lg shadow-lg transition-all duration-300 ${
+          commandFeedback.success
+            ? 'bg-green-100 text-green-800 border border-green-200'
+            : 'bg-red-100 text-red-800 border border-red-200'
+        }`}>
+          {commandFeedback.success ? (
+            <CheckCircle className="w-5 h-5 mr-2" />
+          ) : (
+            <XCircle className="w-5 h-5 mr-2" />
+          )}
+          <span className="text-sm font-medium">
+            {commandFeedback.message || (commandFeedback.success ? 'Command sent' : 'Command failed')}
+          </span>
+        </div>
+      )}
+
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-4">
           </div>
-          
+
           {/* WebSocket Status */}
           <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
             connectionStatus === 'connected' 
@@ -813,53 +883,106 @@ const DisplaysWebSocket: React.FC = () => {
                               <>
                                 <button
                                   onClick={() => handleSendCommand(device.id, 'previous')}
-                                  className="bg-gray-600 text-white p-1 rounded text-sm hover:bg-gray-700"
+                                  disabled={isCommandPending(device.device_token)}
+                                  className="bg-gray-600 text-white p-1 rounded text-sm hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                   title="Previous Image"
                                 >
-                                  <SkipBack className="w-4 h-4" />
+                                  {isCommandPending(device.device_token, 'previous') ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <SkipBack className="w-4 h-4" />
+                                  )}
                                 </button>
                                 <button
                                   onClick={() => handleSendCommand(device.id, 'next')}
-                                  className="bg-gray-600 text-white p-1 rounded text-sm hover:bg-gray-700"
+                                  disabled={isCommandPending(device.device_token)}
+                                  className="bg-gray-600 text-white p-1 rounded text-sm hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                   title="Next Image"
                                 >
-                                  <SkipForward className="w-4 h-4" />
+                                  {isCommandPending(device.device_token, 'next') ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <SkipForward className="w-4 h-4" />
+                                  )}
                                 </button>
                               </>
                             )}
                             {/* Common controls: play/pause */}
                             <button
                               onClick={() => handleSendCommand(device.id, isPi3dDevice(device) ? 'resume' : 'start_slideshow')}
-                              className="bg-green-600 text-white p-1 rounded text-sm hover:bg-green-700"
+                              disabled={isCommandPending(device.device_token)}
+                              className="bg-green-600 text-white p-1 rounded text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                               title={isPi3dDevice(device) ? "Resume Slideshow" : "Start Slideshow"}
                             >
-                              <Play className="w-4 h-4" />
+                              {isCommandPending(device.device_token, 'resume') || isCommandPending(device.device_token, 'start_slideshow') ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Play className="w-4 h-4" />
+                              )}
                             </button>
                             <button
                               onClick={() => handleSendCommand(device.id, isPi3dDevice(device) ? 'pause' : 'stop_slideshow')}
-                              className="bg-red-600 text-white p-1 rounded text-sm hover:bg-red-700"
+                              disabled={isCommandPending(device.device_token)}
+                              className="bg-red-600 text-white p-1 rounded text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                               title={isPi3dDevice(device) ? "Pause Slideshow" : "Stop Slideshow"}
                             >
-                              <Pause className="w-4 h-4" />
+                              {isCommandPending(device.device_token, 'pause') || isCommandPending(device.device_token, 'stop_slideshow') ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Pause className="w-4 h-4" />
+                              )}
                             </button>
                             <button
                               onClick={() => handleSendCommand(device.id, 'reload_playlist')}
-                              className="bg-blue-600 text-white p-1 rounded text-sm hover:bg-blue-700"
+                              disabled={isCommandPending(device.device_token)}
+                              className="bg-blue-600 text-white p-1 rounded text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Reload Playlist"
                             >
-                              <RefreshCw className="w-4 h-4" />
+                              {isCommandPending(device.device_token, 'reload_playlist') ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-4 h-4" />
+                              )}
                             </button>
+                            {/* Pi3D-only: Clear Cache */}
+                            {isPi3dDevice(device) && (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm('Clear the device image cache? Images will need to be re-downloaded.')) {
+                                    handleSendCommand(device.id, 'clear_cache');
+                                  }
+                                }}
+                                disabled={isCommandPending(device.device_token)}
+                                className="bg-orange-600 text-white p-1 rounded text-sm hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Clear Cache"
+                              >
+                                {isCommandPending(device.device_token, 'clear_cache') ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
                             {/* Browser-only: Refresh Browser */}
                             {!isPi3dDevice(device) && (
                               <button
                                 onClick={() => handleSendCommand(device.id, 'refresh_browser')}
-                                className="bg-orange-600 text-white p-1 rounded text-sm hover:bg-orange-700"
+                                disabled={isCommandPending(device.device_token)}
+                                className="bg-orange-600 text-white p-1 rounded text-sm hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Refresh Browser"
                               >
-                                <RefreshCw className="w-4 h-4" />
+                                {isCommandPending(device.device_token, 'refresh_browser') ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="w-4 h-4" />
+                                )}
                               </button>
                             )}
                           </div>
+                        )}
+                        {/* Offline indicator with disabled buttons */}
+                        {!isOnline && device.status === 'authorized' && (
+                          <span className="text-xs text-gray-500 italic">Device offline</span>
                         )}
                       </>
                     )}

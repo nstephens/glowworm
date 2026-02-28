@@ -33,6 +33,7 @@ class CommandType(str, Enum):
     RELOAD_PLAYLIST = "reload_playlist"
     GO_TO = "go_to"
     CLEAR = "clear"
+    CLEAR_CACHE = "clear_cache"
     STATUS = "status"
 
 
@@ -263,6 +264,9 @@ class CommandHandler:
 
             elif command == CommandType.CLEAR.value:
                 return await self._handle_clear(request_id)
+
+            elif command == CommandType.CLEAR_CACHE.value:
+                return await self._handle_clear_cache(request_id)
 
             elif command == CommandType.STATUS.value:
                 return await self._handle_status(request_id)
@@ -514,6 +518,34 @@ class CommandHandler:
             message="Display cleared",
             request_id=request_id,
         )
+
+    async def _handle_clear_cache(self, request_id: Optional[str] = None) -> CommandResult:
+        """Handle the 'clear_cache' command."""
+        if not self.slideshow:
+            return CommandResult(
+                command="clear_cache",
+                status=CommandStatus.FAILED,
+                message="Slideshow not available",
+                request_id=request_id,
+            )
+
+        try:
+            count = self.slideshow.clear_cache()
+            return CommandResult(
+                command="clear_cache",
+                status=CommandStatus.SUCCESS,
+                message=f"Cache cleared: {count} entries removed",
+                data={"entries_cleared": count},
+                request_id=request_id,
+            )
+        except Exception as e:
+            logger.error(f"Failed to clear cache: {e}")
+            return CommandResult(
+                command="clear_cache",
+                status=CommandStatus.FAILED,
+                message=f"Failed to clear cache: {str(e)}",
+                request_id=request_id,
+            )
 
     async def _handle_status(self, request_id: Optional[str] = None) -> CommandResult:
         """Handle the 'status' command."""
