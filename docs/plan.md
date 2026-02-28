@@ -519,6 +519,7 @@ Based on Rewrite.md, this document breaks down the implementation into concrete 
 
 ### Task 5.4: Integration Testing - Registration
 **Complexity:** Low
+**Status:** `passes: true`
 **Description:** Test complete registration flow.
 
 **Tests:**

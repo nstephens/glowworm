@@ -1879,3 +1879,62 @@ Updated frontend to support Pi3D daemon device registration with device type ind
 
 ### Next Task
 Task 5.4: Integration Testing - Registration
+
+## 2026-02-28 20:30 - Task 5.4: Integration Testing - Registration
+
+### What Changed
+Created comprehensive integration tests for the complete device registration flow.
+
+### Files Created
+- `daemon/tests/test_integration_registration.py` - 18 integration tests covering:
+  - **Fresh daemon displays registration code**: Tests daemon without token requests code and displays it
+  - **Registration code displayed on screen**: Tests code appears on Pi3D display via MockDisplayController
+  - **Daemon with token skips registration**: Tests daemon with existing token doesn't need registration
+  - **State transitions during code request**: Tests state machine (idle → checking → requesting → displaying)
+  - **Daemon detects authorization**: Tests daemon receives token when admin authorizes
+  - **Token saved to config file**: Tests device token persists to YAML config
+  - **Authorization within timeout**: Tests authorization detected quickly (spec: <10 seconds)
+  - **Registration display hidden after authorization**: Tests display cleared after completion
+  - **Daemon detects rejection**: Tests rejection handling and state
+  - **Rejection result includes error**: Tests meaningful error message on rejection
+  - **Display hidden after rejection**: Tests display cleared after rejection
+  - **Pending device in device list**: Tests pending device appears in admin list
+  - **Authorized device in device list**: Tests authorized device in list with correct status
+  - **Registration timeout**: Tests timeout when not authorized
+  - **Retry on network error**: Tests retry logic on connection failures
+  - **Complete registration to slideshow ready**: Tests full flow end-to-end
+  - **Multiple registration attempts**: Tests re-registration after rejection
+  - **Registration cancellation**: Tests cancellation mid-flow
+
+### Test Infrastructure
+- `MockBackendServer` - Mock backend HTTP server for registration endpoints:
+  - POST /api/devices/register - Returns registration code
+  - GET /api/devices/register/{code}/status - Returns PENDING/AUTHORIZED/REJECTED
+  - POST /api/devices/register/{code}/authorize - Simulates admin authorization
+  - GET /api/display-devices/admin/devices - Returns device list
+- `MockDisplayController` - Mock display controller tracking show/hide calls
+
+### Verification
+- All 18 new integration tests pass
+- All 400 daemon tests pass: `pytest daemon/tests/ -v`
+- All 24 display tests pass: `pytest display/tests/ -v`
+- Tests exercise real HTTP client (aiohttp) against mock server
+- Tests cover all requirements from plan.md Task 5.4
+
+### Test Coverage Summary
+| Scenario | Status |
+|----------|--------|
+| Fresh daemon displays registration code | ✅ |
+| Admin authorizes device | ✅ |
+| Daemon detects authorization and starts slideshow | ✅ |
+| Device appears correctly in admin device list | ✅ |
+
+### Notes
+- Mock server generates predictable codes (T001, T002, etc.) for test reliability
+- Fast poll interval (0.1s) and short timeout (0.5s-5s) for quick test execution
+- Tests verify token persistence to YAML config file
+- Multiple registration attempts test covers retry-after-rejection scenario
+- Cancellation test verifies graceful cleanup
+
+### Next Task
+Task 6.1: Device Status Display
