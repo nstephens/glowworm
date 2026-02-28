@@ -1123,3 +1123,55 @@ cec:
 
 ### Next Task
 Task 3.4: Integration Testing - Full Slideshow
+
+## 2026-02-28 21:00 - Task 3.4: Integration Testing - Full Slideshow
+
+### What Changed
+Created comprehensive integration tests for the full slideshow operation with daemon controlling Pi3D display.
+
+### Files Created
+- `daemon/tests/test_integration_full_slideshow.py` - 13 integration tests covering:
+  - **Daemon starts and begins slideshow**: Tests daemon initializes display controller, connects to Pi3D IPC, and begins slideshow operation
+  - **Slideshow starts with preloader**: Tests preloader integration for background image downloads
+  - **Images advance at configured interval**: Tests images transition at the display_time_seconds interval
+  - **Transition uses configured duration**: Tests transition_duration setting is applied
+  - **Next command advances immediately**: Tests next() command advances to next image
+  - **Previous command goes back**: Tests previous() command navigates backward
+  - **Pause/resume stops and continues**: Tests pause halts advancement, resume continues
+  - **Display controller detects crash**: Tests health check failure detection
+  - **Display controller auto-restarts**: Tests auto-restart with exponential backoff
+  - **Slideshow continues after display restart**: Tests orchestrator survives display restart
+  - **Slideshow operates from cache**: Tests slideshow works with pre-cached images
+  - **Missing images skipped gracefully**: Tests slideshow skips unavailable images and continues
+  - **Status includes all fields**: Tests comprehensive status reporting
+
+### Test Infrastructure
+- `MockBackendServer` - Mock backend HTTP server for playlist and image endpoints
+- `MockDisplayIPCServer` - Mock Pi3D display IPC server for JSON-RPC communication
+- Async fixtures with pytest-asyncio for realistic integration testing
+- Mock subprocess handling for display controller testing
+
+### Verification
+- All 13 new integration tests pass
+- All 240 daemon tests pass: `pytest daemon/tests/ -v`
+- All 24 display tests pass: `pytest display/tests/ -v`
+- Tests exercise real component interactions with mocked I/O
+
+### Test Coverage Summary
+| Scenario | Status |
+|----------|--------|
+| Daemon starts, spawns Pi3D, begins slideshow | ✅ |
+| Images transition at correct intervals | ✅ |
+| Commands via IPC affect slideshow | ✅ |
+| Daemon survives Pi3D crash and restarts | ✅ |
+| Works offline with cached playlist/images | ✅ |
+
+### Notes
+- Tests use mock display IPC server to simulate Pi3D process without actual GPU
+- Mock backend server simulates playlist and image endpoints
+- Display controller uses patched subprocess for controllable process lifecycle
+- Tests balance thoroughness with execution speed (~16 seconds total)
+- Offline operation tests verify slideshow works from cached images without network
+
+### Next Task
+Task 4.1: WebSocket Client

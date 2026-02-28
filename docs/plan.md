@@ -339,6 +339,7 @@ Based on Rewrite.md, this document breaks down the implementation into concrete 
 
 ### Task 3.4: Integration Testing - Full Slideshow
 **Complexity:** Medium
+**Status:** `passes: true`
 **Description:** End-to-end testing of daemon controlling Pi3D slideshow.
 
 **Tests:**
