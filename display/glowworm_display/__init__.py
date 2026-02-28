@@ -10,5 +10,18 @@ __author__ = "Glowworm Team"
 
 from glowworm_display.config import DisplayConfig
 from glowworm_display.display import Display, create_display
+from glowworm_display.image_loader import (
+    ImageLoader,
+    ImageLoadError,
+    ScaleMode,
+)
 
-__all__ = ["DisplayConfig", "Display", "create_display", "__version__"]
+__all__ = [
+    "DisplayConfig",
+    "Display",
+    "create_display",
+    "ImageLoader",
+    "ImageLoadError",
+    "ScaleMode",
+    "__version__",
+]

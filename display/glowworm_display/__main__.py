@@ -12,6 +12,7 @@ from pathlib import Path
 
 from glowworm_display.config import DisplayConfig, load_config
 from glowworm_display.display import Display
+from glowworm_display.image_loader import ImageLoader, ImageLoadError, ScaleMode
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,19 @@ def parse_args() -> argparse.Namespace:
         help="Run for N frames then exit (for testing, 0=run forever)",
     )
     parser.add_argument(
+        "--test-image",
+        type=str,
+        default=None,
+        help="Display a test image (requires --test-frames or --mock)",
+    )
+    parser.add_argument(
+        "--scale-mode",
+        type=str,
+        choices=["fit", "fill", "stretch"],
+        default="fit",
+        help="Image scaling mode (default: fit)",
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__import__('glowworm_display').__version__}",
@@ -118,6 +132,26 @@ def main() -> int:
     logger.info("Display engine initialized successfully")
     logger.info("Ready to receive commands via IPC")
 
+    # Create image loader
+    image_loader = ImageLoader(
+        display_width=display.width,
+        display_height=display.height,
+        rotation=config.rotation,
+        mock=args.mock,
+    )
+
+    # Load test image if specified
+    test_sprite = None
+    if args.test_image:
+        scale_mode = ScaleMode(args.scale_mode)
+        try:
+            test_sprite = image_loader.load_image(args.test_image, scale_mode=scale_mode)
+            logger.info(f"Test image loaded: {args.test_image}")
+        except ImageLoadError as e:
+            logger.error(f"Failed to load test image: {e}")
+            display.cleanup()
+            return 1
+
     # Run test frames if requested (for testing)
     if args.test_frames > 0:
         logger.info(f"Running {args.test_frames} test frames...")
@@ -126,8 +160,8 @@ def main() -> int:
 
         while frame_count < args.test_frames and display.is_running:
             with display.frame():
-                # Nothing to draw yet - just testing frame loop
-                pass
+                if test_sprite:
+                    test_sprite.draw()
             frame_count += 1
 
         elapsed = time.time() - start_time
@@ -137,8 +171,20 @@ def main() -> int:
         return 0
 
     # For mock mode without test frames, just verify init works
-    if args.mock:
+    if args.mock and not args.test_image:
         logger.info("Mock mode - display initialized successfully, exiting")
+        display.cleanup()
+        return 0
+
+    # If mock mode with test image but no test frames, run a short demo
+    if args.mock and args.test_image and args.test_frames == 0:
+        logger.info("Mock mode with test image - running 60 demo frames")
+        frame_count = 0
+        while frame_count < 60 and display.is_running:
+            with display.frame():
+                if test_sprite:
+                    test_sprite.draw()
+            frame_count += 1
         display.cleanup()
         return 0
 
