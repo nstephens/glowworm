@@ -1606,3 +1606,62 @@ Pi3D daemon protocol:
 
 ### Next Task
 Task 4.5: Integration Testing - WebSocket
+
+## 2026-02-28 18:45 - Task 4.5: Integration Testing - WebSocket
+
+### What Changed
+Created comprehensive integration tests for full WebSocket communication flow between daemon and backend.
+
+### Files Created
+- `daemon/tests/test_integration_websocket.py` - 17 integration tests covering:
+  - **Device connects and authenticates**: Tests device WebSocket connection, authentication via device token, state transitions, and server tracking
+  - **Authentication failure handling**: Tests proper error handling for empty/invalid tokens
+  - **Reconnection after disconnect**: Tests auto-reconnect behavior when connection is lost
+  - **Status updates reach backend**: Tests StatusReporter sends status to backend via WebSocket
+  - **Status updates broadcast to admins**: Tests admin connections receive device status updates
+  - **Status includes all required fields**: Tests comprehensive status payload with slideshow, cache, display, and uptime fields
+  - **Command reaches device**: Tests commands from admin/server reach device via WebSocket
+  - **Command handler processes commands**: Tests CommandHandler correctly handles incoming commands
+  - **All command types**: Tests all supported commands (next, previous, pause, resume, play, go_to, reload_playlist, clear, status)
+  - **Messages queued when offline**: Tests offline message queuing
+  - **Queued messages sent on reconnect**: Tests queue flush on reconnection
+  - **Queue max size enforcement**: Tests queue respects max_queue_size limit
+  - **Queue priority ordering**: Tests messages sent in priority order
+  - **Multiple devices connect**: Tests multiple devices can connect simultaneously
+  - **Commands sent to correct device**: Tests commands are routed to specific devices correctly
+  - **Status updates from multiple devices**: Tests each device's status is tracked separately
+  - **Heartbeat keeps connection alive**: Tests heartbeat mechanism maintains connection
+
+### Test Infrastructure
+- `MockWebSocketServer` - Mock WebSocket server simulating backend behavior:
+  - Device endpoint with authentication (auth -> auth_success/auth_failed)
+  - Admin endpoint with connection tracking
+  - Message routing between devices and admins
+  - Command sending with request_id tracking
+  - Status caching per device
+  - Message logging for verification
+
+### Verification
+- All 17 new integration tests pass
+- All 350 daemon tests pass: `pytest daemon/tests/ -v`
+- Tests exercise real WebSocket client (aiohttp) against mock server
+- Tests cover all requirements from plan.md Task 4.5
+
+### Test Coverage Summary
+| Scenario | Status |
+|----------|--------|
+| Device connects and authenticates | ✅ |
+| Status updates reach backend and admin UI | ✅ |
+| Commands from admin UI reach device | ✅ |
+| Offline queuing and reconnection work | ✅ |
+| Multiple devices work simultaneously | ✅ |
+
+### Notes
+- Mock server implements Pi3D daemon protocol (auth, status, heartbeat, command, command_response)
+- Tests use real aiohttp WebSocket client connecting to mock aiohttp server
+- Heartbeat test uses 0.5s interval for quick testing
+- Multiple device tests verify correct routing and independent status tracking
+- Tests balance thoroughness with execution speed (~26 seconds for all 17 tests)
+
+### Next Task
+Task 5.1: Daemon Registration Mode
