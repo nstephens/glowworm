@@ -93,6 +93,13 @@ from .websocket_client import (
     QueuedMessage,
     create_websocket_client,
 )
+from .status_reporter import (
+    StatusReporter,
+    StatusReporterConfig,
+    DeviceStatus,
+    ReporterState,
+    create_status_reporter,
+)
 
 __all__ = [
     "GlowwormDaemon",
@@ -168,5 +175,11 @@ __all__ = [
     "MessageType",
     "QueuedMessage",
     "create_websocket_client",
+    # Status Reporter (v3.0)
+    "StatusReporter",
+    "StatusReporterConfig",
+    "DeviceStatus",
+    "ReporterState",
+    "create_status_reporter",
 ]
 

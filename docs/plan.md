@@ -379,6 +379,7 @@ Based on Rewrite.md, this document breaks down the implementation into concrete 
 
 ### Task 4.2: Status Reporting
 **Complexity:** Low
+**Status:** `passes: true`
 **Description:** Report device status to backend via WebSocket.
 
 **Subtasks:**

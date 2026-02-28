@@ -1283,3 +1283,142 @@ async with WebSocketClient(config, on_message, on_state_change) as client:
 
 ### Next Task
 Task 4.2: Status Reporting
+
+## 2026-02-28 17:00 - Task 4.2: Status Reporting
+
+### What Changed
+Implemented StatusReporter class for reporting device status to backend via WebSocket with periodic reporting and immediate state change notifications.
+
+### Files Created
+- `daemon/glowworm_daemon/status_reporter.py` - StatusReporter implementation with:
+  - `ReporterState` enum (STOPPED, RUNNING, ERROR)
+  - `StatusReporterConfig` dataclass for configuration:
+    - `report_interval`: Periodic reporting interval (default 30s)
+    - `report_on_state_change`: Report immediately on state changes (default True)
+    - `min_report_interval`: Rate limiting to prevent flooding (default 1s)
+    - `status_priority`: Priority for queued messages
+    - `include_cache_details`: Include detailed cache statistics
+  - `DeviceStatus` dataclass for status message payload:
+    - Current state (playing, paused, stopped, error)
+    - Current image info (id, path)
+    - Slideshow stats (images displayed, skipped, transitions, errors, runtime)
+    - Playlist info (id, name, position, entry count)
+    - Cache statistics (entry count, size, hit rate)
+    - Display state (running, state)
+    - Uptime and timestamp
+    - `to_dict()` method for JSON serialization
+  - `StatusReporter` class with:
+    - Periodic status reporting at configurable intervals
+    - Immediate reporting on slideshow state changes
+    - Rate limiting to prevent message flooding
+    - Status aggregation from all components (slideshow, display, cache)
+    - Status callbacks for external monitoring
+    - Async context manager support
+  - `create_status_reporter()` factory function
+
+- `daemon/tests/test_status_reporter.py` - 28 comprehensive tests covering:
+  - Configuration defaults and custom values
+  - DeviceStatus serialization (to_dict)
+  - Reporter initialization and state management
+  - Start/stop lifecycle
+  - Status reporting with all components
+  - Rate limiting behavior
+  - Offline queuing
+  - State change callback registration
+  - Status callbacks
+  - Status collection from each component type
+  - Uptime tracking
+  - Periodic reporting
+  - Context manager
+  - Slideshow state mapping (playing/transitioning -> playing)
+  - Error handling (send errors, callback errors)
+  - Factory function
+
+### Files Modified
+- `daemon/glowworm_daemon/__init__.py` - Added exports for:
+  - StatusReporter, StatusReporterConfig, DeviceStatus, ReporterState
+  - create_status_reporter
+
+### Verification
+- All 28 StatusReporter tests pass
+- All 303 daemon tests pass: `pytest daemon/tests/ -v`
+- All 24 display tests pass: `pytest display/tests/ -v`
+- Imports work correctly: `from glowworm_daemon import StatusReporter, StatusReporterConfig`
+
+### API Summary
+```python
+from glowworm_daemon import StatusReporter, StatusReporterConfig
+
+# Configuration
+config = StatusReporterConfig(
+    report_interval=30.0,          # Report every 30 seconds
+    report_on_state_change=True,   # Report immediately on state changes
+    min_report_interval=1.0,       # Rate limiting
+)
+
+# Usage with all components
+reporter = StatusReporter(
+    websocket=ws_client,
+    slideshow=slideshow_orchestrator,
+    display=display_controller,
+    cache=image_cache,
+    config=config,
+)
+
+async with reporter:
+    # Reporter sends periodic status updates automatically
+    # Also sends immediately when slideshow state changes
+
+    # Manual status report
+    await reporter.report_status(force=True)
+
+    # Get current status without sending
+    status = reporter.get_last_status()
+```
+
+### Status Message Schema
+```python
+{
+    "state": "playing",
+    "is_online": True,
+    "current_image_id": 123,
+    "current_image_path": "/cache/123.jpg",
+    "slideshow": {
+        "images_displayed": 10,
+        "images_skipped": 1,
+        "transitions_completed": 9,
+        "errors": 0,
+        "runtime_seconds": 300.5,
+    },
+    "playlist": {
+        "id": 1,
+        "name": "Test Playlist",
+        "position": 5,
+        "entry_count": 20,
+    },
+    "cache": {
+        "entry_count": 15,
+        "size_mb": 50.0,
+        "max_size_mb": 500,
+        "hit_rate": 0.85,
+    },
+    "display": {
+        "running": True,
+        "state": "running",
+    },
+    "uptime_seconds": 3600.5,
+    "timestamp": 1709150400.123,
+}
+```
+
+### Notes
+- StatusReporter integrates with WebSocketClient for message sending
+- Periodic reporting runs in background asyncio task
+- Rate limiting prevents flooding during rapid state changes
+- Status is queued when offline via WebSocket client's queue
+- Collects status from slideshow, display controller, and cache
+- State changes mapped: "transitioning" -> "playing" for simpler backend handling
+- All fields optional based on which components are provided
+
+### Next Task
+Task 4.3: Command Reception
