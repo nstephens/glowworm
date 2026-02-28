@@ -28,10 +28,11 @@ setup(
     install_requires=[
         "requests>=2.31.0",
         "urllib3>=2.0.0",
+        "aiohttp>=3.9.0",
     ],
     extras_require={
         "cec": ["cec>=0.2.7"],
-        "dev": ["pytest>=7.4.0", "pytest-cov>=4.1.0", "black>=23.0.0", "flake8>=6.0.0"],
+        "dev": ["pytest>=7.4.0", "pytest-cov>=4.1.0", "pytest-asyncio>=0.23.0", "black>=23.0.0", "flake8>=6.0.0"],
     },
     entry_points={
         "console_scripts": [

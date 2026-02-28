@@ -379,3 +379,89 @@ Created comprehensive integration tests, performance benchmarks, and manual test
 
 ### Next Task
 Task 2.1: Image Manager - HTTP Client
+
+## 2026-02-28 16:15 - Task 2.1: Image Manager - HTTP Client
+
+### What Changed
+Implemented async HTTP client for fetching images from backend with caching support.
+
+### Files Created
+- `daemon/glowworm_daemon/image_manager.py` - ImageManager class with:
+  - `ImageManager` class for async image downloads using aiohttp
+  - `ImageManagerConfig` dataclass for configuration
+  - `DownloadProgress` dataclass for progress tracking
+  - `CacheEntry` dataclass for cache metadata
+  - `DownloadStatus` enum (PENDING, DOWNLOADING, COMPLETE, CACHED, FAILED, CANCELLED)
+  - ETag/Last-Modified header handling for conditional requests (304 support)
+  - Exponential backoff retry logic (configurable base delay, max delay, max retries)
+  - Download progress callbacks with bytes downloaded/total tracking
+  - `ImageNotFoundError` and `AuthenticationError` custom exceptions
+  - Cache statistics reporting (`get_cache_stats()`)
+  - Async context manager support (`async with ImageManager(...)`)
+
+- `daemon/tests/__init__.py` - Test package init
+- `daemon/tests/conftest.py` - Pytest configuration for async tests
+- `daemon/tests/test_image_manager.py` - 27 unit tests covering:
+  - Configuration defaults and cache directory creation
+  - URL building and cache path generation
+  - Content-type to extension mapping
+  - Session lifecycle (start/stop)
+  - Successful downloads with progress tracking
+  - 304 Not Modified (cache hit) handling
+  - 404 and 401/403 error handling
+  - Retry on server errors (5xx)
+  - Max retries exceeded
+  - Cache clearing
+  - Conditional request headers
+  - Force download ignoring cache
+
+### Files Modified
+- `daemon/glowworm_daemon/__init__.py` - Added exports for ImageManager classes, bumped version to 3.0.0
+- `daemon/setup.py` - Added `aiohttp>=3.9.0` dependency, `pytest-asyncio>=0.23.0` dev dependency
+
+### Verification
+- All 27 tests pass: `pytest daemon/tests/test_image_manager.py -v`
+- Package installs successfully with dependencies
+- Imports work correctly: `from glowworm_daemon import ImageManager, ImageManagerConfig`
+
+### API Summary
+```python
+# Configuration
+config = ImageManagerConfig(
+    backend_url="http://localhost:8000",
+    device_token="token-123",
+    cache_dir="/var/cache/glowworm/images",
+    max_retries=3,
+    retry_base_delay=1.0,
+    retry_max_delay=60.0,
+)
+
+# Usage
+async with ImageManager(config) as manager:
+    # Download with progress
+    def on_progress(progress: DownloadProgress):
+        print(f"{progress.progress_percent:.1f}%")
+
+    path, status = await manager.download_image(
+        image_id=123,
+        progress_callback=on_progress
+    )
+
+    # Check cache
+    if manager.is_cached(123):
+        path = manager.get_cached_path(123)
+
+    # Stats
+    stats = manager.get_cache_stats()
+```
+
+### Notes
+- Backend fetches use `/api/images/{image_id}/file` endpoint
+- ETag/Last-Modified headers are stored in cache metadata for conditional requests
+- On 304 response, returns cached file path without re-downloading
+- Retry with exponential backoff: 1s, 2s, 4s... up to max_delay
+- Progress callbacks fire on each chunk (64KB default)
+- Cache metadata is in-memory; persistence to be added in Task 2.2
+
+### Next Task
+Task 2.2: Image Manager - Local Cache
