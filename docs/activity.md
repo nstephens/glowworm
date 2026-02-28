@@ -204,3 +204,64 @@ Implemented the Renderer class that manages the main render loop, image queue, s
 
 ### Next Task
 Task 1.6: IPC Server
+
+## 2026-02-28 14:50 - Task 1.6: IPC Server
+
+### What Changed
+Implemented JSON-RPC 2.0 server over Unix domain sockets for daemon communication with the Pi3D display engine.
+
+### Files Created
+- `display/glowworm_display/ipc_server.py` - IPC server implementation with:
+  - `IPCServer` class for async Unix socket server
+  - `IPCServerConfig` dataclass for configuration
+  - `IPCClient` class for client connection management
+  - `ConnectionState` enum for connection tracking
+  - JSON-RPC 2.0 request parsing and response formatting
+  - Command handlers: `load_image`, `queue_image`, `get_status`, `pause`, `resume`, `clear`
+  - Async notification sending (`state_changed`)
+  - `create_ipc_server()` factory function
+
+### Files Modified
+- `display/glowworm_display/__init__.py` - Added exports for `IPCServer`, `IPCServerConfig`, `create_ipc_server`
+- `display/glowworm_display/__main__.py`:
+  - Added asyncio support for running render loop with IPC server
+  - Added `--test-ipc` CLI option for IPC server testing
+  - Integrated IPC server with main render loop via `run_with_ipc()` function
+  - State changes now send notifications to all connected IPC clients
+
+### Verification
+- Imports work correctly: `from glowworm_display import IPCServer, IPCServerConfig, create_ipc_server`
+- `glowworm-display --mock` still initializes and exits cleanly
+- `glowworm-display --mock --test-ipc --socket /tmp/glowworm/display.sock`:
+  - Server creates socket at configured path
+  - Client can connect and send JSON-RPC commands
+  - `get_status` returns current renderer state and statistics
+  - `pause` command pauses renderer and sends notification
+  - `resume` command resumes renderer and sends notification
+  - Invalid methods return proper JSON-RPC error (code -32601)
+  - Server handles client disconnect gracefully
+  - Multiple commands handled correctly in sequence
+- `glowworm-display --version` outputs `3.0.0`
+- `--test-renderer` mode still works with IPC integration
+
+### IPC Protocol
+Commands (JSON-RPC 2.0):
+- `get_status` → Returns state, is_running, is_paused, current_image, queue_length, stats
+- `pause` → Pauses renderer, returns success + state
+- `resume` → Resumes renderer, returns success + state
+- `clear` → Clears display and queue, returns success
+- `load_image(path, scale_mode?, transition_duration?)` → Loads image immediately
+- `queue_image(path, scale_mode?, transition_duration?)` → Queues image for display
+
+Notifications (sent to all clients):
+- `state_changed` → {state: string} - Sent after state-changing commands
+
+### Notes
+- Server uses asyncio for non-blocking I/O
+- Render loop runs with `await asyncio.sleep(0)` to yield to IPC tasks
+- Notifications are sent after responses using `asyncio.create_task()` with small delay
+- Socket permissions set to 0o660 for group access
+- Server cleans up socket file on stop
+
+### Next Task
+Task 1.7: Registration Display Mode

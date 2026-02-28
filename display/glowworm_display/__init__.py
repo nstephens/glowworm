@@ -15,6 +15,11 @@ from glowworm_display.image_loader import (
     ImageLoadError,
     ScaleMode,
 )
+from glowworm_display.ipc_server import (
+    IPCServer,
+    IPCServerConfig,
+    create_ipc_server,
+)
 from glowworm_display.renderer import (
     Renderer,
     RendererState,
@@ -34,6 +39,9 @@ __all__ = [
     "create_display",
     "ImageLoader",
     "ImageLoadError",
+    "IPCServer",
+    "IPCServerConfig",
+    "create_ipc_server",
     "Renderer",
     "RendererState",
     "RenderStats",

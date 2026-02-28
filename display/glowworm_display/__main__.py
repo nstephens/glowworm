@@ -5,6 +5,7 @@ Launches the Pi3D display engine with IPC server for daemon communication.
 """
 
 import argparse
+import asyncio
 import logging
 import sys
 import time
@@ -13,6 +14,7 @@ from pathlib import Path
 from glowworm_display.config import DisplayConfig, load_config
 from glowworm_display.display import Display
 from glowworm_display.image_loader import ImageLoader, ImageLoadError, ScaleMode
+from glowworm_display.ipc_server import IPCServer, IPCServerConfig
 from glowworm_display.renderer import Renderer, RendererState
 from glowworm_display.transitions import CrossfadeTransition
 
@@ -103,6 +105,11 @@ def parse_args() -> argparse.Namespace:
         "--test-renderer",
         action="store_true",
         help="Test the renderer with queued images (use with --test-image and --test-transition)",
+    )
+    parser.add_argument(
+        "--test-ipc",
+        action="store_true",
+        help="Test the IPC server with mock display (runs server and waits for commands)",
     )
     parser.add_argument(
         "--version",
@@ -312,13 +319,13 @@ def main() -> int:
         return 0
 
     # For mock mode without test frames, just verify init works
-    if args.mock and not args.test_image:
+    if args.mock and not args.test_image and not args.test_ipc:
         logger.info("Mock mode - display initialized successfully, exiting")
         display.cleanup()
         return 0
 
     # If mock mode with test image but no test frames, run a short demo
-    if args.mock and args.test_image and args.test_frames == 0:
+    if args.mock and args.test_image and args.test_frames == 0 and not args.test_ipc:
         logger.info("Mock mode with test image - running 60 demo frames")
         frame_count = 0
         while frame_count < 60 and display.is_running:
@@ -329,7 +336,13 @@ def main() -> int:
         display.cleanup()
         return 0
 
-    # TODO: Start IPC server (Task 1.6)
+    # Test IPC server mode
+    if args.test_ipc:
+        logger.info("Testing IPC server mode...")
+        logger.info(f"Socket path: {socket_path}")
+        logger.info("Send commands using: echo '<json>' | nc -U <socket_path>")
+        logger.info("Example: {\"jsonrpc\":\"2.0\",\"method\":\"get_status\",\"id\":1}")
+        # Fall through to main loop with IPC
 
     # Create renderer for main loop
     renderer = Renderer(
@@ -338,9 +351,13 @@ def main() -> int:
         default_transition_duration=args.transition_duration,
     )
 
-    logger.info("Entering main render loop...")
+    # Run with IPC server
     try:
-        renderer.run()
+        asyncio.run(run_with_ipc(
+            renderer=renderer,
+            display=display,
+            socket_path=socket_path,
+        ))
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
     finally:
@@ -349,6 +366,61 @@ def main() -> int:
         display.cleanup()
 
     return 0
+
+
+async def run_with_ipc(
+    renderer: Renderer,
+    display: Display,
+    socket_path: str,
+) -> None:
+    """
+    Run the render loop with IPC server.
+
+    This runs the render loop in the main thread while the IPC server
+    handles connections asynchronously.
+
+    Args:
+        renderer: The renderer instance
+        display: The display instance
+        socket_path: Path to the Unix socket for IPC
+    """
+    # Create and configure IPC server
+    config = IPCServerConfig(socket_path=socket_path)
+    ipc_server = IPCServer(config=config, renderer=renderer)
+
+    # Set up state change notifications
+    def on_state_change(old_state: RendererState, new_state: RendererState) -> None:
+        """Forward state changes to IPC clients."""
+        asyncio.create_task(ipc_server.send_notification("state_changed", {
+            "old_state": old_state.value,
+            "new_state": new_state.value,
+        }))
+
+    renderer.on_state_change = on_state_change
+
+    # Start IPC server
+    await ipc_server.start()
+    logger.info(f"IPC server started on {socket_path}")
+
+    try:
+        # Run render loop with async integration
+        logger.info("Entering main render loop with IPC...")
+        renderer._running = True
+
+        while renderer._running and display.is_running:
+            # Run one frame
+            if not renderer.run_once():
+                break
+
+            # Yield to allow IPC tasks to run
+            # This is a short sleep to prevent blocking the event loop
+            await asyncio.sleep(0)
+
+    except asyncio.CancelledError:
+        logger.info("Main loop cancelled")
+    finally:
+        logger.info("Stopping IPC server...")
+        await ipc_server.stop()
 
 
 if __name__ == "__main__":
