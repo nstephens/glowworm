@@ -112,6 +112,12 @@ def parse_args() -> argparse.Namespace:
         help="Test the IPC server with mock display (runs server and waits for commands)",
     )
     parser.add_argument(
+        "--test-registration",
+        type=str,
+        default=None,
+        help="Test registration display with given code (e.g., --test-registration ABCD)",
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__import__('glowworm_display').__version__}",
@@ -212,6 +218,7 @@ def main() -> int:
             image_loader=image_loader,
             default_transition_duration=args.transition_duration,
             on_state_change=on_state_change,
+            mock=args.mock,
         )
 
         # Queue the test image(s)
@@ -318,6 +325,40 @@ def main() -> int:
         display.cleanup()
         return 0
 
+    # Test registration display mode
+    if args.test_registration:
+        logger.info(f"Testing registration display: {args.test_registration}")
+
+        # Create renderer with mock mode
+        renderer = Renderer(
+            display=display,
+            image_loader=image_loader,
+            default_transition_duration=args.transition_duration,
+            mock=args.mock,
+        )
+
+        # Show registration code
+        renderer.show_registration(args.test_registration)
+
+        # Run for test frames or a default
+        max_frames = args.test_frames if args.test_frames > 0 else 300  # ~5 seconds at 60fps
+        frame_count = 0
+
+        logger.info(f"Running registration display for {max_frames} frames...")
+        start_time = time.time()
+
+        while frame_count < max_frames and display.is_running:
+            renderer.run_once()
+            frame_count += 1
+
+        elapsed = time.time() - start_time
+        fps = frame_count / elapsed if elapsed > 0 else 0
+        logger.info(f"Registration test complete: {frame_count} frames in {elapsed:.2f}s ({fps:.1f} FPS)")
+        logger.info(f"Status: {renderer.get_status()}")
+
+        display.cleanup()
+        return 0
+
     # For mock mode without test frames, just verify init works
     if args.mock and not args.test_image and not args.test_ipc:
         logger.info("Mock mode - display initialized successfully, exiting")
@@ -349,6 +390,7 @@ def main() -> int:
         display=display,
         image_loader=image_loader,
         default_transition_duration=args.transition_duration,
+        mock=args.mock,
     )
 
     # Run with IPC server

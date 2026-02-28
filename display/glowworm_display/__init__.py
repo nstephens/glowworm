@@ -25,6 +25,10 @@ from glowworm_display.renderer import (
     RendererState,
     RenderStats,
 )
+from glowworm_display.text_renderer import (
+    TextRenderer,
+    TextStyle,
+)
 from glowworm_display.transitions import (
     CrossfadeTransition,
     Transition,
@@ -46,6 +50,8 @@ __all__ = [
     "RendererState",
     "RenderStats",
     "ScaleMode",
+    "TextRenderer",
+    "TextStyle",
     "Transition",
     "TransitionProgress",
     "TransitionState",

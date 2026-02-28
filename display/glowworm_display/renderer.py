@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Callable
 
 from glowworm_display.display import Display
 from glowworm_display.image_loader import ImageLoader, ImageLoadError, ScaleMode
+from glowworm_display.text_renderer import TextRenderer
 from glowworm_display.transitions import CrossfadeTransition, Transition, TransitionState
 
 if TYPE_CHECKING:
@@ -28,6 +29,7 @@ class RendererState(str, Enum):
     DISPLAYING = "displaying"  # Showing a static image
     TRANSITIONING = "transitioning"  # Transitioning between images
     PAUSED = "paused"  # Paused, not updating display
+    REGISTRATION = "registration"  # Showing registration code
 
 
 @dataclass
@@ -90,6 +92,7 @@ class Renderer:
         image_loader: ImageLoader,
         default_transition_duration: float = 1.0,
         on_state_change: StateChangeCallback | None = None,
+        mock: bool = False,
     ) -> None:
         """
         Initialize the renderer.
@@ -99,11 +102,13 @@ class Renderer:
             image_loader: Image loader for creating sprites
             default_transition_duration: Default transition duration in seconds
             on_state_change: Optional callback when state changes
+            mock: If True, use mock rendering for development
         """
         self.display = display
         self.image_loader = image_loader
         self.default_transition_duration = default_transition_duration
         self.on_state_change = on_state_change
+        self.mock = mock
 
         # State management
         self._state = RendererState.IDLE
@@ -116,6 +121,13 @@ class Renderer:
 
         # Current transition (if any)
         self._transition: Transition | None = None
+
+        # Text renderer for registration display
+        self._text_renderer = TextRenderer(
+            display_width=display.width,
+            display_height=display.height,
+            mock=mock,
+        )
 
         # Statistics
         self.stats = RenderStats()
@@ -338,6 +350,10 @@ class Renderer:
                 self._current_sprite.set_alpha(1.0)
                 self._current_sprite.draw()
 
+        elif self._state == RendererState.REGISTRATION:
+            # Draw registration display with animation
+            self._text_renderer.render_registration()
+
     def pause(self) -> None:
         """
         Pause the renderer.
@@ -394,8 +410,56 @@ class Renderer:
             self._transition.cancel()
             self._transition = None
 
+        # Clear registration display if active
+        self._text_renderer.clear_registration()
+
         self._set_state(RendererState.IDLE)
         logger.info("Renderer cleared")
+
+    def show_registration(self, code: str) -> None:
+        """
+        Display a registration code on screen.
+
+        Shows the registration code large and centered with a
+        waiting animation. Clears any current image display.
+
+        Args:
+            code: The registration code to display (typically 4 characters)
+        """
+        # Clear current display state
+        self._image_queue.clear()
+        self._current_sprite = None
+        self._next_sprite = None
+
+        if self._transition:
+            self._transition.cancel()
+            self._transition = None
+
+        # Set the registration code
+        self._text_renderer.set_registration_code(code)
+        self._set_state(RendererState.REGISTRATION)
+        logger.info(f"Showing registration code: {code}")
+
+    def hide_registration(self) -> None:
+        """
+        Hide the registration display.
+
+        Returns to idle state. Use load_image_immediate or queue_image
+        to start displaying images.
+        """
+        self._text_renderer.clear_registration()
+        self._set_state(RendererState.IDLE)
+        logger.info("Registration display hidden")
+
+    @property
+    def is_showing_registration(self) -> bool:
+        """Check if currently showing registration code."""
+        return self._state == RendererState.REGISTRATION
+
+    @property
+    def registration_code(self) -> str | None:
+        """Get the current registration code, if any."""
+        return self._text_renderer.current_code
 
     def run_once(self) -> bool:
         """
@@ -472,6 +536,8 @@ class Renderer:
             "state": self._state.value,
             "is_running": self._running,
             "is_paused": self.is_paused,
+            "is_registration": self.is_showing_registration,
+            "registration_code": self.registration_code,
             "current_image": self.current_image_path,
             "queue_length": self.queue_length,
             "stats": {

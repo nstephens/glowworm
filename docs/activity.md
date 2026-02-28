@@ -265,3 +265,62 @@ Notifications (sent to all clients):
 
 ### Next Task
 Task 1.7: Registration Display Mode
+
+## 2026-02-28 14:54 - Task 1.7: Registration Display Mode
+
+### What Changed
+Implemented text rendering for registration code display with animated waiting indicators.
+
+### Files Created
+- `display/glowworm_display/text_renderer.py` - TextRenderer class with:
+  - `MockFont` and `MockText` classes for development/testing without Pi3D
+  - `TextStyle` dataclass for text styling configuration
+  - `TextRenderer` class for GPU-accelerated text display
+  - Large, centered registration code display
+  - Animated waiting indicator with pulsing code and staggered dots
+  - `set_registration_code()` and `clear_registration()` methods
+  - `render_registration()` for frame-by-frame rendering
+
+### Files Modified
+- `display/glowworm_display/__init__.py` - Added exports for `TextRenderer`, `TextStyle`
+- `display/glowworm_display/renderer.py`:
+  - Added `RendererState.REGISTRATION` enum value
+  - Added `TextRenderer` integration with mock mode support
+  - Added `show_registration()` and `hide_registration()` methods
+  - Added `is_showing_registration` and `registration_code` properties
+  - Updated `_render_frame()` to handle registration state
+  - Updated `get_status()` to include registration info
+- `display/glowworm_display/ipc_server.py`:
+  - Added `show_registration` IPC command handler
+  - Added `hide_registration` IPC command handler
+- `display/glowworm_display/__main__.py`:
+  - Added `--test-registration` CLI argument
+  - Added registration display test mode
+  - Updated Renderer instantiation to pass mock parameter
+
+### Verification
+- `glowworm-display --mock` still initializes and exits cleanly
+- `glowworm-display --mock --test-registration ABCD` displays registration code with animation:
+  - State shows as "registration"
+  - `is_registration: True`
+  - `registration_code: "ABCD"`
+- IPC commands work:
+  - `show_registration` with `code` param sets registration mode
+  - `hide_registration` returns to idle state
+  - State change notifications sent to connected clients
+- `glowworm-display --version` outputs `3.0.0`
+
+### IPC Protocol Updates
+New commands:
+- `show_registration(code)` → {success, state, code} - Display registration code
+- `hide_registration` → {success, state} - Hide registration display
+
+### Notes
+- Registration display uses pulse animation (0.85-1.0 alpha, 2s cycle) on code
+- Waiting dots animate with staggered timing (0.5s cycle per dot)
+- Registration state is preserved separately from pause/resume states
+- Text uses DejaVu fonts on real Pi3D, mock text objects in mock mode
+- Registration mode clears any current image/transition before displaying
+
+### Next Task
+Task 1.8: Integration Testing - Display Engine

@@ -114,6 +114,8 @@ class IPCServer:
             "resume": self._handle_resume,
             "clear": self._handle_clear,
             "queue_image": self._handle_queue_image,
+            "show_registration": self._handle_show_registration,
+            "hide_registration": self._handle_hide_registration,
         }
 
         # Notification listeners (for sending async notifications)
@@ -615,6 +617,55 @@ class IPCServer:
         # Small delay to ensure response is sent first
         await asyncio.sleep(0.01)
         await self.send_notification("state_changed", {"state": state})
+
+    async def _handle_show_registration(self, code: str) -> dict[str, Any]:
+        """
+        Show registration code on display.
+
+        Args:
+            code: The registration code to display
+
+        Returns:
+            Dict with success status
+        """
+        if not self.renderer:
+            return {"success": False, "error": "Renderer not initialized"}
+
+        if not code or not isinstance(code, str):
+            return {"success": False, "error": "Registration code required"}
+
+        self.renderer.show_registration(code)
+        state = self.renderer.state.value
+
+        # Schedule notification to be sent after response
+        asyncio.create_task(self._send_state_notification(state))
+
+        return {
+            "success": True,
+            "state": state,
+            "code": code.upper(),
+        }
+
+    async def _handle_hide_registration(self) -> dict[str, Any]:
+        """
+        Hide registration display.
+
+        Returns:
+            Dict with success status
+        """
+        if not self.renderer:
+            return {"success": False, "error": "Renderer not initialized"}
+
+        self.renderer.hide_registration()
+        state = self.renderer.state.value
+
+        # Schedule notification to be sent after response
+        asyncio.create_task(self._send_state_notification(state))
+
+        return {
+            "success": True,
+            "state": state,
+        }
 
 
 async def create_ipc_server(
