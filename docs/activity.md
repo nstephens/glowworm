@@ -575,3 +575,97 @@ cache.clear()
 
 ### Next Task
 Task 2.3: Playlist Manager
+
+## 2026-02-28 17:15 - Task 2.3: Playlist Manager
+
+### What Changed
+Implemented the PlaylistManager class for managing playlist state, fetching from backend, and navigation.
+
+### Files Created
+- `daemon/glowworm_daemon/playlist_manager.py` - PlaylistManager class with:
+  - `PlaylistManagerConfig` dataclass for configuration
+  - `PlaylistData` dataclass for parsed playlist information
+  - `PlaylistImage` dataclass for image metadata
+  - `PlaylistEntry` dataclass for single/pair entries
+  - `PlaylistPosition` dataclass for position tracking with serialization
+  - `PlaylistStatus` enum (OK, FETCHING, ERROR, NOT_LOADED)
+  - `PlaylistManager` class with:
+    - Async HTTP fetching from backend API using aiohttp
+    - Playlist parsing and validation for manifest and playlist endpoints
+    - Position tracking persisted to disk (JSON file in state_dir)
+    - Shuffle mode with deterministic seed (same seed = same order)
+    - Next/previous navigation with wrap-around
+    - Go to specific position
+    - Upcoming images for preloading
+    - Version checking via content hash
+    - Comprehensive status reporting
+    - Async context manager support
+
+- `daemon/tests/test_playlist_manager.py` - 35 unit tests covering:
+  - Configuration defaults and directory creation
+  - Position serialization (to_dict, from_dict)
+  - Session lifecycle (start, stop, context manager)
+  - Playlist fetching (manifest format, playlist format)
+  - Error handling (404, 401, 500 with retry)
+  - Navigation (next, previous, go_to, wrapping)
+  - Shuffle mode (deterministic, enable/disable)
+  - State persistence across restarts
+  - Version hash computation and change detection
+  - Status reporting with/without playlist
+  - Empty playlist handling
+
+### Files Modified
+- `daemon/glowworm_daemon/__init__.py` - Added exports for PlaylistManager classes
+
+### Verification
+- All 35 playlist manager tests pass
+- All 95 daemon tests pass: `pytest daemon/tests/ -v`
+- Imports work correctly: `from glowworm_daemon import PlaylistManager, PlaylistManagerConfig`
+
+### API Summary
+```python
+from glowworm_daemon import PlaylistManager, PlaylistManagerConfig
+
+# Configuration
+config = PlaylistManagerConfig(
+    backend_url="http://localhost:8000",
+    device_token="token-123",
+    state_dir="/var/lib/glowworm",
+    max_retries=3,
+)
+
+# Usage
+async with PlaylistManager(config) as manager:
+    # Fetch playlist
+    playlist = await manager.fetch_playlist(playlist_id=1)
+    print(f"Playlist: {playlist.name}, {playlist.image_count} images")
+
+    # Navigation
+    images = manager.get_current_images()
+    entry, pos = manager.next()
+    entry, pos = manager.previous()
+
+    # Shuffle mode (deterministic)
+    manager.set_shuffle(True, seed=12345)
+
+    # Get upcoming images for preloading
+    upcoming = manager.get_upcoming_images(count=3)
+
+    # Check for updates
+    if await manager.check_for_updates():
+        print("Playlist has changed!")
+
+    # Status
+    status = manager.get_status()
+```
+
+### Notes
+- Position is persisted to `{state_dir}/playlist_state.json`
+- Shuffle uses Python's `random.Random(seed)` for deterministic order
+- Version hash is computed from sequence + image checksums
+- Retry logic uses exponential backoff with configurable delays
+- Handles both manifest endpoint (image list) and playlist endpoint (computed sequence)
+- Entry count accounts for paired images (pair = 1 entry, not 2)
+
+### Next Task
+Task 2.4: Preloading Logic

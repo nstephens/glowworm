@@ -31,6 +31,18 @@ from .cache import (
     CacheStats,
     create_cache,
 )
+from .playlist_manager import (
+    PlaylistManager,
+    PlaylistManagerConfig,
+    PlaylistData,
+    PlaylistImage,
+    PlaylistEntry,
+    PlaylistPosition,
+    PlaylistStatus,
+    PlaylistError,
+    PlaylistNotFoundError,
+    create_playlist_manager,
+)
 
 __all__ = [
     "GlowwormDaemon",
@@ -50,5 +62,16 @@ __all__ = [
     "CacheEntryMetadata",
     "CacheStats",
     "create_cache",
+    # Playlist Manager
+    "PlaylistManager",
+    "PlaylistManagerConfig",
+    "PlaylistData",
+    "PlaylistImage",
+    "PlaylistEntry",
+    "PlaylistPosition",
+    "PlaylistStatus",
+    "PlaylistError",
+    "PlaylistNotFoundError",
+    "create_playlist_manager",
 ]
 

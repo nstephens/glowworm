@@ -213,6 +213,7 @@ Based on Rewrite.md, this document breaks down the implementation into concrete 
 
 ### Task 2.3: Playlist Manager
 **Complexity:** Medium
+**Status:** `passes: true`
 **Description:** Manage playlist state, fetching from backend and tracking position.
 
 **Subtasks:**
