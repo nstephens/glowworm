@@ -324,3 +324,58 @@ New commands:
 
 ### Next Task
 Task 1.8: Integration Testing - Display Engine
+
+## 2026-02-28 15:05 - Task 1.8: Integration Testing - Display Engine
+
+### What Changed
+Created comprehensive integration tests, performance benchmarks, and manual testing documentation for the Pi3D display engine.
+
+### Files Created
+- `display/tests/__init__.py` - Test package init
+- `display/tests/conftest.py` - Pytest fixtures and test harness:
+  - Test fixtures for mock display, image loader, renderer
+  - Test image generation helpers (solid color images)
+  - `IPCTestClient` class for async IPC communication testing
+  - Fixtures for temporary directories and IPC socket paths
+- `display/tests/test_integration_ipc.py` - 24 integration tests covering:
+  - Image loading via IPC (queue_image, load_image)
+  - Image sequence display
+  - Scale mode parameters
+  - Pause/resume during slideshow
+  - Pause during transitions
+  - Queue processing behavior while paused
+  - Clear functionality
+  - Registration display mode
+  - Status reporting
+  - Multiple client connections
+  - Connection error handling
+  - Invalid JSON/method handling
+- `display/tests/benchmark.py` - Performance benchmark script:
+  - Static display FPS measurement
+  - Transition FPS measurement
+  - Memory stability testing (30+ image sequences)
+  - Pass/fail thresholds (30+ FPS hardware, 100+ mock)
+  - Memory growth limits (<50MB)
+- `display/tests/MANUAL_TESTING.md` - Manual testing checklist:
+  - 10 test cases with step-by-step procedures
+  - Pass/fail checkboxes
+  - Expected results
+  - Performance targets table
+  - Pi hardware testing commands
+
+### Verification
+- All 24 pytest integration tests pass: `pytest display/tests/ -v`
+- Performance benchmark passes in mock mode: `python -m tests.benchmark --mock`
+- Mock mode FPS: 200k+ (expected for non-GPU rendering)
+- Memory stability: no growth over 30 image transitions
+- Test harness correctly handles IPC notifications interleaved with responses
+
+### Notes
+- Integration tests use async fixtures with pytest-asyncio
+- IPCTestClient properly skips notification messages when waiting for responses
+- Benchmark targets are different for mock (100+ FPS) vs hardware (30+ FPS)
+- Manual testing document covers extended operation (1-hour stability test)
+- Test images are generated dynamically as solid-color JPEGs
+
+### Next Task
+Task 2.1: Image Manager - HTTP Client
