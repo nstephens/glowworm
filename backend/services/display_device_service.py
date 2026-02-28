@@ -233,6 +233,7 @@ class DisplayDeviceService:
         if cache_data:
             device.last_cache_size_mb = cache_data.get("size_mb")
             device.last_cache_hit_rate = cache_data.get("hit_rate")
+            device.last_cache_entry_count = cache_data.get("entry_count")
 
         # Uptime
         device.last_uptime_seconds = status_payload.get("uptime_seconds")

@@ -1938,3 +1938,75 @@ Created comprehensive integration tests for the complete device registration flo
 
 ### Next Task
 Task 6.1: Device Status Display
+
+## 2026-02-28 18:45 - Task 6.1: Device Status Display
+
+### What Changed
+Implemented real-time Pi3D device status display in admin interface with thumbnail preview, connection status, cache statistics, slideshow state indicator, and last seen timestamps.
+
+### Files Modified
+- `frontend/src/pages/DisplaysWebSocket.tsx`:
+  - Added `RealtimeDeviceStatus` interface for real-time status from WebSocket
+  - Added `realtimeStatuses` state to track device status updates
+  - Added `imageErrors` state to handle failed thumbnail loads
+  - Added handler for `device_status_update` WebSocket messages
+  - Added `fetchDeviceConnectionStatuses()` to get initial device connection status from backend
+  - Added helper functions:
+    - `formatUptime()` - Format daemon uptime duration
+    - `formatRelativeTime()` - Format last seen as relative time (e.g., "5m ago")
+    - `getSlideshowStateIndicator()` - Visual indicator for playing/paused/stopped states
+    - `getConnectionIndicator()` - Connection status with animated dot + WiFi icon
+    - `getRealtimeStatus()` - Get realtime status for a device
+    - `getCurrentImageId()` - Get current image ID (prefer realtime over database)
+    - `handleImageError()` - Handle failed thumbnail loads
+  - Updated device list rendering:
+    - Added current image thumbnail (Pi3D devices only, 80x80px)
+    - Enhanced connection status indicator with animated pulse when online
+    - Added slideshow state badge (Playing, Paused, Stopped, Error)
+    - Added cache statistics (entry count, size, hit rate)
+    - Added uptime display
+    - Added slideshow stats (images displayed, errors)
+    - Updated last seen display with relative time for offline devices
+    - Added playlist name display
+
+- `frontend/src/types/index.ts`:
+  - Added `last_cache_entry_count` to `DisplayDevice` interface
+
+- `backend/models/display_device.py`:
+  - Added `last_cache_entry_count` column (Integer, nullable)
+  - Updated `to_dict()` to include new field
+
+- `backend/services/display_device_service.py`:
+  - Updated `update_device_status()` to extract and store `cache.entry_count`
+
+- `backend/alembic/versions/c91e0df274b0_add_last_cache_entry_count_to_display_.py`:
+  - Created migration to add `last_cache_entry_count` column
+
+### Features Implemented
+| Feature | Description |
+|---------|-------------|
+| Current image thumbnail | Shows current displayed image (80x80px) for Pi3D devices |
+| Connection status | Animated green dot + WiFi icon when online, gray when offline |
+| Cache statistics | Shows entry count, size in MB, and hit rate percentage |
+| Slideshow state | Visual badge showing Playing (green), Paused (yellow), Stopped (gray), Error (red) |
+| Last seen timestamp | Shows relative time (e.g., "5m ago") for offline devices |
+| Uptime display | Shows daemon uptime (e.g., "2h 15m") |
+| Slideshow stats | Shows images displayed and error count |
+| Playlist info | Shows assigned playlist name |
+
+### Verification
+- Frontend builds successfully: `npm run build`
+- All 63 backend tests pass: `pytest tests/ -v`
+- All 24 display tests pass: `pytest display/tests/ -v`
+- Daemon tests: 397 passed, 3 pre-existing failures (unrelated to this task)
+- TypeScript compiles without errors
+
+### Notes
+- Thumbnail images use `/api/images/{id}/file?size=small` endpoint
+- Real-time status updates flow via WebSocket `device_status_update` messages
+- Initial connection status fetched from `/api/ws/devices/status` on WebSocket connect
+- Status updates come from both database fields and real-time WebSocket messages
+- Graceful fallback when thumbnail fails to load (shows placeholder icon)
+
+### Next Task
+Task 6.2: Device Controls

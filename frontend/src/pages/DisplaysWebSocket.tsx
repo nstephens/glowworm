@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Wifi, WifiOff, Play, Pause, Settings, RefreshCw, SkipForward, SkipBack, Monitor, Server } from 'lucide-react';
+import { ArrowLeft, Wifi, WifiOff, Play, Pause, Settings, RefreshCw, SkipForward, SkipBack, Monitor, Server, Image, Database, Clock, Activity, AlertCircle } from 'lucide-react';
 import { AdminWebSocketClient } from '../services/websocket';
 import type { DisplayDevice, DeviceType } from '../types';
 
@@ -22,7 +22,40 @@ interface DeviceStatus {
   last_image_id?: number;
   last_cache_size_mb?: number;
   last_cache_hit_rate?: number;
+  last_cache_entry_count?: number;
   last_uptime_seconds?: number;
+}
+
+interface RealtimeDeviceStatus {
+  state?: string;
+  is_online?: boolean;
+  current_image_id?: number;
+  current_image_path?: string;
+  slideshow?: {
+    images_displayed?: number;
+    images_skipped?: number;
+    transitions_completed?: number;
+    errors?: number;
+    runtime_seconds?: number;
+  };
+  playlist?: {
+    id?: number;
+    name?: string;
+    position?: number;
+    entry_count?: number;
+  };
+  cache?: {
+    entry_count?: number;
+    size_mb?: number;
+    max_size_mb?: number;
+    hit_rate?: number;
+  };
+  display?: {
+    running?: boolean;
+    state?: string;
+  };
+  uptime_seconds?: number;
+  timestamp?: number;
 }
 
 const DisplaysWebSocket: React.FC = () => {
@@ -35,6 +68,8 @@ const DisplaysWebSocket: React.FC = () => {
   const [websocketClient, setWebsocketClient] = useState<AdminWebSocketClient | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [connectedDevices, setConnectedDevices] = useState<Set<string>>(new Set());
+  const [realtimeStatuses, setRealtimeStatuses] = useState<Map<string, RealtimeDeviceStatus>>(new Map());
+  const [imageErrors, setImageErrors] = useState<Set<number>>(new Set());
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -46,6 +81,8 @@ const DisplaysWebSocket: React.FC = () => {
         client.on('connected', () => {
           console.log('Admin WebSocket connected');
           setConnectionStatus('connected');
+          // Fetch initial device connection status
+          fetchDeviceConnectionStatuses();
         });
 
         client.on('disconnected', () => {
@@ -90,6 +127,13 @@ const DisplaysWebSocket: React.FC = () => {
         client.on('device_error', (message) => {
           console.log('Device error:', message);
           handleDeviceError(message);
+        });
+
+        // Handle real-time device status updates from Pi3D daemons
+        client.on('message', (message) => {
+          if (message.type === 'device_status_update') {
+            handleRealtimeStatusUpdate(message);
+          }
         });
 
         client.on('error', (error) => {
@@ -137,6 +181,36 @@ const DisplaysWebSocket: React.FC = () => {
       setError('Failed to load devices');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Fetch real-time device connection status from backend
+  const fetchDeviceConnectionStatuses = async () => {
+    try {
+      const response = await fetch('/api/ws/devices/status', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Update connected devices set
+        const connected = new Set<string>();
+        const statuses = new Map<string, RealtimeDeviceStatus>();
+
+        for (const device of data.devices || []) {
+          if (device.is_connected) {
+            connected.add(device.device_token);
+          }
+          if (device.status) {
+            statuses.set(device.device_token, device.status);
+          }
+        }
+
+        setConnectedDevices(connected);
+        setRealtimeStatuses(statuses);
+      }
+    } catch (err) {
+      console.error('Failed to fetch device connection statuses:', err);
     }
   };
 
@@ -203,6 +277,23 @@ const DisplaysWebSocket: React.FC = () => {
   const handleDeviceError = useCallback((message: any) => {
     console.error('Device error reported:', message);
     // Could show a notification or update UI to indicate device error
+  }, []);
+
+  const handleRealtimeStatusUpdate = useCallback((message: any) => {
+    const { device_token, status } = message;
+    if (device_token && status) {
+      setRealtimeStatuses(prev => {
+        const updated = new Map(prev);
+        updated.set(device_token, status);
+        return updated;
+      });
+      // Mark device as connected when we receive status updates
+      setConnectedDevices(prev => {
+        const updated = new Set(prev);
+        updated.add(device_token);
+        return updated;
+      });
+    }
   }, []);
 
   const handleAuthorizeDevice = async (deviceId: number, deviceName?: string, deviceIdentifier?: string) => {
@@ -351,6 +442,117 @@ const DisplaysWebSocket: React.FC = () => {
     return new Date(dateString).toLocaleString();
   };
 
+  // Format uptime duration
+  const formatUptime = (seconds?: number) => {
+    if (!seconds) return null;
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
+  };
+
+  // Format relative time for last seen
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return formatDate(dateString);
+  };
+
+  // Get slideshow state indicator
+  const getSlideshowStateIndicator = (state?: string) => {
+    if (!state) return null;
+
+    const normalizedState = state.toLowerCase();
+    switch (normalizedState) {
+      case 'playing':
+      case 'transitioning':
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+            <Play className="w-3 h-3 mr-1 fill-current" />
+            Playing
+          </span>
+        );
+      case 'paused':
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+            <Pause className="w-3 h-3 mr-1" />
+            Paused
+          </span>
+        );
+      case 'stopped':
+      case 'idle':
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+            <AlertCircle className="w-3 h-3 mr-1" />
+            Stopped
+          </span>
+        );
+      case 'error':
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+            <AlertCircle className="w-3 h-3 mr-1" />
+            Error
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+            {state}
+          </span>
+        );
+    }
+  };
+
+  // Get connection status indicator with color
+  const getConnectionIndicator = (deviceToken: string) => {
+    const isConnected = connectedDevices.has(deviceToken);
+    if (isConnected) {
+      return (
+        <span className="inline-flex items-center" title="Online">
+          <span className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></span>
+          <Wifi className="w-4 h-4 text-green-500" />
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center" title="Offline">
+        <span className="w-2 h-2 bg-gray-400 rounded-full mr-1"></span>
+        <WifiOff className="w-4 h-4 text-gray-400" />
+      </span>
+    );
+  };
+
+  // Get realtime status for a device
+  const getRealtimeStatus = (deviceToken: string): RealtimeDeviceStatus | undefined => {
+    return realtimeStatuses.get(deviceToken);
+  };
+
+  // Get current image ID - prefer realtime status over database record
+  const getCurrentImageId = (device: DeviceStatus): number | undefined => {
+    const realtimeStatus = getRealtimeStatus(device.device_token);
+    return realtimeStatus?.current_image_id || device.last_image_id;
+  };
+
+  // Handle image load error
+  const handleImageError = (imageId: number) => {
+    setImageErrors(prev => {
+      const updated = new Set(prev);
+      updated.add(imageId);
+      return updated;
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="p-8">
@@ -451,55 +653,110 @@ const DisplaysWebSocket: React.FC = () => {
           </div>
         ) : (
           <ul className="divide-y divide-gray-200">
-            {currentDevices.map((device) => (
+            {currentDevices.map((device) => {
+              const realtimeStatus = getRealtimeStatus(device.device_token);
+              const currentImageId = getCurrentImageId(device);
+              const isOnline = connectedDevices.has(device.device_token);
+              const effectiveState = realtimeStatus?.state || device.last_state;
+              const cacheStats = realtimeStatus?.cache || {
+                entry_count: device.last_cache_entry_count,
+                size_mb: device.last_cache_size_mb,
+                hit_rate: device.last_cache_hit_rate,
+              };
+              const uptime = realtimeStatus?.uptime_seconds || device.last_uptime_seconds;
+
+              return (
               <li key={device.id} className="px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <p className="text-sm font-medium text-gray-900">
-                            {device.device_name || `Device ${device.id}`}
-                          </p>
-                          {/* Connection Status */}
-                          <div className="flex items-center">
-                            {getConnectionStatus(device.device_token) ? (
-                              <Wifi className="w-4 h-4 text-green-500" title="Connected" />
-                            ) : (
-                              <WifiOff className="w-4 h-4 text-gray-400" title="Offline" />
-                            )}
-                          </div>
-                          {/* Device Type Badge */}
-                          {getDeviceTypeBadge(device.device_type)}
-                        </div>
-                        <p className="text-sm text-gray-500">
-                          Token: {device.device_token.substring(0, 12)}...
+                <div className="flex items-start justify-between">
+                  {/* Left side: Thumbnail + Info */}
+                  <div className="flex items-start space-x-4 flex-1">
+                    {/* Current Image Thumbnail (Pi3D devices only) */}
+                    {isPi3dDevice(device) && currentImageId && !imageErrors.has(currentImageId) ? (
+                      <div className="flex-shrink-0 w-20 h-20 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                        <img
+                          src={`/api/images/${currentImageId}/file?size=small`}
+                          alt="Current display"
+                          className="w-full h-full object-cover"
+                          onError={() => handleImageError(currentImageId)}
+                        />
+                      </div>
+                    ) : isPi3dDevice(device) ? (
+                      <div className="flex-shrink-0 w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                        <Image className="w-8 h-8 text-gray-400" />
+                      </div>
+                    ) : null}
+
+                    {/* Device Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 flex-wrap">
+                        <p className="text-sm font-medium text-gray-900">
+                          {device.device_name || `Device ${device.id}`}
                         </p>
-                        {device.device_identifier && (
-                          <p className="text-sm text-gray-500">
-                            ID: {device.device_identifier}
+                        {/* Connection Status Indicator */}
+                        {getConnectionIndicator(device.device_token)}
+                        {/* Device Type Badge */}
+                        {getDeviceTypeBadge(device.device_type)}
+                        {/* Slideshow State Indicator (Pi3D only) */}
+                        {isPi3dDevice(device) && isOnline && getSlideshowStateIndicator(effectiveState)}
+                        {/* Authorization Status Badge */}
+                        <span className={getStatusBadge(device.status)}>
+                          {device.status}
+                        </span>
+                      </div>
+
+                      <p className="text-sm text-gray-500 mt-1">
+                        Token: {device.device_token.substring(0, 12)}...
+                        {device.device_identifier && <> | ID: {device.device_identifier}</>}
+                      </p>
+
+                      {/* Pi3D Extended Status */}
+                      {isPi3dDevice(device) && (
+                        <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                          {/* Cache Stats */}
+                          {(cacheStats.size_mb !== undefined || cacheStats.entry_count !== undefined) && (
+                            <span className="inline-flex items-center" title="Cache statistics">
+                              <Database className="w-3 h-3 mr-1" />
+                              {cacheStats.entry_count !== undefined && <>{cacheStats.entry_count} images</>}
+                              {cacheStats.size_mb !== undefined && <> ({cacheStats.size_mb.toFixed(1)} MB)</>}
+                              {cacheStats.hit_rate !== undefined && <> | {(cacheStats.hit_rate * 100).toFixed(0)}% hit</>}
+                            </span>
+                          )}
+                          {/* Uptime */}
+                          {uptime !== undefined && (
+                            <span className="inline-flex items-center" title="Daemon uptime">
+                              <Clock className="w-3 h-3 mr-1" />
+                              Uptime: {formatUptime(uptime)}
+                            </span>
+                          )}
+                          {/* Slideshow stats */}
+                          {realtimeStatus?.slideshow?.images_displayed !== undefined && (
+                            <span className="inline-flex items-center" title="Images displayed this session">
+                              <Activity className="w-3 h-3 mr-1" />
+                              {realtimeStatus.slideshow.images_displayed} displayed
+                              {(realtimeStatus.slideshow.errors || 0) > 0 && (
+                                <span className="text-red-500 ml-1">
+                                  ({realtimeStatus.slideshow.errors} errors)
+                                </span>
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Last seen / timestamps */}
+                      <div className="mt-2 text-xs text-gray-400">
+                        {!isOnline && (
+                          <p className="text-orange-500">
+                            Last seen: {formatRelativeTime(device.last_seen)}
                           </p>
                         )}
-                        {/* Pi3D Status Info */}
-                        {isPi3dDevice(device) && device.last_state && (
-                          <p className="text-sm text-gray-500">
-                            State: {device.last_state}
-                            {device.last_cache_size_mb !== undefined && (
-                              <> | Cache: {device.last_cache_size_mb.toFixed(1)} MB</>
-                            )}
-                          </p>
+                        {isOnline && (
+                          <p className="text-green-600">Online now</p>
+                        )}
+                        {device.playlist_name && (
+                          <p>Playlist: {device.playlist_name}</p>
                         )}
                       </div>
-                      <span className={getStatusBadge(device.status)}>
-                        {device.status}
-                      </span>
-                    </div>
-                    <div className="mt-2 text-xs text-gray-500">
-                      <p>Created: {formatDate(device.created_at)}</p>
-                      <p>Last seen: {formatDate(device.last_seen)}</p>
-                      {device.authorized_at && (
-                        <p>Authorized: {formatDate(device.authorized_at)}</p>
-                      )}
                     </div>
                   </div>
                   
@@ -549,7 +806,7 @@ const DisplaysWebSocket: React.FC = () => {
                         </button>
 
                         {/* Real-time Commands */}
-                        {getConnectionStatus(device.device_token) && (
+                        {isOnline && (
                           <div className="flex items-center space-x-1">
                             {/* Pi3D specific controls: next/previous */}
                             {isPi3dDevice(device) && (
@@ -609,7 +866,8 @@ const DisplaysWebSocket: React.FC = () => {
                   </div>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>

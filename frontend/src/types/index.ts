@@ -126,6 +126,7 @@ export interface DisplayDevice {
   last_image_id?: number;
   last_cache_size_mb?: number;
   last_cache_hit_rate?: number;
+  last_cache_entry_count?: number;
   last_uptime_seconds?: number;
 }
 

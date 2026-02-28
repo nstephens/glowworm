@@ -51,6 +51,7 @@ class DisplayDevice(Base):
     last_image_id = Column(Integer, nullable=True, comment="ID of currently displayed image")
     last_cache_size_mb = Column(Float, nullable=True, comment="Cache size in MB")
     last_cache_hit_rate = Column(Float, nullable=True, comment="Cache hit rate 0.0-1.0")
+    last_cache_entry_count = Column(Integer, nullable=True, comment="Number of cached images")
     last_uptime_seconds = Column(Float, nullable=True, comment="Daemon uptime in seconds")
     last_status_json = Column(JSON, nullable=True, comment="Full last status payload as JSON")
     
@@ -97,5 +98,6 @@ class DisplayDevice(Base):
             "last_image_id": self.last_image_id,
             "last_cache_size_mb": self.last_cache_size_mb,
             "last_cache_hit_rate": self.last_cache_hit_rate,
+            "last_cache_entry_count": self.last_cache_entry_count,
             "last_uptime_seconds": self.last_uptime_seconds,
         }
