@@ -1735,3 +1735,86 @@ Implemented the RegistrationManager class for handling device registration flow 
 
 ### Next Task
 Task 5.2: Backend Registration Endpoints
+
+## 2026-02-28 19:15 - Task 5.2: Backend Registration Endpoints
+
+### What Changed
+Implemented API endpoints for Pi3D daemon-based device registration, enabling daemons to register and get authorized without browser cookies.
+
+### Files Created
+- `backend/api/device_registration.py` - New registration API with:
+  - `POST /api/devices/register` - Request 4-character registration code
+  - `GET /api/devices/register/{code}/status` - Poll for authorization status
+  - `POST /api/devices/register/{code}/authorize` - Direct code authorization
+  - `DaemonRegistrationRequest/Response` Pydantic models
+  - `RegistrationStatusResponse` with status, token, device_id, playlist_id
+  - `generate_registration_code()` helper (excludes ambiguous characters 0OI1L)
+
+- `backend/tests/test_device_registration.py` - 17 comprehensive tests covering:
+  - Code generation (length, characters, uniqueness)
+  - Device registration (creates pending device)
+  - Status polling (PENDING, AUTHORIZED, REJECTED, EXPIRED)
+  - Code normalization (lowercase -> uppercase)
+  - Invalid code handling (wrong length, not found)
+  - Authorization flow (generates permanent 32-char token)
+  - Full registration flow integration test
+  - Rejection flow test
+
+### Files Modified
+- `backend/main.py` - Added device_registration_router import and include
+
+### API Protocol
+**POST /api/devices/register**
+Request:
+```json
+{
+  "device_type": "pi3d",
+  "daemon_version": "3.0.0",
+  "capabilities": {"pi3d_display": true, "websocket": true}
+}
+```
+Response:
+```json
+{
+  "code": "ABCD",
+  "device_id": 1,
+  "expires_at": "2026-02-28T19:45:00",
+  "message": "Display this code..."
+}
+```
+
+**GET /api/devices/register/{code}/status**
+Response:
+```json
+{
+  "status": "PENDING|AUTHORIZED|REJECTED|EXPIRED",
+  "device_token": "32-char-permanent-token",
+  "device_id": 1,
+  "playlist_id": 42,
+  "message": "..."
+}
+```
+
+### Registration Flow
+1. Daemon calls POST /api/devices/register → gets 4-char code
+2. Daemon displays code on Pi3D screen via show_registration IPC
+3. Daemon polls GET /api/devices/register/{code}/status every 5s
+4. Admin authorizes device via existing /api/display-devices/admin/devices/{id}/authorize
+5. Daemon receives AUTHORIZED status with permanent device token
+6. Daemon saves token to config file and switches to normal mode
+
+### Verification
+- All 17 new registration tests pass
+- All 63 backend tests pass: `pytest tests/ -v`
+- Registration code excludes visually ambiguous characters (0, O, I, 1, L)
+- Code expires after 30 minutes
+- Permanent token is 32 characters (alphanumeric)
+
+### Notes
+- Registration code is stored as device_token initially, replaced with permanent token on authorization
+- This is separate from browser-based registration in display_devices.py which uses cookies
+- Daemon RegistrationManager (Task 5.1) consumes these endpoints
+- Admin authorization still goes through existing /api/display-devices/admin/devices/{id}/authorize
+
+### Next Task
+Task 5.3: Frontend Registration Updates

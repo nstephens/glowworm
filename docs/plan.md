@@ -479,6 +479,7 @@ Based on Rewrite.md, this document breaks down the implementation into concrete 
 
 ### Task 5.2: Backend Registration Endpoints
 **Complexity:** Medium
+**Status:** `passes: true`
 **Description:** API endpoints for daemon-based device registration.
 
 **Subtasks:**
