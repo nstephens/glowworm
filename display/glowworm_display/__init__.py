@@ -9,5 +9,6 @@ __version__ = "3.0.0"
 __author__ = "Glowworm Team"
 
 from glowworm_display.config import DisplayConfig
+from glowworm_display.display import Display, create_display
 
-__all__ = ["DisplayConfig", "__version__"]
+__all__ = ["DisplayConfig", "Display", "create_display", "__version__"]
