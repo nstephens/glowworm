@@ -13,6 +13,7 @@ from pathlib import Path
 from glowworm_display.config import DisplayConfig, load_config
 from glowworm_display.display import Display
 from glowworm_display.image_loader import ImageLoader, ImageLoadError, ScaleMode
+from glowworm_display.transitions import CrossfadeTransition
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,18 @@ def parse_args() -> argparse.Namespace:
         help="Image scaling mode (default: fit)",
     )
     parser.add_argument(
+        "--test-transition",
+        type=str,
+        default=None,
+        help="Second image for testing cross-fade transition (requires --test-image)",
+    )
+    parser.add_argument(
+        "--transition-duration",
+        type=float,
+        default=1.0,
+        help="Transition duration in seconds (default: 1.0)",
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__import__('glowworm_display').__version__}",
@@ -142,8 +155,10 @@ def main() -> int:
 
     # Load test image if specified
     test_sprite = None
+    test_sprite2 = None
+    scale_mode = ScaleMode(args.scale_mode)
+
     if args.test_image:
-        scale_mode = ScaleMode(args.scale_mode)
         try:
             test_sprite = image_loader.load_image(args.test_image, scale_mode=scale_mode)
             logger.info(f"Test image loaded: {args.test_image}")
@@ -151,6 +166,53 @@ def main() -> int:
             logger.error(f"Failed to load test image: {e}")
             display.cleanup()
             return 1
+
+    # Load second test image for transition testing
+    if args.test_transition:
+        if not args.test_image:
+            logger.error("--test-transition requires --test-image")
+            display.cleanup()
+            return 1
+        try:
+            test_sprite2 = image_loader.load_image(args.test_transition, scale_mode=scale_mode)
+            logger.info(f"Second test image loaded: {args.test_transition}")
+        except ImageLoadError as e:
+            logger.error(f"Failed to load second test image: {e}")
+            display.cleanup()
+            return 1
+
+    # Test transition mode
+    if args.test_transition and test_sprite and test_sprite2:
+        logger.info(f"Testing cross-fade transition: {args.transition_duration}s duration")
+
+        transition = CrossfadeTransition(duration=args.transition_duration)
+
+        # Run the transition loop
+        start_time = time.time()
+        frame_count = 0
+        transition.start()
+
+        while not transition.is_complete and display.is_running:
+            with display.frame():
+                transition.render(test_sprite, test_sprite2)
+            frame_count += 1
+
+        elapsed = time.time() - start_time
+        fps = frame_count / elapsed if elapsed > 0 else 0
+        logger.info(f"Transition completed: {frame_count} frames in {elapsed:.2f}s ({fps:.1f} FPS)")
+
+        # Display the final image for a moment
+        logger.info("Displaying final image...")
+        final_frames = int(config.fps_target * 0.5)  # Show for 0.5 seconds
+        for _ in range(final_frames):
+            if not display.is_running:
+                break
+            with display.frame():
+                test_sprite2.set_alpha(1.0)
+                test_sprite2.draw()
+
+        display.cleanup()
+        return 0
 
     # Run test frames if requested (for testing)
     if args.test_frames > 0:

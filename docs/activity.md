@@ -108,3 +108,48 @@ Implemented the ImageLoader class for loading images, creating Pi3D textures, ca
 
 ### Next Task
 Task 1.4: Cross-fade Transition
+
+## 2026-02-28 14:40 - Task 1.4: Cross-fade Transition
+
+### What Changed
+Implemented the cross-fade transition system with a base Transition class and CrossfadeTransition implementation for smooth alpha-blending between images.
+
+### Files Created
+- `display/glowworm_display/transitions/base.py` - Base transition class with:
+  - `Transition` abstract base class with start/cancel/update/render methods
+  - `TransitionState` enum (IDLE, RUNNING, COMPLETED, CANCELLED)
+  - `TransitionProgress` dataclass for progress information
+  - Progress callback support for external monitoring
+  - Easing function support (linear, ease-in-out-cubic, ease-out-quad)
+
+- `display/glowworm_display/transitions/crossfade.py` - CrossfadeTransition with:
+  - Alpha blending between current (outgoing) and next (incoming) sprites
+  - Configurable transition duration
+  - Optional easing (cubic ease-in-out by default)
+  - Proper Z-depth layering for sprite overlap
+  - `render_single()` method for fade in/out from blank screen
+
+### Files Modified
+- `display/glowworm_display/transitions/__init__.py` - Added exports for all transition classes
+- `display/glowworm_display/__init__.py` - Added CrossfadeTransition, Transition, TransitionProgress, TransitionState to package exports
+- `display/glowworm_display/__main__.py` - Added CLI options for transition testing:
+  - `--test-transition <path>` - Second image for testing cross-fade
+  - `--transition-duration <seconds>` - Configurable transition time
+
+### Verification
+- Imports work correctly from package root
+- Transition completes within ±100ms of specified duration (tested with 0.5s → 0.532s)
+- Alpha values interpolate correctly (0→1 for incoming, 1→0 for outgoing)
+- Progress callback fires at each frame update
+- Transition cancellation works mid-way
+- CLI test mode works: `glowworm-display --mock --test-image img1.jpg --test-transition img2.jpg --transition-duration 0.5`
+- Existing CLI modes still work (--mock, --test-frames, --version)
+
+### Notes
+- FPS testing in mock mode shows very high values (300k+) since no actual GPU rendering occurs
+- Real Pi3D hardware testing will verify 30+ FPS performance (Task 1.8)
+- Transition duration timing uses `time.time()` for simplicity; may need refinement for frame-perfect timing
+- Easing functions can be swapped by setting `use_easing=False` for linear interpolation
+
+### Next Task
+Task 1.5: Renderer Main Loop

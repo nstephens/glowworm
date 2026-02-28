@@ -15,13 +15,23 @@ from glowworm_display.image_loader import (
     ImageLoadError,
     ScaleMode,
 )
+from glowworm_display.transitions import (
+    CrossfadeTransition,
+    Transition,
+    TransitionProgress,
+    TransitionState,
+)
 
 __all__ = [
+    "CrossfadeTransition",
     "DisplayConfig",
     "Display",
     "create_display",
     "ImageLoader",
     "ImageLoadError",
     "ScaleMode",
+    "Transition",
+    "TransitionProgress",
+    "TransitionState",
     "__version__",
 ]
