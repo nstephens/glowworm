@@ -240,14 +240,14 @@ class WebSocketClient:
                 )
                 self._session = aiohttp.ClientSession(timeout=timeout)
 
-            # Connect to WebSocket with device token in cookie
+            # Connect to WebSocket with device token in cookie header
             logger.info(f"Connecting to {self.config.url}")
-            cookies = {"glowworm_display": self.config.device_token}
+            headers = {"Cookie": f"glowworm_display={self.config.device_token}"}
             self._ws = await self._session.ws_connect(
                 self.config.url,
                 heartbeat=None,  # We handle heartbeat ourselves
                 receive_timeout=self.config.read_timeout,
-                cookies=cookies,
+                headers=headers,
             )
 
             # Authenticate
