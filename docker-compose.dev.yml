@@ -70,6 +70,8 @@ services:
       USE_CELERY: ${USE_CELERY:-true}
     volumes:
       - ./data/uploads:/app/uploads
+    ports:
+      - "${BACKEND_PORT:-8001}:8001"
     depends_on:
       glowworm-mysql:
         condition: service_healthy
