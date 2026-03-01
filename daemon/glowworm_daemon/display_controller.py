@@ -806,6 +806,7 @@ class DisplayController:
             True if successful, False otherwise
         """
         if not self._ipc_client or not self._ipc_client.is_connected:
+            print(f"load_image: IPC not connected", flush=True)
             return False
 
         params: dict[str, Any] = {
@@ -815,7 +816,9 @@ class DisplayController:
         if transition_duration is not None:
             params["transition_duration"] = transition_duration
 
+        print(f"load_image: calling IPC with params={params}", flush=True)
         response = await self._ipc_client.call("load_image", params)
+        print(f"load_image: response.success={response.success}, result={response.result}, error={response.error}", flush=True)
         return response.success and response.result.get("success", False)
 
     async def queue_image(
