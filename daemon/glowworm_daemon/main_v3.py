@@ -217,7 +217,7 @@ class GlowwormDaemonV3:
         result = await registration.run_registration(self.display)
 
         if result.success:
-            logger.info(f"Registration successful! Device ID: {result.device_id}")
+            logger.info("Registration successful! Token saved to config.")
             return True
         else:
             logger.error(f"Registration failed: {result.error}")
