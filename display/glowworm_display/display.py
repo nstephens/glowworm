@@ -150,7 +150,9 @@ class Display:
         """Check if display is running."""
         if self._display is None:
             return False
-        return self._display.loop_running()
+        # Note: Do NOT call loop_running() here - that does frame processing!
+        # Just check the is_running flag directly.
+        return self._display.is_running
 
     def _detect_resolution(self) -> tuple[int, int]:
         """
