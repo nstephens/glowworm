@@ -540,6 +540,7 @@ class SlideshowOrchestrator:
 
     async def _slideshow_loop(self) -> None:
         """Main slideshow loop."""
+        print("Slideshow loop started", flush=True)
         logger.debug("Slideshow loop started")
 
         try:
@@ -552,13 +553,17 @@ class SlideshowOrchestrator:
 
                 # Get current images
                 images = self.playlist.get_current_images()
+                print(f"Current images: {images}", flush=True)
                 if not images:
+                    print("No current images, waiting...", flush=True)
                     logger.warning("No current images, waiting...")
                     await asyncio.sleep(1.0)
                     continue
 
                 # Display the current image(s)
+                print(f"Displaying {len(images)} image(s)...", flush=True)
                 success = await self._display_images(images)
+                print(f"Display result: {success}", flush=True)
 
                 if success:
                     self._stats.images_displayed += 1
