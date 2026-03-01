@@ -20,8 +20,8 @@ from .websocket_client import WebSocketClient, WebSocketConfig, ConnectionState
 from .status_reporter import StatusReporter, StatusReporterConfig
 from .command_handler import CommandHandler, CommandHandlerConfig
 from .slideshow_orchestrator import SlideshowOrchestrator, SlideshowConfig
-from .playlist_manager import PlaylistManager
-from .image_manager import ImageManager
+from .playlist_manager import PlaylistManager, PlaylistManagerConfig
+from .image_manager import ImageManager, ImageManagerConfig
 from .cache import create_cache, CacheConfig
 from .logging_config import setup_logging
 
@@ -96,15 +96,18 @@ class GlowwormDaemonV3:
         logger.info("Display started successfully")
 
         # Initialize managers
-        self.image_manager = ImageManager(
+        image_config = ImageManagerConfig(
             backend_url=self.config.backend.url,
-            cache=self.cache,
+            device_token=self.config.backend.device_token,
+            cache_dir=str(self.config.cache.directory),
         )
+        self.image_manager = ImageManager(config=image_config, cache=self.cache)
 
-        self.playlist_manager = PlaylistManager(
+        playlist_config = PlaylistManagerConfig(
             backend_url=self.config.backend.url,
             device_token=self.config.backend.device_token,
         )
+        self.playlist_manager = PlaylistManager(config=playlist_config)
 
         # Initialize slideshow orchestrator
         slideshow_config = SlideshowConfig(
