@@ -43,6 +43,10 @@ class DisplayControllerConfig:
     # Path to Unix socket for IPC
     socket_path: str = "/run/glowworm/display.sock"
 
+    # Use cage Wayland compositor (required on Pi5/headless without X11)
+    use_cage: bool = True
+    cage_command: str = "cage"
+
     # Health check interval in seconds
     health_check_interval: float = 5.0
 
@@ -431,19 +435,31 @@ class DisplayController:
     async def _start_process(self) -> bool:
         """Start the subprocess and establish IPC connection."""
         try:
-            # Build command
-            cmd = list(self.config.display_command)
-            cmd.extend(["--socket", self.config.socket_path])
+            # Build display command
+            display_cmd = list(self.config.display_command)
+            display_cmd.extend(["--socket", self.config.socket_path])
 
             if self.config.mock_mode:
-                cmd.append("--mock")
+                display_cmd.append("--mock")
 
             if self.config.config_file:
-                cmd.extend(["--config", self.config.config_file])
+                display_cmd.extend(["--config", self.config.config_file])
+
+            # Wrap with cage if enabled (required on Pi5/headless)
+            if self.config.use_cage:
+                cmd = [self.config.cage_command, "--"] + display_cmd
+            else:
+                cmd = display_cmd
 
             # Build environment
             env = os.environ.copy()
             env.update(self.config.extra_env)
+
+            # Set XDG_RUNTIME_DIR for cage/Wayland
+            if self.config.use_cage and "XDG_RUNTIME_DIR" not in env:
+                runtime_dir = "/run/user/0"
+                os.makedirs(runtime_dir, mode=0o700, exist_ok=True)
+                env["XDG_RUNTIME_DIR"] = runtime_dir
 
             # Pass display config via environment variable if provided
             if self.config.display_config_json:
