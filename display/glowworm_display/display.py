@@ -408,16 +408,27 @@ class Display:
         """
         Context manager for a single frame.
 
-        Clears the display, yields for drawing, then swaps buffers.
+        Uses Pi3D's loop_running() which handles clear and swap_buffers internally.
 
         Usage:
             with display.frame():
                 # draw sprites/shapes here
                 pass
         """
-        self.clear()
-        yield
-        self.swap_buffers()
+        if self._mock:
+            # Mock mode: no actual display operations
+            self._frames += 1
+            yield
+        elif self._display:
+            # Pi3D mode: use loop_running() which handles clear/swap internally
+            if self._display.loop_running():
+                yield
+            else:
+                # Display was closed
+                self._running = False
+                yield
+        else:
+            yield
 
     def __enter__(self) -> "Display":
         """Context manager entry - initialize display."""
