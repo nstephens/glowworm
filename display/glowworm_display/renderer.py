@@ -407,9 +407,8 @@ class Renderer:
             pass
 
         elif self._state == RendererState.DISPLAYING:
-            # Draw current image
+            # Draw current image (alpha should already be 1.0 from transition completion)
             if self._current_sprite:
-                self._current_sprite.set_alpha(1.0)
                 self._current_sprite.draw()
 
         elif self._state == RendererState.TRANSITIONING:
