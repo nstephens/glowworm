@@ -260,6 +260,15 @@ class Display:
                 "Pi3D library not found. Install it with: pip install pi3d"
             ) from e
 
+        # On Pi5 with Wayland/Cage, Pi3D detects PLATFORM_LINUX (3) and tries X11.
+        # We need to force it to use pygame/SDL2 mode by setting the module variable
+        # BEFORE Display.create() is called.
+        # When running under Wayland compositor (Cage), force pygame/SDL2 mode
+        wayland_display = os.environ.get("WAYLAND_DISPLAY")
+        if wayland_display:
+            logger.info(f"Wayland detected ({wayland_display}), forcing pygame/SDL2 mode")
+            pi3d.USE_PYGAME = True
+
         # Log pi3d configuration for debugging
         logger.info("Creating Pi3D display...")
         logger.info(f"Pi3D version: {getattr(pi3d, '__version__', 'unknown')}")
@@ -274,10 +283,6 @@ class Display:
             # Use 16-bit depth buffer for better Pi4/Pi5 compatibility
             # Pi4+ has issues with 24-bit depth in SDL2 mode
             "depth": 16,
-            # Force pygame/SDL2 mode on Pi5/Debian Trixie where X11 isn't available
-            # Pi3D detects PLATFORM_LINUX (3) on Pi5 and tries to use X11,
-            # but we're running under Wayland/Cage compositor
-            "use_pygame": True,
         }
 
         # Handle fullscreen vs windowed
