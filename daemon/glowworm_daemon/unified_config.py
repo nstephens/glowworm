@@ -117,10 +117,11 @@ class BackendConfig:
         if self.websocket_url:
             return self.websocket_url
         # Convert http(s) to ws(s)
+        # Frontend proxies /api/* to backend, including WebSockets
         if self.url.startswith("https://"):
-            return self.url.replace("https://", "wss://", 1) + "/ws/device"
+            return self.url.replace("https://", "wss://", 1) + "/api/ws/device"
         elif self.url.startswith("http://"):
-            return self.url.replace("http://", "ws://", 1) + "/ws/device"
+            return self.url.replace("http://", "ws://", 1) + "/api/ws/device"
         return self.websocket_url
 
 
