@@ -274,6 +274,10 @@ class Display:
             # Use 16-bit depth buffer for better Pi4/Pi5 compatibility
             # Pi4+ has issues with 24-bit depth in SDL2 mode
             "depth": 16,
+            # Force pygame/SDL2 mode on Pi5/Debian Trixie where X11 isn't available
+            # Pi3D detects PLATFORM_LINUX (3) on Pi5 and tries to use X11,
+            # but we're running under Wayland/Cage compositor
+            "use_pygame": True,
         }
 
         # Handle fullscreen vs windowed
