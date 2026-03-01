@@ -926,21 +926,54 @@ class ImageLoader:
                 scaled_width = image_width * scale
                 scaled_height = half_height
 
-        # Calculate Y offset based on position
-        # Pi3D coordinate system: Y=0 is center, positive Y is up
-        # Top half: center is at +quarter_height
-        # Bottom half: center is at -quarter_height
-        quarter_height = effective_height / 4.0
+        # Calculate position offset based on rotation
+        # Pi3D reports hardware dimensions, and sprites are rotated to display correctly.
+        # For rotated displays, we need to position along the axis that becomes vertical
+        # after rotation.
+        #
+        # Rotation 0: Y is vertical, position along Y
+        # Rotation 90: X becomes vertical (Y->-X), position along X (negated)
+        # Rotation 180: Y is vertical (Y->-Y), position along Y (negated)
+        # Rotation 270: X becomes vertical (Y->X), position along X
+        quarter_offset = effective_height / 4.0
 
-        if position == 'top':
-            y_offset = quarter_height  # Upper half
+        if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
+            # Rotated display: position along X axis (which becomes vertical)
+            if self.rotation == Rotation.DEG_270:
+                # 270°: visual top is positive X
+                if position == 'top':
+                    x_offset = quarter_offset
+                    y_offset = 0.0
+                else:
+                    x_offset = -quarter_offset
+                    y_offset = 0.0
+            else:  # DEG_90
+                # 90°: visual top is negative X
+                if position == 'top':
+                    x_offset = -quarter_offset
+                    y_offset = 0.0
+                else:
+                    x_offset = quarter_offset
+                    y_offset = 0.0
         else:
-            y_offset = -quarter_height  # Lower half
+            # Non-rotated display: position along Y axis
+            x_offset = 0.0
+            if self.rotation == Rotation.DEG_180:
+                # 180°: Y is flipped
+                if position == 'top':
+                    y_offset = -quarter_offset
+                else:
+                    y_offset = quarter_offset
+            else:  # DEG_0
+                if position == 'top':
+                    y_offset = quarter_offset
+                else:
+                    y_offset = -quarter_offset
 
         return ImageDimensions(
             width=scaled_width,
             height=scaled_height,
-            x_offset=0.0,
+            x_offset=x_offset,
             y_offset=y_offset,
             scale_x=scaled_width / image_width if image_width > 0 else 1.0,
             scale_y=scaled_height / image_height if image_height > 0 else 1.0,
@@ -976,7 +1009,7 @@ class ImageLoader:
             f"Creating stacked sprite ({position}): "
             f"image={image_width}x{image_height}, "
             f"scaled={dims.width:.0f}x{dims.height:.0f}, "
-            f"y_offset={dims.y_offset:.0f}, "
+            f"offset=({dims.x_offset:.0f}, {dims.y_offset:.0f}), "
             f"rotation={self.rotation.value}"
         )
         # Also write to a debug file
@@ -985,7 +1018,7 @@ class ImageLoader:
                 f.write(
                     f"stacked sprite ({position}): image={image_width}x{image_height}, "
                     f"scaled={dims.width:.0f}x{dims.height:.0f}, "
-                    f"y_offset={dims.y_offset:.0f}, rotation={self.rotation.value}\n"
+                    f"offset=({dims.x_offset:.0f}, {dims.y_offset:.0f}), rotation={self.rotation.value}\n"
                 )
         except:
             pass
