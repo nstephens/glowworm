@@ -872,36 +872,44 @@ class ImageLoader:
         Returns:
             ImageDimensions with calculated size and position
         """
-        # Use display dimensions directly - Pi3D already reports actual screen size
-        # Rotation is applied to images, not to the coordinate system
-        effective_width = self.display_width
-        effective_height = self.display_height
+        # Pi3D reports hardware dimensions. For rotated displays, we need to
+        # calculate based on VISUAL dimensions (what the user sees).
+        # Hardware 3840x2160 rotated 270° = Visual 2160x3840 (portrait)
+        if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
+            # Rotated: visual width/height are swapped from hardware
+            visual_width = self.display_height   # 2160
+            visual_height = self.display_width   # 3840
+        else:
+            visual_width = self.display_width
+            visual_height = self.display_height
 
         logger.info(
-            f"calculate_stacked_dimensions: display={effective_width}x{effective_height}, "
+            f"calculate_stacked_dimensions: hardware={self.display_width}x{self.display_height}, "
+            f"visual={visual_width}x{visual_height}, "
             f"image={image_width}x{image_height}, position={position}, rotation={self.rotation.value}"
         )
         # Also write to a debug file since logging may not be visible
         try:
             with open("/tmp/glowworm_stacked_debug.log", "a") as f:
                 f.write(
-                    f"calculate_stacked: display={effective_width}x{effective_height}, "
+                    f"calculate_stacked: hardware={self.display_width}x{self.display_height}, "
+                    f"visual={visual_width}x{visual_height}, "
                     f"image={image_width}x{image_height}, position={position}, "
                     f"rotation={self.rotation.value}\n"
                 )
         except:
             pass
 
-        # Each image gets half the display height
-        half_height = effective_height / 2.0
+        # Each image gets half the VISUAL height (what user sees as vertical)
+        half_height = visual_height / 2.0
 
-        # Calculate aspect ratios
+        # Calculate aspect ratios based on visual dimensions
         image_aspect = image_width / image_height
-        half_aspect = effective_width / half_height
+        half_aspect = visual_width / half_height
 
         if scale_mode == ScaleMode.STRETCH:
             # Stretch to fill half
-            scaled_width = float(effective_width)
+            scaled_width = float(visual_width)
             scaled_height = half_height
         elif scale_mode == ScaleMode.FILL:
             # Fill the half, cropping as needed
@@ -910,15 +918,15 @@ class ImageLoader:
                 scaled_width = image_width * scale
                 scaled_height = half_height
             else:
-                scale = effective_width / image_width
-                scaled_width = float(effective_width)
+                scale = visual_width / image_width
+                scaled_width = float(visual_width)
                 scaled_height = image_height * scale
         else:
             # FIT mode - fit within half, letterbox if needed
             if image_aspect > half_aspect:
                 # Image is wider - fit to width
-                scale = effective_width / image_width
-                scaled_width = float(effective_width)
+                scale = visual_width / image_width
+                scaled_width = float(visual_width)
                 scaled_height = image_height * scale
             else:
                 # Image is taller - fit to half height
@@ -927,20 +935,14 @@ class ImageLoader:
                 scaled_height = half_height
 
         # Calculate position offset based on rotation
-        # Pi3D reports hardware dimensions, and sprites are rotated to display correctly.
-        # For rotated displays, we need to position along the axis that becomes vertical
-        # after rotation.
-        #
-        # Rotation 0: Y is vertical, position along Y
-        # Rotation 90: X becomes vertical (Y->-X), position along X (negated)
-        # Rotation 180: Y is vertical (Y->-Y), position along Y (negated)
-        # Rotation 270: X becomes vertical (Y->X), position along X
-        quarter_offset = effective_height / 4.0
+        # Pi3D coordinates are in hardware space, but we position based on visual layout.
+        # Quarter offset = visual_height / 4 (center of each half)
+        quarter_offset = visual_height / 4.0
 
         if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
-            # Rotated display: position along X axis (which becomes vertical)
+            # Rotated display: position along X axis (which becomes vertical visually)
             if self.rotation == Rotation.DEG_270:
-                # 270°: visual top is positive X
+                # 270°: visual top is positive X in hardware coords
                 if position == 'top':
                     x_offset = quarter_offset
                     y_offset = 0.0
@@ -948,7 +950,7 @@ class ImageLoader:
                     x_offset = -quarter_offset
                     y_offset = 0.0
             else:  # DEG_90
-                # 90°: visual top is negative X
+                # 90°: visual top is negative X in hardware coords
                 if position == 'top':
                     x_offset = -quarter_offset
                     y_offset = 0.0
