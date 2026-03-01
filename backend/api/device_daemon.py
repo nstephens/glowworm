@@ -633,8 +633,17 @@ async def get_device_playlist(
         )
 
     # Build the manifest format expected by the daemon
+    import json as json_module
     images = []
-    sequence = playlist.computed_sequence or playlist.sequence or []
+    raw_sequence = playlist.computed_sequence or playlist.sequence or []
+    # Parse JSON if stored as string
+    if isinstance(raw_sequence, str):
+        try:
+            sequence = json_module.loads(raw_sequence)
+        except (json_module.JSONDecodeError, TypeError):
+            sequence = []
+    else:
+        sequence = raw_sequence
     default_time = playlist.display_time_seconds or 30
 
     for entry in sequence:
