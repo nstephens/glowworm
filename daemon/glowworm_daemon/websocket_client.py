@@ -240,12 +240,14 @@ class WebSocketClient:
                 )
                 self._session = aiohttp.ClientSession(timeout=timeout)
 
-            # Connect to WebSocket
+            # Connect to WebSocket with device token in cookie
             logger.info(f"Connecting to {self.config.url}")
+            cookies = {"glowworm_display": self.config.device_token}
             self._ws = await self._session.ws_connect(
                 self.config.url,
                 heartbeat=None,  # We handle heartbeat ourselves
                 receive_timeout=self.config.read_timeout,
+                cookies=cookies,
             )
 
             # Authenticate
@@ -290,7 +292,10 @@ class WebSocketClient:
 
     async def _authenticate(self) -> bool:
         """
-        Send authentication message and wait for response.
+        Wait for authentication confirmation from server.
+
+        The device token is sent via cookie header during connection.
+        Server sends 'connection_established' on success or closes on failure.
 
         Returns:
             True if authentication succeeded
@@ -298,19 +303,9 @@ class WebSocketClient:
         if not self._ws:
             return False
 
-        auth_message = {
-            "type": MessageType.AUTH.value,
-            "payload": {
-                "device_token": self.config.device_token,
-            }
-        }
-
         try:
-            await self._ws.send_json(auth_message)
-            self._stats.messages_sent += 1
-            self._stats.bytes_sent += len(json.dumps(auth_message))
-
-            # Wait for auth response
+            # Wait for server's connection_established message
+            # The device token was already sent via cookie
             response = await asyncio.wait_for(
                 self._ws.receive_json(),
                 timeout=self.config.connect_timeout,
@@ -319,16 +314,21 @@ class WebSocketClient:
             self._stats.messages_received += 1
             self._stats.bytes_received += len(json.dumps(response))
 
-            if response.get("type") == MessageType.AUTH_SUCCESS.value:
+            msg_type = response.get("type", "")
+            if msg_type == "connection_established":
+                logger.info("Authentication successful (connection established)")
+                return True
+            elif msg_type == MessageType.AUTH_SUCCESS.value:
                 logger.info("Authentication successful")
                 return True
-            elif response.get("type") == MessageType.AUTH_FAILED.value:
+            elif msg_type == MessageType.AUTH_FAILED.value:
                 reason = response.get("payload", {}).get("reason", "Unknown")
                 logger.error(f"Authentication failed: {reason}")
                 return False
             else:
-                logger.error(f"Unexpected auth response: {response}")
-                return False
+                # Treat other messages as success - connection is alive
+                logger.info(f"Connected, received: {msg_type}")
+                return True
 
         except asyncio.TimeoutError:
             logger.error("Authentication timeout")
