@@ -297,14 +297,9 @@ class PlaylistManager:
                     # Parse and validate playlist
                     playlist = self._parse_playlist_response(data, playlist_id)
 
-                    # If manifest is incomplete (no images or fewer than sequence),
-                    # fetch full images list from dedicated endpoint
-                    if not playlist.images or playlist.image_count < len(playlist.sequence):
-                        logger.info(
-                            f"Manifest incomplete: {playlist.image_count} images, "
-                            f"{len(playlist.sequence)} in sequence. Fetching full list..."
-                        )
-                        playlist = await self._fetch_playlist_images(playlist)
+                    # Always fetch full images list from dedicated endpoint
+                    # The device-daemon endpoint often has incomplete image data
+                    playlist = await self._fetch_playlist_images(playlist)
 
                     self._playlist = playlist
 
