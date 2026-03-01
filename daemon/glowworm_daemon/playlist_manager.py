@@ -916,12 +916,18 @@ class PlaylistManager:
             f"{singles} singles, {pairs} pairs ({len(computed_sequence)} total entries)"
         )
 
-        # Reset position if it's now out of bounds
-        if self._position and self._position.position >= len(computed_sequence):
+        # Reset position when pairing is computed - the position was stored
+        # when iterating through individual images, but now it means something
+        # different (entry index instead of image index)
+        if self._position:
+            old_position = self._position.position
             self._position.position = 0
             if self._shuffle_enabled:
                 self._generate_shuffle()
             self._save_state()
+            logger.info(
+                f"Reset position from {old_position} to 0 after computing pairing sequence"
+            )
 
 
 def create_playlist_manager(config: PlaylistManagerConfig) -> PlaylistManager:
