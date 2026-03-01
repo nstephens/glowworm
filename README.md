@@ -1,6 +1,6 @@
 # GlowWorm
 
-A modern web-based digital photo display system for creating beautiful fullscreen slideshows on portrait-oriented displays. Perfect for turning Raspberry Pi devices into stunning digital photo frames that showcase your memories with style.
+A modern digital photo display system for creating beautiful fullscreen slideshows on Raspberry Pi devices. Version 3.0 features GPU-accelerated rendering via Pi3D for smooth, reliable performance.
 
 GlowWorm transforms any display into an elegant photo frame with powerful features for managing, organizing, and presenting your photo collection. Built for home users, artists, businesses, and anyone wanting to display photos beautifully.
 
@@ -10,6 +10,14 @@ GlowWorm transforms any display into an elegant photo frame with powerful featur
   </a><br>
   [Youtube demo of display device playing a slideshow]
 </p>
+
+## What's New in v3.0
+
+- **GPU-accelerated display** - Smooth 30+ FPS transitions using Pi3D (OpenGL ES)
+- **Lower memory usage** - Under 200MB RAM vs 400MB+ with browser-based display
+- **Improved reliability** - No more browser crashes or memory leaks
+- **Simplified setup** - Standard Raspberry Pi OS Lite (no FullPageOS required)
+- **Offline operation** - Continues displaying cached images indefinitely without network
 
 ## Screenshots
 
@@ -46,37 +54,33 @@ Watch the complete walkthrough: [GlowWorm Installation and Usage on YouTube](htt
 - Create custom playlists from your image library
 - Drag-and-drop reordering with visual pairing indicators
 - Smart image pairing for landscape photos (automatic stacking)
-- Multiple display modes optimized for different devices
 - Per-playlist EXIF date display option
 - Automatic variant generation for display resolutions
 
 **Scheduling System**
-- Time-based playlist switching (new in v2.0)
+- Time-based playlist switching
 - Day-of-week scheduling for different content
-- Automatic power on/off for display devices
+- Automatic power on/off for display devices via HDMI-CEC
 - Perfect for businesses or themed displays
 - Set-and-forget automation
 
-**Display Modes**
-- Default - Smart pairing of landscape images with full-screen portraits
-- Ken Burns Plus - Gentle zoom and pan effects (Raspberry Pi safe)
-- Soft Glow - Subtle luminosity transitions
-- Ambient Pulse - Breathing light effect
-- Dreamy Reveal - Elegant fade-in animations
-- Stacked Reveal - Synchronized dual-image transitions
+**Pi3D Display Engine (v3.0)**
+- GPU-accelerated OpenGL ES 2.0 rendering
+- Smooth cross-fade transitions at 30+ FPS
+- Local image caching with LRU eviction
+- Automatic crash recovery and restart
+- Registration code display for easy device setup
 
 **Display Device Management**
 - Simple code-based device registration
 - Multi-device support with individual configurations
-- Real-time status monitoring and health checks
-- Remote browser refresh and playlist assignment
-- Automatic resolution detection with variant generation prompts
-- Daemon service for reliable display management (new in v2.0)
+- Real-time status monitoring via WebSocket
+- Remote control (next, previous, pause, resume)
+- Cache statistics and health monitoring
 
 **Advanced Features**
 - WebSocket-based real-time communication
 - Resolution-optimized image variants
-- Hardware acceleration support for Raspberry Pi
 - Efficient preloading and caching
 - RESTful API for programmatic access
 
@@ -87,35 +91,30 @@ Watch the complete walkthrough: [GlowWorm Installation and Usage on YouTube](htt
 - Live display status dashboard
 - System logs and monitoring
 
-
-
 ## Compatibility
 
-### Tested Environments
+### Server Deployment (Docker)
 
-**Server Deployment (Docker):**
 - Ubuntu Server 20.04+ - Fully tested and working
 - Linux distributions with Docker support - Expected to work
 
-**Display Devices:**
-- Raspberry Pi 3B+/4/5 with Pi3D daemon - Fully tested and working (recommended)
-- GPU-accelerated slideshows at 30+ FPS with low memory usage
+### Display Devices
 
-### Untested Environments
+- **Raspberry Pi 4 (4GB+)** - Recommended, fully tested
+- **Raspberry Pi 5** - Fully supported
+- **Raspberry Pi 3B+** - Supported (may have lower FPS during transitions)
 
-**Server Deployment:**
-- Windows (Docker Desktop) - May require adjustments
-- macOS (Docker Desktop) - May require adjustments
-- Non-Ubuntu Linux distributions - Should work but not verified
+### Requirements
 
-**Note on Windows/macOS:**
-The Docker deployment is designed for Linux servers and may need modifications for Windows or macOS environments. Community contributions for platform-specific configurations are welcome via GitHub issues or pull requests.
+- Raspberry Pi OS Lite (64-bit, Bookworm or newer)
+- Python 3.11+
+- HDMI display (any resolution, 1080p recommended)
 
 ---
 
 ## Quick Start
 
-### Docker Deployment (Recommended)
+### 1. Deploy the Server (Docker)
 
 **Requirements:**
 - Docker Engine 20.10+
@@ -142,6 +141,22 @@ The script will:
 - Complete the setup wizard (set admin password)
 - Start uploading photos
 
+### 2. Set Up a Display Device
+
+On your Raspberry Pi (running Raspberry Pi OS Lite 64-bit):
+
+```bash
+curl -sSL https://raw.githubusercontent.com/nstephens/glowworm/main/pi3d/scripts/install.sh | sudo bash
+```
+
+The installer will:
+1. Install Pi3D and dependencies
+2. Set up the GlowWorm daemon
+3. Run the configuration wizard
+4. Start the service
+
+When complete, a registration code will appear on screen. Enter this code in your GlowWorm admin interface to authorize the device.
+
 **Docker Hub Images:**
 - [Backend](https://hub.docker.com/r/nickstephens/glowworm-backend)
 - [Frontend](https://hub.docker.com/r/nickstephens/glowworm-frontend)
@@ -150,10 +165,19 @@ The script will:
 
 ## Documentation
 
-For detailed documentation, please visit the **[GlowWorm Wiki](https://github.com/nstephens/glowworm/wiki)**:
+### Pi3D Display (v3.0)
+
+- [Installation Guide](docs/pi3d/installation.md) - Complete setup instructions
+- [Configuration Reference](docs/pi3d/configuration.md) - All configuration options
+- [Troubleshooting](docs/pi3d/troubleshooting.md) - Common issues and solutions
+- [Developer Documentation](docs/pi3d/development.md) - Architecture and IPC protocol
+
+### General Documentation
+
+Visit the **[GlowWorm Wiki](https://github.com/nstephens/glowworm/wiki)** for:
 
 **Getting Started**
-- [Installation Guide](https://github.com/nstephens/glowworm/wiki/Installation)
+- [Server Installation](https://github.com/nstephens/glowworm/wiki/Installation)
 - [Configuration](https://github.com/nstephens/glowworm/wiki/Configuration)
 - [First-Time Setup](https://github.com/nstephens/glowworm/wiki/Setup-Wizard)
 
@@ -163,21 +187,53 @@ For detailed documentation, please visit the **[GlowWorm Wiki](https://github.co
 - [Managing Display Devices](https://github.com/nstephens/glowworm/wiki/Display-Devices)
 - [Scheduling System](https://github.com/nstephens/glowworm/wiki/Scheduling)
 
-**Display Setup**
-- [Raspberry Pi Setup](https://github.com/nstephens/glowworm/wiki/Raspberry-Pi-Setup)
-- [Display Daemon Service](https://github.com/nstephens/glowworm/wiki/Display-Daemon)
-- [Performance Tuning](https://github.com/nstephens/glowworm/wiki/Performance)
-
 **Advanced**
 - [Reverse Proxy Setup](https://github.com/nstephens/glowworm/wiki/Reverse-Proxy)
 - [Custom Domain Configuration](https://github.com/nstephens/glowworm/wiki/Custom-Domain)
 - [API Documentation](https://github.com/nstephens/glowworm/wiki/API)
-- [Native Installation](https://github.com/nstephens/glowworm/wiki/Native-Install)
 
 **Troubleshooting**
 - [Common Issues](https://github.com/nstephens/glowworm/wiki/Troubleshooting)
 - [Docker Issues](https://github.com/nstephens/glowworm/wiki/Docker-Troubleshooting)
-- [Display Problems](https://github.com/nstephens/glowworm/wiki/Display-Troubleshooting)
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    GlowWorm Server (Docker)                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌───────────────────┐    │
+│  │   FastAPI   │  │   Celery    │  │      MySQL        │    │
+│  │   Backend   │  │   Workers   │  │     Database      │    │
+│  └──────┬──────┘  └─────────────┘  └───────────────────┘    │
+│         │                                                    │
+│  ┌──────┴──────────────────────────────────────────────┐    │
+│  │               WebSocket Manager                      │    │
+│  └──────────────────────┬──────────────────────────────┘    │
+└─────────────────────────┼───────────────────────────────────┘
+                          │
+         ┌────────────────┴────────────────┐
+         │                                 │
+         ▼                                 ▼
+┌─────────────────────┐         ┌─────────────────────────────┐
+│   Admin Interface   │         │     Raspberry Pi Display    │
+│   (React Frontend)  │         │                             │
+│                     │         │  ┌───────────────────────┐  │
+│  - Image upload     │         │  │   GlowWorm Daemon     │  │
+│  - Playlist editing │         │  │   - WebSocket client  │  │
+│  - Device control   │         │  │   - Image caching     │  │
+│  - Scheduling       │         │  │   - Playlist state    │  │
+└─────────────────────┘         │  └───────────┬───────────┘  │
+                                │              │ IPC          │
+                                │  ┌───────────▼───────────┐  │
+                                │  │   Pi3D Display        │  │
+                                │  │   - GPU rendering     │  │
+                                │  │   - 30+ FPS           │  │
+                                │  │   - <200MB RAM        │  │
+                                │  └───────────────────────┘  │
+                                └─────────────────────────────┘
+```
 
 ---
 
@@ -199,7 +255,7 @@ This project is licensed under the GNU General Public License v3.0 - see the LIC
 
 ## Support
 
-- **Documentation:** [GlowWorm Wiki](https://github.com/nstephens/glowworm/wiki)
+- **Documentation:** [GlowWorm Wiki](https://github.com/nstephens/glowworm/wiki) and [Pi3D Docs](docs/pi3d/)
 - **Issues:** [GitHub Issue Tracker](https://github.com/nstephens/glowworm/issues)
 - **Questions:** Check existing issues or open a new one
 

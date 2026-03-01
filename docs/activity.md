@@ -2499,3 +2499,90 @@ sudo journalctl -u glowworm-daemon -f
 
 ### Next Task
 Task 7.4: Documentation
+
+## 2026-02-28 20:30 - Task 7.4: Documentation
+
+### What Changed
+Created comprehensive user and developer documentation for the Pi3D display system.
+
+### Files Created
+
+**Installation Guide (`docs/pi3d/installation.md`):**
+- Complete Raspberry Pi setup instructions
+- Quick install via curl script
+- Manual step-by-step installation
+- Dependency installation
+- Virtual environment setup
+- Systemd service configuration
+- GPU memory configuration
+- Device registration process
+- Verification steps
+- Uninstallation instructions
+
+**Configuration Reference (`docs/pi3d/configuration.md`):**
+- All YAML configuration sections documented
+- Backend connection settings
+- Display rendering options (orientation, rotation, FPS)
+- Slideshow settings (timing, scale modes, preloading)
+- Cache configuration (size limits, eviction)
+- IPC settings
+- Logging configuration
+- CEC power control options
+- Environment variable overrides
+- Complete example configuration
+
+**Troubleshooting Guide (`docs/pi3d/troubleshooting.md`):**
+- Quick diagnostics commands
+- Common issues and solutions:
+  - Display not showing anything
+  - Registration code not appearing
+  - Images not loading
+  - Choppy transitions
+  - Service won't start
+  - WebSocket connection issues
+  - CEC not working
+  - Memory issues
+- Log analysis guidance
+- Crash recovery procedures
+- Factory reset instructions
+- Getting help / filing issues
+
+**Developer Documentation (`docs/pi3d/development.md`):**
+- Architecture overview with ASCII diagram
+- Package structure (daemon and display)
+- IPC Protocol (JSON-RPC 2.0):
+  - Socket location
+  - Message format
+  - All available methods documented
+  - Notification types
+  - Error codes
+- Development setup instructions
+- Mock mode for testing
+- WebSocket protocol (device ↔ backend)
+- Performance considerations and targets
+- Renderer state machine diagram
+- Contributing guidelines
+
+**README.md Updates:**
+- Added "What's New in v3.0" section
+- Updated features to highlight Pi3D engine
+- Updated display device requirements
+- Added Pi3D-specific quick start instructions
+- Added architecture diagram
+- Added links to new Pi3D documentation
+- Removed deprecated browser-based display references
+
+### Verification
+- All documentation files created successfully
+- Markdown syntax valid
+- Cross-references between documents work
+- Configuration examples match actual schema
+
+### Notes
+- Documentation covers all subtasks from Task 7.4
+- Links to existing wiki documentation preserved
+- Technical details match implementation from previous tasks
+- New users can follow installation guide without prior knowledge
+
+### Next Task
+Task 7.5: Final Integration Testing
