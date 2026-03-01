@@ -268,11 +268,17 @@ class GlowwormDaemonV3:
 
 async def async_main():
     """Async main entry point."""
+    print("async_main() starting...", flush=True)
+
     # Load configuration
     try:
+        print("Loading configuration...", flush=True)
         config = load_config()
+        print(f"Configuration loaded: backend_url={config.backend.url}", flush=True)
     except Exception as e:
-        print(f"Failed to load configuration: {e}", file=sys.stderr)
+        print(f"Failed to load configuration: {e}", file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
     # Setup logging
@@ -305,7 +311,15 @@ async def async_main():
 
 def main():
     """Main entry point."""
-    asyncio.run(async_main())
+    import sys
+    print("GlowWorm daemon starting...", flush=True)
+    try:
+        asyncio.run(async_main())
+    except Exception as e:
+        print(f"Fatal error: {e}", file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
