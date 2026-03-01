@@ -105,14 +105,20 @@ class CrossfadeTransition(Transition):
         if current_sprite is not None:
             current_sprite.set_alpha(current_alpha)
             # Position further back
-            current_sprite.position(current_sprite.x, current_sprite.y, 2.0)
+            # Pi3D uses .x() and .y() methods, MockSprite uses .x and .y attributes
+            curr_x = current_sprite.x() if callable(current_sprite.x) else current_sprite.x
+            curr_y = current_sprite.y() if callable(current_sprite.y) else current_sprite.y
+            current_sprite.position(curr_x, curr_y, 2.0)
             current_sprite.draw()
 
         # Update and draw next (incoming) sprite
         if next_sprite is not None:
             next_sprite.set_alpha(next_alpha)
             # Position in front
-            next_sprite.position(next_sprite.x, next_sprite.y, 1.0)
+            # Pi3D uses .x() and .y() methods, MockSprite uses .x and .y attributes
+            next_x = next_sprite.x() if callable(next_sprite.x) else next_sprite.x
+            next_y = next_sprite.y() if callable(next_sprite.y) else next_sprite.y
+            next_sprite.position(next_x, next_y, 1.0)
             next_sprite.draw()
 
     def render_single(
