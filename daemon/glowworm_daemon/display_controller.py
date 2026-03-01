@@ -705,6 +705,15 @@ class DisplayController:
 
                 # Check process health
                 if self._process and self._process.returncode is not None:
+                    print(f"Display process crashed with code {self._process.returncode}", flush=True)
+                    # Try to get any remaining output
+                    if self._process.stderr:
+                        try:
+                            stderr = await asyncio.wait_for(self._process.stderr.read(), timeout=1.0)
+                            if stderr:
+                                print(f"Display stderr: {stderr.decode()}", flush=True)
+                        except:
+                            pass
                     logger.error(
                         f"Display process crashed with code {self._process.returncode}"
                     )
