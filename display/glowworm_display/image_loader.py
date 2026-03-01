@@ -849,3 +849,182 @@ class ImageLoader:
         except ImageLoadError as e:
             logger.error(f"Failed to preload image: {e}")
             return None
+
+    def calculate_stacked_dimensions(
+        self,
+        image_width: int,
+        image_height: int,
+        position: str,
+        scale_mode: ScaleMode = ScaleMode.FIT,
+    ) -> ImageDimensions:
+        """
+        Calculate display dimensions for an image in a stacked layout.
+
+        For portrait displays, two landscape images are displayed stacked
+        (top/bottom), each occupying half the screen height.
+
+        Args:
+            image_width: Original image width in pixels
+            image_height: Original image height in pixels
+            position: 'top' or 'bottom'
+            scale_mode: How to scale the image within its half
+
+        Returns:
+            ImageDimensions with calculated size and position
+        """
+        # Account for rotation
+        if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
+            effective_width = self.display_height
+            effective_height = self.display_width
+        else:
+            effective_width = self.display_width
+            effective_height = self.display_height
+
+        # Each image gets half the display height
+        half_height = effective_height / 2.0
+
+        # Calculate aspect ratios
+        image_aspect = image_width / image_height
+        half_aspect = effective_width / half_height
+
+        if scale_mode == ScaleMode.STRETCH:
+            # Stretch to fill half
+            scaled_width = float(effective_width)
+            scaled_height = half_height
+        elif scale_mode == ScaleMode.FILL:
+            # Fill the half, cropping as needed
+            if image_aspect > half_aspect:
+                scale = half_height / image_height
+                scaled_width = image_width * scale
+                scaled_height = half_height
+            else:
+                scale = effective_width / image_width
+                scaled_width = float(effective_width)
+                scaled_height = image_height * scale
+        else:
+            # FIT mode - fit within half, letterbox if needed
+            if image_aspect > half_aspect:
+                # Image is wider - fit to width
+                scale = effective_width / image_width
+                scaled_width = float(effective_width)
+                scaled_height = image_height * scale
+            else:
+                # Image is taller - fit to half height
+                scale = half_height / image_height
+                scaled_width = image_width * scale
+                scaled_height = half_height
+
+        # Calculate Y offset based on position
+        # Pi3D coordinate system: Y=0 is center, positive Y is up
+        # Top half: center is at +quarter_height
+        # Bottom half: center is at -quarter_height
+        quarter_height = effective_height / 4.0
+
+        if position == 'top':
+            y_offset = quarter_height  # Upper half
+        else:
+            y_offset = -quarter_height  # Lower half
+
+        return ImageDimensions(
+            width=scaled_width,
+            height=scaled_height,
+            x_offset=0.0,
+            y_offset=y_offset,
+            scale_x=scaled_width / image_width if image_width > 0 else 1.0,
+            scale_y=scaled_height / image_height if image_height > 0 else 1.0,
+        )
+
+    def create_stacked_sprite(
+        self,
+        texture: "MockTexture | pi3d.Texture",
+        position: str,
+        scale_mode: ScaleMode = ScaleMode.FIT,
+        z: float = 1.0,
+    ) -> "MockSprite | pi3d.Sprite":
+        """
+        Create a sprite positioned for stacked display.
+
+        Args:
+            texture: Pi3D Texture to use
+            position: 'top' or 'bottom'
+            scale_mode: How to scale the image within its half
+            z: Z depth for layering
+
+        Returns:
+            Pi3D Sprite positioned for stacked display
+        """
+        image_width = texture.ix
+        image_height = texture.iy
+
+        dims = self.calculate_stacked_dimensions(
+            image_width, image_height, position, scale_mode
+        )
+
+        logger.debug(
+            f"Creating stacked sprite ({position}): "
+            f"image={image_width}x{image_height}, "
+            f"display={dims.width:.0f}x{dims.height:.0f}, "
+            f"y_offset={dims.y_offset:.0f}"
+        )
+
+        if self.mock:
+            sprite = MockSprite(
+                texture=texture,
+                w=dims.width,
+                h=dims.height,
+                x=dims.x_offset,
+                y=dims.y_offset,
+                z=z,
+            )
+            if self.rotation != Rotation.DEG_0:
+                sprite.rotateToZ(float(self.rotation.value))
+            return sprite
+
+        import pi3d
+
+        shader = self._get_shader()
+        sprite = pi3d.Sprite(
+            w=dims.width,
+            h=dims.height,
+            x=dims.x_offset,
+            y=dims.y_offset,
+            z=z,
+        )
+        sprite.set_shader(shader)
+        sprite.set_textures([texture])
+
+        if self.rotation != Rotation.DEG_0:
+            sprite.rotateToZ(float(self.rotation.value))
+
+        return sprite
+
+    def load_stacked_image(
+        self,
+        file_path: str | Path,
+        position: str,
+        scale_mode: ScaleMode = ScaleMode.FIT,
+        z: float = 1.0,
+    ) -> "MockSprite | pi3d.Sprite":
+        """
+        Load an image positioned for stacked display.
+
+        Convenience method for loading images in a top/bottom stacked layout.
+
+        Args:
+            file_path: Path to the image file
+            position: 'top' or 'bottom'
+            scale_mode: How to scale the image within its half
+            z: Z depth for layering
+
+        Returns:
+            Pi3D Sprite positioned for stacked display
+
+        Raises:
+            ImageLoadError: If image cannot be loaded
+        """
+        logger.info(f"Loading stacked image ({position}): {file_path}")
+
+        texture = self.load_texture(file_path)
+        sprite = self.create_stacked_sprite(texture, position, scale_mode, z)
+
+        return sprite

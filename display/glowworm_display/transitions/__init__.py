@@ -14,10 +14,12 @@ from glowworm_display.transitions.base import (
     ease_out_quad,
 )
 from glowworm_display.transitions.crossfade import CrossfadeTransition
+from glowworm_display.transitions.stacked_reveal import StackedRevealTransition
 
 __all__ = [
     "CrossfadeTransition",
     "ProgressCallback",
+    "StackedRevealTransition",
     "Transition",
     "TransitionProgress",
     "TransitionState",

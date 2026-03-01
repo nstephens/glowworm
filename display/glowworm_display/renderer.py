@@ -19,7 +19,12 @@ from glowworm_display.display import Display
 from glowworm_display.image_loader import ImageLoader, ImageLoadError, ScaleMode
 from glowworm_display.performance import PerformanceMonitor, PerformanceConfig
 from glowworm_display.text_renderer import TextRenderer
-from glowworm_display.transitions import CrossfadeTransition, Transition, TransitionState
+from glowworm_display.transitions import (
+    CrossfadeTransition,
+    StackedRevealTransition,
+    Transition,
+    TransitionState,
+)
 
 if TYPE_CHECKING:
     import pi3d
@@ -91,6 +96,17 @@ class QueuedImage:
     transition_duration: float = 1.0
 
 
+@dataclass
+class QueuedImagePair:
+    """A pair of images queued for stacked display."""
+
+    top_path: str
+    bottom_path: str
+    scale_mode: ScaleMode = ScaleMode.FIT
+    transition_duration: float = 1.5
+    stagger_delay: float = 0.3
+
+
 # Callback types
 StateChangeCallback = Callable[[RendererState, RendererState], None]
 
@@ -141,10 +157,18 @@ class Renderer:
         self._state = RendererState.IDLE
         self._paused_state: RendererState | None = None  # State before pause
 
-        # Current and queued images
+        # Current and queued images (single image mode)
         self._current_sprite: "MockSprite | pi3d.Sprite | None" = None
         self._next_sprite: "MockSprite | pi3d.Sprite | None" = None
         self._image_queue: list[QueuedImage] = []
+
+        # Stacked image mode (paired images)
+        self._stacked_mode: bool = False
+        self._current_top_sprite: "MockSprite | pi3d.Sprite | None" = None
+        self._current_bottom_sprite: "MockSprite | pi3d.Sprite | None" = None
+        self._next_top_sprite: "MockSprite | pi3d.Sprite | None" = None
+        self._next_bottom_sprite: "MockSprite | pi3d.Sprite | None" = None
+        self._pair_queue: list[QueuedImagePair] = []
 
         # Current transition (if any)
         self._transition: Transition | None = None
@@ -284,6 +308,46 @@ class Renderer:
         self._image_queue.append(queued)
         logger.info(f"Image queued: {path} (queue length: {len(self._image_queue)})")
 
+    def queue_image_pair(
+        self,
+        top_path: str,
+        bottom_path: str,
+        scale_mode: ScaleMode = ScaleMode.FIT,
+        transition_duration: float | None = None,
+        stagger_delay: float = 0.3,
+    ) -> None:
+        """
+        Add a pair of images for stacked display.
+
+        On portrait displays, two landscape images are displayed stacked
+        (top/bottom) with a staggered reveal transition.
+
+        Args:
+            top_path: Path to the top image file
+            bottom_path: Path to the bottom image file
+            scale_mode: How to scale the images
+            transition_duration: Override default transition duration
+            stagger_delay: Delay between top and bottom image transitions
+        """
+        duration = (
+            transition_duration
+            if transition_duration is not None
+            else 1.5  # Default longer for stacked transitions
+        )
+
+        queued = QueuedImagePair(
+            top_path=top_path,
+            bottom_path=bottom_path,
+            scale_mode=scale_mode,
+            transition_duration=duration,
+            stagger_delay=stagger_delay,
+        )
+        self._pair_queue.append(queued)
+        logger.info(
+            f"Image pair queued: {top_path}, {bottom_path} "
+            f"(pair queue length: {len(self._pair_queue)})"
+        )
+
     def load_image_immediate(
         self,
         path: str,
@@ -309,11 +373,19 @@ class Renderer:
             else self.default_transition_duration
         )
 
-        # Clear queue and cancel any in-progress transition
+        # Clear queues and cancel any in-progress transition
         self._image_queue.clear()
+        self._pair_queue.clear()
         if self._transition and self._transition.is_running:
             self._transition.cancel()
             logger.debug("Cancelled in-progress transition")
+
+        # Exit stacked mode if active
+        self._stacked_mode = False
+        self._current_top_sprite = None
+        self._current_bottom_sprite = None
+        self._next_top_sprite = None
+        self._next_bottom_sprite = None
 
         # Load the new image
         try:
@@ -324,6 +396,61 @@ class Renderer:
 
         # Start transition
         self._start_transition(duration)
+        return True
+
+    def load_image_pair_immediate(
+        self,
+        top_path: str,
+        bottom_path: str,
+        scale_mode: ScaleMode = ScaleMode.FIT,
+        transition_duration: float | None = None,
+        stagger_delay: float = 0.3,
+    ) -> bool:
+        """
+        Load a pair of images immediately for stacked display.
+
+        Clears the queue and starts the stacked reveal transition.
+
+        Args:
+            top_path: Path to the top image file
+            bottom_path: Path to the bottom image file
+            scale_mode: How to scale the images
+            transition_duration: Override default transition duration
+            stagger_delay: Delay between top and bottom image transitions
+
+        Returns:
+            True if images loaded successfully, False if failed
+        """
+        duration = transition_duration if transition_duration is not None else 1.5
+
+        # Clear queues and cancel any in-progress transition
+        self._image_queue.clear()
+        self._pair_queue.clear()
+        if self._transition and self._transition.is_running:
+            self._transition.cancel()
+            logger.debug("Cancelled in-progress transition")
+
+        # Load the new images
+        try:
+            self._next_top_sprite = self.image_loader.load_stacked_image(
+                top_path, position='top', scale_mode=scale_mode
+            )
+            self._next_bottom_sprite = self.image_loader.load_stacked_image(
+                bottom_path, position='bottom', scale_mode=scale_mode
+            )
+        except ImageLoadError as e:
+            logger.error(f"Failed to load image pair: {e}")
+            return False
+
+        # Enter stacked mode
+        self._stacked_mode = True
+
+        # Clear single image mode sprites
+        self._current_sprite = None
+        self._next_sprite = None
+
+        # Start stacked transition
+        self._start_stacked_transition(duration, stagger_delay)
         return True
 
     def _start_transition(self, duration: float) -> None:
@@ -338,6 +465,29 @@ class Renderer:
         self.stats.transition_count += 1
         logger.debug(f"Started transition: duration={duration}s")
 
+    def _start_stacked_transition(
+        self, duration: float, stagger_delay: float = 0.3
+    ) -> None:
+        """Start a stacked reveal transition for paired images."""
+        if self._next_top_sprite is None and self._next_bottom_sprite is None:
+            logger.warning("No next sprites to transition to")
+            return
+
+        self._transition = StackedRevealTransition(
+            duration=duration,
+            stagger_delay=stagger_delay,
+            top_duration=1.2,
+            bottom_duration=1.5,
+            use_slide=True,
+        )
+        self._transition.start()
+        self._set_state(RendererState.TRANSITIONING)
+        self.stats.transition_count += 1
+        logger.debug(
+            f"Started stacked transition: duration={duration}s, "
+            f"stagger={stagger_delay}s"
+        )
+
     def _process_queue(self) -> None:
         """Process the next image in the queue if ready."""
         if self._state == RendererState.TRANSITIONING:
@@ -348,8 +498,21 @@ class Renderer:
             # Paused, don't process queue
             return
 
+        # Check pair queue first (stacked images take priority)
+        if self._pair_queue:
+            self._process_pair_queue()
+            return
+
         if not self._image_queue:
             return
+
+        # Exit stacked mode when processing single images
+        if self._stacked_mode:
+            self._stacked_mode = False
+            self._current_top_sprite = None
+            self._current_bottom_sprite = None
+            self._next_top_sprite = None
+            self._next_bottom_sprite = None
 
         # Get next queued image
         queued = self._image_queue.pop(0)
@@ -369,6 +532,42 @@ class Renderer:
         # Start transition
         self._start_transition(queued.transition_duration)
 
+    def _process_pair_queue(self) -> None:
+        """Process the next image pair in the pair queue."""
+        if not self._pair_queue:
+            return
+
+        queued = self._pair_queue.pop(0)
+        logger.debug(
+            f"Processing queued image pair: {queued.top_path}, {queued.bottom_path}"
+        )
+
+        # Load the images
+        try:
+            self._next_top_sprite = self.image_loader.load_stacked_image(
+                queued.top_path, position='top', scale_mode=queued.scale_mode
+            )
+            self._next_bottom_sprite = self.image_loader.load_stacked_image(
+                queued.bottom_path, position='bottom', scale_mode=queued.scale_mode
+            )
+        except ImageLoadError as e:
+            logger.error(f"Failed to load queued image pair: {e}")
+            # Try next in queue
+            self._process_queue()
+            return
+
+        # Enter stacked mode
+        self._stacked_mode = True
+
+        # Clear single image mode sprites
+        self._current_sprite = None
+        self._next_sprite = None
+
+        # Start stacked transition
+        self._start_stacked_transition(
+            queued.transition_duration, queued.stagger_delay
+        )
+
     def _update_transition(self) -> None:
         """Update the current transition state."""
         if self._transition is None:
@@ -377,27 +576,49 @@ class Renderer:
         progress = self._transition.update()
 
         if self._transition.state == TransitionState.COMPLETED:
-            # Transition complete - swap sprites
-            self._current_sprite = self._next_sprite
-            self._next_sprite = None
-            self._transition = None
-            self._set_state(RendererState.DISPLAYING)
-            self.stats.images_displayed += 1
+            if self._stacked_mode:
+                # Stacked transition complete - swap both sprites
+                self._current_top_sprite = self._next_top_sprite
+                self._current_bottom_sprite = self._next_bottom_sprite
+                self._next_top_sprite = None
+                self._next_bottom_sprite = None
+                self._transition = None
+                self._set_state(RendererState.DISPLAYING)
+                self.stats.images_displayed += 2  # Count both images
+
+                logger.debug("Stacked transition complete, now displaying paired images")
+            else:
+                # Single image transition complete - swap sprites
+                self._current_sprite = self._next_sprite
+                self._next_sprite = None
+                self._transition = None
+                self._set_state(RendererState.DISPLAYING)
+                self.stats.images_displayed += 1
+
+                logger.debug("Transition complete, now displaying new image")
 
             # Track image change time and schedule GC
             self._last_image_change = time.time()
             self._gc_scheduled = True
 
-            logger.debug("Transition complete, now displaying new image")
-
         elif self._transition.state == TransitionState.CANCELLED:
-            # Transition cancelled - keep current sprite
-            self._next_sprite = None
-            self._transition = None
-            if self._current_sprite:
-                self._set_state(RendererState.DISPLAYING)
+            if self._stacked_mode:
+                # Stacked transition cancelled - keep current sprites
+                self._next_top_sprite = None
+                self._next_bottom_sprite = None
+                self._transition = None
+                if self._current_top_sprite or self._current_bottom_sprite:
+                    self._set_state(RendererState.DISPLAYING)
+                else:
+                    self._set_state(RendererState.IDLE)
             else:
-                self._set_state(RendererState.IDLE)
+                # Single transition cancelled - keep current sprite
+                self._next_sprite = None
+                self._transition = None
+                if self._current_sprite:
+                    self._set_state(RendererState.DISPLAYING)
+                else:
+                    self._set_state(RendererState.IDLE)
             logger.debug("Transition cancelled")
 
     def _render_frame(self) -> None:
@@ -407,20 +628,49 @@ class Renderer:
             pass
 
         elif self._state == RendererState.DISPLAYING:
-            # Draw current image (alpha should already be 1.0 from transition completion)
-            if self._current_sprite:
-                self._current_sprite.draw()
+            if self._stacked_mode:
+                # Draw both stacked images
+                if self._current_top_sprite:
+                    self._current_top_sprite.set_alpha(1.0)
+                    self._current_top_sprite.draw()
+                if self._current_bottom_sprite:
+                    self._current_bottom_sprite.set_alpha(1.0)
+                    self._current_bottom_sprite.draw()
+            else:
+                # Draw current image (alpha should already be 1.0 from transition completion)
+                if self._current_sprite:
+                    self._current_sprite.draw()
 
         elif self._state == RendererState.TRANSITIONING:
             # Render transition
             if self._transition:
-                self._transition.render(self._current_sprite, self._next_sprite)
+                if self._stacked_mode and isinstance(self._transition, StackedRevealTransition):
+                    # Render stacked transition with staggered timing
+                    self._transition.render_stacked(
+                        self._current_top_sprite,
+                        self._current_bottom_sprite,
+                        self._next_top_sprite,
+                        self._next_bottom_sprite,
+                        self.display.height,
+                    )
+                else:
+                    # Render single image transition
+                    self._transition.render(self._current_sprite, self._next_sprite)
 
         elif self._state == RendererState.PAUSED:
-            # Draw current image (frozen)
-            if self._current_sprite:
-                self._current_sprite.set_alpha(1.0)
-                self._current_sprite.draw()
+            if self._stacked_mode:
+                # Draw both stacked images (frozen)
+                if self._current_top_sprite:
+                    self._current_top_sprite.set_alpha(1.0)
+                    self._current_top_sprite.draw()
+                if self._current_bottom_sprite:
+                    self._current_bottom_sprite.set_alpha(1.0)
+                    self._current_bottom_sprite.draw()
+            else:
+                # Draw current image (frozen)
+                if self._current_sprite:
+                    self._current_sprite.set_alpha(1.0)
+                    self._current_sprite.draw()
 
         elif self._state == RendererState.REGISTRATION:
             # Draw registration display with animation
@@ -479,8 +729,16 @@ class Renderer:
         Removes current image and clears queue.
         """
         self._image_queue.clear()
+        self._pair_queue.clear()
         self._current_sprite = None
         self._next_sprite = None
+
+        # Clear stacked mode
+        self._stacked_mode = False
+        self._current_top_sprite = None
+        self._current_bottom_sprite = None
+        self._next_top_sprite = None
+        self._next_bottom_sprite = None
 
         if self._transition:
             self._transition.cancel()
@@ -707,6 +965,13 @@ class Renderer:
         Returns:
             Dict with current state and statistics
         """
+        # Get display dimensions
+        display_width = self.display.width if self.display else 0
+        display_height = self.display.height if self.display else 0
+
+        # Get rotation from image loader (config setting)
+        rotation = self.image_loader.rotation.value if self.image_loader else 0
+
         status = {
             "state": self._state.value,
             "is_running": self._running,
@@ -716,6 +981,11 @@ class Renderer:
             "has_error": self.has_error,
             "current_image": self.current_image_path,
             "queue_length": self.queue_length,
+            "pair_queue_length": len(self._pair_queue),
+            "stacked_mode": self._stacked_mode,
+            "display_width": display_width,
+            "display_height": display_height,
+            "rotation": rotation,
             "stats": {
                 "frame_count": self.stats.frame_count,
                 "avg_fps": round(self.stats.avg_fps, 1),

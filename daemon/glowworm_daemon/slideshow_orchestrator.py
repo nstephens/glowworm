@@ -14,6 +14,7 @@ Provides:
 - Pause/resume state management
 - Missing image handling (skip with error log)
 - Offline operation using cached images
+- Image pairing for portrait displays (landscape images stacked)
 """
 import asyncio
 import logging
@@ -67,6 +68,16 @@ class SlideshowConfig:
 
     # Interval for checking playlist updates
     playlist_update_interval: float = 300.0  # 5 minutes
+
+    # Display orientation for image pairing ('portrait', 'landscape', or 'auto')
+    # 'auto' detects from display dimensions
+    display_orientation: str = "auto"
+
+    # Stagger delay for paired image transitions (seconds)
+    stagger_delay: float = 0.3
+
+    # Transition duration for paired images (longer for visual effect)
+    pair_transition_duration: float = 1.5
 
 
 @dataclass
@@ -311,6 +322,9 @@ class SlideshowOrchestrator:
                 self._set_state(SlideshowState.ERROR)
                 return False
 
+            # Compute image pairing sequence based on display orientation
+            await self._compute_pairing()
+
             # Start slideshow loop
             self._slideshow_task = asyncio.create_task(self._slideshow_loop())
 
@@ -320,6 +334,42 @@ class SlideshowOrchestrator:
             self._set_state(SlideshowState.PLAYING)
             logger.info("Slideshow started")
             return True
+
+    async def _compute_pairing(self) -> None:
+        """
+        Compute image pairing sequence based on display orientation.
+
+        Fetches display status to get dimensions and determines the
+        appropriate pairing strategy.
+        """
+        # Determine display orientation
+        orientation = self.config.display_orientation
+
+        if orientation == "auto":
+            # Detect from display dimensions
+            status = await self.display.get_status()
+            if status:
+                # Try to get display dimensions from status
+                # The renderer reports these in its status
+                width = status.get("display_width", 1920)
+                height = status.get("display_height", 1080)
+
+                # Account for rotation - if display is rotated 90/270, swap dimensions
+                rotation = status.get("rotation", 0)
+                if rotation in (90, 270):
+                    width, height = height, width
+
+                from glowworm_daemon.image_pairing import detect_display_orientation
+                orientation = detect_display_orientation(width, height)
+                logger.info(f"Auto-detected display orientation: {orientation} ({width}x{height})")
+            else:
+                # Default to portrait if we can't get status
+                orientation = "portrait"
+                logger.warning("Could not get display status, defaulting to portrait orientation")
+
+        # Compute pairing sequence
+        self.playlist.compute_pairing_sequence(orientation)
+        logger.info(f"Computed pairing sequence for {orientation} display")
 
     async def stop(self) -> None:
         """Stop the slideshow."""
@@ -512,6 +562,9 @@ class SlideshowOrchestrator:
         try:
             await self.playlist.fetch_playlist()
 
+            # Recompute pairing sequence
+            await self._compute_pairing()
+
             # Update preloader with new playlist
             if self.preloader:
                 await self.preloader.update_preload_queue(self.playlist)
@@ -645,6 +698,8 @@ class SlideshowOrchestrator:
         Display one or more images.
 
         Handles downloading if needed, and sends to display.
+        For paired images (2 landscape on portrait display), displays
+        them stacked with staggered transitions.
 
         Args:
             images: List of PlaylistImage objects to display
@@ -652,11 +707,15 @@ class SlideshowOrchestrator:
         Returns:
             True if successful, False if all images failed.
         """
-        # Currently only handle single images (pair support can be added later)
         if not images:
             print("_display_images: no images", flush=True)
             return False
 
+        # Check if this is a paired display (2 images)
+        if len(images) == 2:
+            return await self._display_image_pair(images[0], images[1])
+
+        # Single image display
         image = images[0]
         self._stats.current_image_id = image.id
 
@@ -702,6 +761,85 @@ class SlideshowOrchestrator:
                 details=f"IPC call to display failed for image at {image_path}",
                 recoverable=True,
                 show_on_display=False,  # Don't show - might cause loop
+            )
+            self._set_state(SlideshowState.PLAYING)
+            return False
+
+    async def _display_image_pair(
+        self,
+        top_image: "PlaylistImage",
+        bottom_image: "PlaylistImage",
+    ) -> bool:
+        """
+        Display a pair of images stacked (top/bottom).
+
+        Used for portrait displays where two landscape images are
+        displayed together with staggered transitions.
+
+        Args:
+            top_image: Image for the top half
+            bottom_image: Image for the bottom half
+
+        Returns:
+            True if successful, False if failed
+        """
+        self._stats.current_image_id = top_image.id
+
+        # Get paths for both images
+        print(f"_display_image_pair: getting paths for images {top_image.id}, {bottom_image.id}", flush=True)
+        top_path = await self._get_image_path(top_image)
+        bottom_path = await self._get_image_path(bottom_image)
+
+        if not top_path:
+            print(f"_display_image_pair: no path for top image {top_image.id}", flush=True)
+            await self._report_error(
+                message=f"Image unavailable (ID: {top_image.id})",
+                code="IMAGE_LOAD",
+                details=f"Failed to download or locate image {top_image.id}",
+                recoverable=True,
+                show_on_display=False,
+            )
+            return False
+
+        if not bottom_path:
+            print(f"_display_image_pair: no path for bottom image {bottom_image.id}", flush=True)
+            await self._report_error(
+                message=f"Image unavailable (ID: {bottom_image.id})",
+                code="IMAGE_LOAD",
+                details=f"Failed to download or locate image {bottom_image.id}",
+                recoverable=True,
+                show_on_display=False,
+            )
+            return False
+
+        self._stats.current_image_path = f"{top_path}+{bottom_path}"
+
+        # Send to display as pair
+        self._set_state(SlideshowState.TRANSITIONING)
+
+        print(f"_display_image_pair: calling display.load_image_pair({top_path}, {bottom_path})", flush=True)
+        success = await self.display.load_image_pair(
+            top_path=str(top_path),
+            bottom_path=str(bottom_path),
+            scale_mode=self.config.scale_mode,
+            transition_duration=self.config.pair_transition_duration,
+            stagger_delay=self.config.stagger_delay,
+        )
+        print(f"_display_image_pair: load_image_pair returned {success}", flush=True)
+
+        if success:
+            self._stats.transitions_completed += 1
+            self._set_state(SlideshowState.PLAYING)
+            logger.info(f"Displayed image pair {top_image.id}, {bottom_image.id}")
+            return True
+        else:
+            print(f"_display_image_pair: display.load_image_pair failed", flush=True)
+            await self._report_error(
+                message=f"Display error for image pair {top_image.id}, {bottom_image.id}",
+                code="DISPLAY",
+                details=f"IPC call to display failed for image pair",
+                recoverable=True,
+                show_on_display=False,
             )
             self._set_state(SlideshowState.PLAYING)
             return False

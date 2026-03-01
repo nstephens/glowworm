@@ -862,6 +862,48 @@ class DisplayController:
             return response.result.get("queue_position")
         return None
 
+    async def load_image_pair(
+        self,
+        top_path: str,
+        bottom_path: str,
+        scale_mode: str = "fit",
+        transition_duration: float | None = None,
+        stagger_delay: float = 0.3,
+    ) -> bool:
+        """
+        Load a pair of images for stacked display.
+
+        Used for portrait displays where two landscape images are
+        displayed stacked (top/bottom) with staggered transitions.
+
+        Args:
+            top_path: Path to the top image file
+            bottom_path: Path to the bottom image file
+            scale_mode: Scale mode (fit, fill, stretch)
+            transition_duration: Optional transition duration
+            stagger_delay: Delay between top and bottom transitions
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self._ipc_client or not self._ipc_client.is_connected:
+            print(f"load_image_pair: IPC not connected", flush=True)
+            return False
+
+        params: dict[str, Any] = {
+            "top_path": top_path,
+            "bottom_path": bottom_path,
+            "scale_mode": scale_mode,
+            "stagger_delay": stagger_delay,
+        }
+        if transition_duration is not None:
+            params["transition_duration"] = transition_duration
+
+        print(f"load_image_pair: calling IPC with params={params}", flush=True)
+        response = await self._ipc_client.call("load_image_pair", params)
+        print(f"load_image_pair: response.success={response.success}, result={response.result}, error={response.error}", flush=True)
+        return response.success and response.result.get("success", False)
+
     async def pause(self) -> bool:
         """
         Pause the display.

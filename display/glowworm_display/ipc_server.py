@@ -109,6 +109,7 @@ class IPCServer:
         # Command handlers
         self._handlers: dict[str, Callable[..., Any]] = {
             "load_image": self._handle_load_image,
+            "load_image_pair": self._handle_load_image_pair,
             "get_status": self._handle_get_status,
             "pause": self._handle_pause,
             "resume": self._handle_resume,
@@ -526,6 +527,50 @@ class IPCServer:
             "success": True,
             "queue_position": self.renderer.queue_length,
         }
+
+    async def _handle_load_image_pair(
+        self,
+        top_path: str,
+        bottom_path: str,
+        scale_mode: str = "fit",
+        transition_duration: float | None = None,
+        stagger_delay: float = 0.3,
+    ) -> dict[str, Any]:
+        """
+        Load a pair of images for stacked display.
+
+        Used for portrait displays where two landscape images are
+        displayed stacked (top/bottom) with staggered transitions.
+
+        Args:
+            top_path: Path to the top image file
+            bottom_path: Path to the bottom image file
+            scale_mode: Scale mode (fit, fill, stretch)
+            transition_duration: Optional transition duration override
+            stagger_delay: Delay between top and bottom transitions
+
+        Returns:
+            Dict with success status
+        """
+        if not self.renderer:
+            return {"success": False, "error": "Renderer not initialized"}
+
+        from glowworm_display.image_loader import ScaleMode
+
+        try:
+            mode = ScaleMode(scale_mode)
+        except ValueError:
+            return {"success": False, "error": f"Invalid scale_mode: {scale_mode}"}
+
+        success = self.renderer.load_image_pair_immediate(
+            top_path=top_path,
+            bottom_path=bottom_path,
+            scale_mode=mode,
+            transition_duration=transition_duration,
+            stagger_delay=stagger_delay,
+        )
+
+        return {"success": success}
 
     async def _handle_get_status(self) -> dict[str, Any]:
         """

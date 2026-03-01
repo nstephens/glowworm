@@ -852,6 +852,77 @@ class PlaylistManager:
             except OSError as e:
                 logger.warning(f"Failed to delete state file: {e}")
 
+    def compute_pairing_sequence(
+        self,
+        display_orientation: str = "portrait"
+    ) -> None:
+        """
+        Compute and set the pairing sequence based on display orientation.
+
+        For portrait displays, pairs landscape images (stacked top/bottom).
+        For landscape displays, pairs portrait images (side by side).
+
+        This should be called after fetching the playlist and when the
+        display orientation is known.
+
+        Args:
+            display_orientation: 'portrait' or 'landscape'
+        """
+        if not self._playlist:
+            logger.warning("No playlist loaded, cannot compute pairing sequence")
+            return
+
+        from glowworm_daemon.image_pairing import (
+            compute_pairing_sequence,
+            PairingEntry,
+        )
+
+        # Build list of image info dicts for the pairing algorithm
+        images_info = []
+        for image_id in self._playlist.sequence:
+            image = self._playlist.images.get(image_id)
+            if image:
+                images_info.append({
+                    'id': image.id,
+                    'width': image.width or 0,
+                    'height': image.height or 0,
+                })
+            else:
+                # Image metadata not available, treat as unknown
+                images_info.append({
+                    'id': image_id,
+                    'width': 0,
+                    'height': 0,
+                })
+
+        # Compute pairing sequence
+        pairing_entries = compute_pairing_sequence(images_info, display_orientation)
+
+        # Convert to PlaylistEntry objects
+        computed_sequence = []
+        for entry in pairing_entries:
+            computed_sequence.append(PlaylistEntry(
+                entry_type=entry.entry_type,
+                image_ids=entry.image_ids,
+            ))
+
+        self._playlist.computed_sequence = computed_sequence
+
+        # Log pairing statistics
+        singles = sum(1 for e in computed_sequence if e.entry_type == 'single')
+        pairs = sum(1 for e in computed_sequence if e.entry_type == 'pair')
+        logger.info(
+            f"Computed pairing sequence for {display_orientation} display: "
+            f"{singles} singles, {pairs} pairs ({len(computed_sequence)} total entries)"
+        )
+
+        # Reset position if it's now out of bounds
+        if self._position and self._position.position >= len(computed_sequence):
+            self._position.position = 0
+            if self._shuffle_enabled:
+                self._generate_shuffle()
+            self._save_state()
+
 
 def create_playlist_manager(config: PlaylistManagerConfig) -> PlaylistManager:
     """Factory function to create a PlaylistManager instance."""
