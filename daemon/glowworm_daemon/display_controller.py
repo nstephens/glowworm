@@ -866,7 +866,7 @@ class DisplayController:
         self,
         top_path: str,
         bottom_path: str,
-        scale_mode: str = "fit",
+        scale_mode: str = "fill",  # Use fill for stacked to minimize black bars
         transition_duration: float | None = None,
         stagger_delay: float = 0.3,
     ) -> bool:

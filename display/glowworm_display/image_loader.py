@@ -900,8 +900,10 @@ class ImageLoader:
         except:
             pass
 
-        # Each image gets half the VISUAL height (what user sees as vertical)
-        half_height = visual_height / 2.0
+        # Each image gets half the VISUAL height, minus a small gap
+        # Gap creates visible separation between the two stacked images
+        gap_pixels = 20  # Gap between images (10 pixels on each side of center)
+        half_height = (visual_height - gap_pixels) / 2.0
 
         # Calculate aspect ratios based on visual dimensions
         image_aspect = image_width / image_height
@@ -948,29 +950,28 @@ class ImageLoader:
         # Calculate position offset
         # Pi3D coordinates are in hardware space. For rotated displays, visual Y
         # maps to hardware X (or -X depending on rotation direction).
-        # Quarter offset = visual_height / 4 (center of each half)
-        quarter_offset = visual_height / 4.0
+        # Each image center is at: half_height/2 + gap/2 from center
+        quarter_offset = half_height / 2.0 + gap_pixels / 2.0
 
         if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
             # Rotated display: position along X axis (which becomes vertical visually)
-            # Note: rotateToZ rotates counter-clockwise, so 270° = 90° clockwise
-            # This means hardware +Y becomes visual +X (right), and hardware +X becomes visual -Y (bottom)
-            # So for visual top (positive visual Y), we need negative hardware X
+            # 270° CCW rotation: visual top = hardware +X, visual right = hardware -Y
+            # 90° CCW rotation: visual top = hardware -X, visual right = hardware +Y
             if self.rotation == Rotation.DEG_270:
-                # 270° CCW = 90° CW: visual top is negative X in hardware coords
+                # 270° CCW: visual top is +X in hardware coords
                 if position == 'top':
-                    x_offset = -quarter_offset
+                    x_offset = quarter_offset
                     y_offset = 0.0
                 else:
-                    x_offset = quarter_offset
+                    x_offset = -quarter_offset
                     y_offset = 0.0
             else:  # DEG_90
-                # 90° CCW: visual top is positive X in hardware coords
+                # 90° CCW: visual top is -X in hardware coords
                 if position == 'top':
-                    x_offset = quarter_offset
+                    x_offset = -quarter_offset
                     y_offset = 0.0
                 else:
-                    x_offset = -quarter_offset
+                    x_offset = quarter_offset
                     y_offset = 0.0
         else:
             # Non-rotated display: position along Y axis
