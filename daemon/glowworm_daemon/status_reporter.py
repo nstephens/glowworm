@@ -88,6 +88,12 @@ class DeviceStatus:
     display_running: bool = False
     display_state: str = "stopped"
 
+    # Error info (v3.0)
+    has_error: bool = False
+    error_message: Optional[str] = None
+    error_code: Optional[str] = None
+    error_timestamp: Optional[float] = None
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -120,6 +126,12 @@ class DeviceStatus:
             },
             "uptime_seconds": round(self.uptime_seconds, 1),
             "timestamp": self.timestamp,
+            "has_error": self.has_error,
+            "error": {
+                "message": self.error_message,
+                "code": self.error_code,
+                "timestamp": self.error_timestamp,
+            } if self.has_error else None,
         }
 
 
@@ -342,6 +354,15 @@ class StatusReporter:
                 status.playlist_name = playlist.get("name")
                 status.playlist_position = playlist.get("position", 0)
                 status.playlist_entry_count = playlist.get("entry_count", 0)
+
+            # Error info
+            status.has_error = slideshow_status.get("has_error", False)
+            if status.has_error:
+                last_error = slideshow_status.get("last_error", {})
+                if last_error:
+                    status.error_message = last_error.get("message")
+                    status.error_code = last_error.get("code")
+                    status.error_timestamp = last_error.get("timestamp")
         else:
             status.state = "stopped"
 

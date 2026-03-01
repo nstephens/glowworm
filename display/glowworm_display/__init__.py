@@ -21,6 +21,7 @@ from glowworm_display.ipc_server import (
     create_ipc_server,
 )
 from glowworm_display.renderer import (
+    ErrorInfo,
     Renderer,
     RendererState,
     RenderStats,
@@ -41,6 +42,7 @@ __all__ = [
     "DisplayConfig",
     "Display",
     "create_display",
+    "ErrorInfo",
     "ImageLoader",
     "ImageLoadError",
     "IPCServer",

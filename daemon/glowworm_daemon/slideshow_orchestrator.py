@@ -70,6 +70,21 @@ class SlideshowConfig:
 
 
 @dataclass
+class SlideshowError:
+    """Information about a slideshow error."""
+
+    message: str  # User-friendly error message
+    code: str = "UNKNOWN"  # Error code for categorization
+    details: str | None = None  # Technical details
+    timestamp: float = 0.0  # When the error occurred
+    recoverable: bool = True  # Whether the system can recover
+
+    def __post_init__(self) -> None:
+        if self.timestamp == 0.0:
+            self.timestamp = time.time()
+
+
+@dataclass
 class SlideshowStats:
     """Statistics for the slideshow."""
 
@@ -81,6 +96,7 @@ class SlideshowStats:
     started_at: Optional[float] = None
     current_image_id: Optional[int] = None
     current_image_path: Optional[str] = None
+    last_error: Optional[SlideshowError] = None
 
 
 # Type for state change callbacks
@@ -199,6 +215,11 @@ class SlideshowOrchestrator:
         """Add a callback for state changes."""
         self._state_callbacks.append(callback)
 
+    @property
+    def last_error(self) -> Optional[SlideshowError]:
+        """Get the last error that occurred."""
+        return self._stats.last_error
+
     def _set_state(self, new_state: SlideshowState) -> None:
         """Set the state and notify callbacks."""
         if new_state == self._state:
@@ -213,6 +234,53 @@ class SlideshowOrchestrator:
                 callback(old_state, new_state)
             except Exception as e:
                 logger.warning(f"State callback error: {e}")
+
+    async def _report_error(
+        self,
+        message: str,
+        code: str = "SLIDESHOW",
+        details: str | None = None,
+        recoverable: bool = True,
+        show_on_display: bool = False,
+    ) -> None:
+        """
+        Report an error with proper logging and optional display.
+
+        Args:
+            message: User-friendly error message
+            code: Error code for categorization
+            details: Technical details for logging
+            recoverable: Whether the system can recover
+            show_on_display: If True, show error on Pi3D display
+        """
+        # Log with full details
+        log_msg = f"[{code}] {message}"
+        if details:
+            log_msg += f" - Details: {details}"
+        logger.error(log_msg)
+
+        # Record error in stats
+        self._stats.errors += 1
+        self._stats.last_error = SlideshowError(
+            message=message,
+            code=code,
+            details=details,
+            recoverable=recoverable,
+        )
+
+        # Show on display if requested and display is available
+        if show_on_display and self.display and self.display.is_running:
+            await self.display.show_error(
+                message=message,
+                code=code,
+                details=details,
+                recoverable=recoverable,
+            )
+
+    async def clear_error_display(self) -> None:
+        """Clear error display on Pi3D."""
+        if self.display and self.display.is_running:
+            await self.display.clear_error()
 
     async def start(self) -> bool:
         """
@@ -584,7 +652,13 @@ class SlideshowOrchestrator:
         image_path = await self._get_image_path(image)
 
         if not image_path:
-            logger.error(f"Failed to get image {image.id}, skipping")
+            await self._report_error(
+                message=f"Image unavailable (ID: {image.id})",
+                code="IMAGE_LOAD",
+                details=f"Failed to download or locate image {image.id} after retries",
+                recoverable=True,
+                show_on_display=False,  # Don't show for individual image errors, we'll skip
+            )
             return False
 
         self._stats.current_image_path = str(image_path)
@@ -604,7 +678,13 @@ class SlideshowOrchestrator:
             logger.info(f"Displayed image {image.id}")
             return True
         else:
-            logger.error(f"Failed to send image {image.id} to display")
+            await self._report_error(
+                message=f"Display error for image {image.id}",
+                code="DISPLAY",
+                details=f"IPC call to display failed for image at {image_path}",
+                recoverable=True,
+                show_on_display=False,  # Don't show - might cause loop
+            )
             self._set_state(SlideshowState.PLAYING)
             return False
 
@@ -680,6 +760,7 @@ class SlideshowOrchestrator:
             "state": self._state.value,
             "is_playing": self.is_playing,
             "is_paused": self.is_paused,
+            "has_error": stats.last_error is not None,
             "current_image_id": stats.current_image_id,
             "current_image_path": stats.current_image_path,
             "images_displayed": stats.images_displayed,
@@ -694,6 +775,15 @@ class SlideshowOrchestrator:
                 "preload_count": self.config.preload_count,
             },
         }
+
+        # Include last error details if available
+        if stats.last_error:
+            status["last_error"] = {
+                "message": stats.last_error.message,
+                "code": stats.last_error.code,
+                "timestamp": stats.last_error.timestamp,
+                "recoverable": stats.last_error.recoverable,
+            }
 
         # Add time until next transition
         if self._next_transition_time and self._state == SlideshowState.PLAYING:

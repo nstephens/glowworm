@@ -863,6 +863,54 @@ class DisplayController:
         response = await self._ipc_client.call("hide_registration")
         return response.success and response.result.get("success", False)
 
+    async def show_error(
+        self,
+        message: str,
+        code: str = "ERROR",
+        details: str | None = None,
+        recoverable: bool = True,
+    ) -> bool:
+        """
+        Show an error message on the display.
+
+        Args:
+            message: User-friendly error message
+            code: Error code for categorization (e.g., "NETWORK", "IMAGE")
+            details: Technical details for logging (not shown to user)
+            recoverable: Whether the system can recover from this error
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self._ipc_client or not self._ipc_client.is_connected:
+            # If we can't show error on display, at least log it
+            logger.error(f"Cannot show error on display (not connected): [{code}] {message}")
+            return False
+
+        params = {
+            "message": message,
+            "code": code,
+        }
+        if details:
+            params["details"] = details
+        params["recoverable"] = recoverable
+
+        response = await self._ipc_client.call("show_error", params)
+        return response.success and response.result.get("success", False)
+
+    async def clear_error(self) -> bool:
+        """
+        Clear the error display and return to previous state.
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self._ipc_client or not self._ipc_client.is_connected:
+            return False
+
+        response = await self._ipc_client.call("clear_error")
+        return response.success and response.result.get("success", False)
+
     # Context manager support
 
     async def __aenter__(self) -> "DisplayController":

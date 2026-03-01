@@ -116,6 +116,8 @@ class IPCServer:
             "queue_image": self._handle_queue_image,
             "show_registration": self._handle_show_registration,
             "hide_registration": self._handle_hide_registration,
+            "show_error": self._handle_show_error,
+            "clear_error": self._handle_clear_error,
         }
 
         # Notification listeners (for sending async notifications)
@@ -666,6 +668,85 @@ class IPCServer:
             "success": True,
             "state": state,
         }
+
+    async def _handle_show_error(
+        self,
+        message: str,
+        code: str = "ERROR",
+        details: str | None = None,
+        recoverable: bool = True,
+    ) -> dict[str, Any]:
+        """
+        Show an error message on display.
+
+        Args:
+            message: User-friendly error message
+            code: Error code for categorization
+            details: Technical details (for logging only)
+            recoverable: Whether the system can recover
+
+        Returns:
+            Dict with success status
+        """
+        if not self.renderer:
+            return {"success": False, "error": "Renderer not initialized"}
+
+        if not message or not isinstance(message, str):
+            return {"success": False, "error": "Error message required"}
+
+        self.renderer.show_error(
+            message=message,
+            code=code,
+            details=details,
+            recoverable=recoverable,
+        )
+        state = self.renderer.state.value
+
+        # Schedule notification to be sent after response
+        asyncio.create_task(self._send_state_notification(state))
+        # Also send error notification
+        asyncio.create_task(self._send_error_notification(message, code))
+
+        return {
+            "success": True,
+            "state": state,
+            "error_code": code,
+        }
+
+    async def _handle_clear_error(self) -> dict[str, Any]:
+        """
+        Clear error display and return to previous state.
+
+        Returns:
+            Dict with success status
+        """
+        if not self.renderer:
+            return {"success": False, "error": "Renderer not initialized"}
+
+        self.renderer.clear_error()
+        state = self.renderer.state.value
+
+        # Schedule notification to be sent after response
+        asyncio.create_task(self._send_state_notification(state))
+
+        return {
+            "success": True,
+            "state": state,
+        }
+
+    async def _send_error_notification(self, message: str, code: str) -> None:
+        """
+        Send an error notification to all clients.
+
+        Args:
+            message: Error message
+            code: Error code
+        """
+        await asyncio.sleep(0.01)
+        await self.send_notification("error_occurred", {
+            "message": message,
+            "code": code,
+        })
 
 
 async def create_ipc_server(

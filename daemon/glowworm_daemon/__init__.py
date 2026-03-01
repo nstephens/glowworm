@@ -64,6 +64,7 @@ from .slideshow_orchestrator import (
     SlideshowConfig,
     SlideshowState,
     SlideshowStats,
+    SlideshowError,
     create_slideshow_orchestrator,
 )
 from .unified_config import (
@@ -164,6 +165,7 @@ __all__ = [
     "SlideshowConfig",
     "SlideshowState",
     "SlideshowStats",
+    "SlideshowError",
     "create_slideshow_orchestrator",
     # Unified Configuration (v3.0)
     "UnifiedConfig",

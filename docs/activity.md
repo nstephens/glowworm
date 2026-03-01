@@ -2195,3 +2195,91 @@ Created frontend integration tests for Pi3D device features to validate the admi
 
 ### Next Task
 Task 7.1: Error Handling
+
+## 2026-02-28 19:45 - Task 7.1: Error Handling
+
+### What Changed
+Implemented comprehensive error handling across the Pi3D display engine, daemon, and frontend with user-friendly error display, contextual logging, and error recovery strategies.
+
+### Files Modified
+
+**Display Engine:**
+- `display/glowworm_display/renderer.py`:
+  - Added `ErrorInfo` dataclass for error state tracking
+  - Added `RendererState.ERROR` state
+  - Added `show_error()` and `clear_error()` methods
+  - Added `errors_count` to `RenderStats`
+  - Updated `get_status()` to include error info
+  - Added error rendering in `_render_frame()`
+
+- `display/glowworm_display/text_renderer.py`:
+  - Added error message display with `set_error_message()`
+  - Added `render_error()` with pulsing animation
+  - Added `clear_error()` and `_wrap_text()` helper
+  - Added error text objects for Pi3D rendering
+
+- `display/glowworm_display/ipc_server.py`:
+  - Added `show_error` and `clear_error` IPC handlers
+  - Added error notification to connected clients
+
+- `display/glowworm_display/__init__.py`:
+  - Exported `ErrorInfo` class
+
+**Daemon:**
+- `daemon/glowworm_daemon/slideshow_orchestrator.py`:
+  - Added `SlideshowError` dataclass for error tracking
+  - Added `_report_error()` method for centralized error handling
+  - Added `clear_error_display()` method
+  - Added `last_error` property
+  - Updated `get_status()` to include error info
+  - Updated image loading errors to use new error reporting
+
+- `daemon/glowworm_daemon/display_controller.py`:
+  - Added `show_error()` and `clear_error()` IPC command methods
+  - Added proper error logging when not connected
+
+- `daemon/glowworm_daemon/status_reporter.py`:
+  - Added error fields to `DeviceStatus`: `has_error`, `error_message`, `error_code`, `error_timestamp`
+  - Updated `to_dict()` to include error info
+  - Updated `_collect_status()` to collect error info from slideshow
+
+- `daemon/glowworm_daemon/__init__.py`:
+  - Exported `SlideshowError` class
+
+**Frontend:**
+- `frontend/src/pages/DisplaysWebSocket.tsx`:
+  - Added error fields to `RealtimeDeviceStatus` interface
+  - Added error display UI in device cards (red alert box with error code and message)
+
+### Files Created
+- `daemon/tests/test_error_handling.py`:
+  - 21 tests for error handling across all components
+  - Tests for SlideshowError creation and properties
+  - Tests for error reporting and display
+  - Tests for status collection with errors
+  - Tests for IPC error commands
+  - Tests for error recovery strategies
+  - Tests for module exports
+
+### Error Handling Features
+1. **Pi3D Error Display**: User-friendly error messages shown on screen with pulsing animation
+2. **Contextual Logging**: All errors logged with code, message, and technical details
+3. **Error State Tracking**: Errors recorded in stats and status reports
+4. **Frontend Error Display**: Pi3D devices show error alerts in admin interface
+5. **Error Recovery**: Image loading retries before skipping, display auto-restart
+6. **IPC Error Commands**: `show_error` and `clear_error` available via IPC
+
+### Verification
+```
+pytest daemon/tests/test_error_handling.py -v
+# 21 passed
+```
+
+### Notes
+- Error display auto-clears when new content loads successfully
+- Error info included in WebSocket status updates for real-time frontend updates
+- Error recovery strategies use existing retry mechanisms (max_image_retries, auto_restart)
+- No additional recovery needed as existing mechanisms handle most cases
+
+### Next Task
+Task 7.2: Performance Monitoring

@@ -124,6 +124,13 @@ class TextRenderer:
         self._pulse_period: float = 2.0  # seconds for full pulse cycle
         self._dot_period: float = 0.5  # seconds per dot animation
 
+        # Error display state
+        self._error_message: str | None = None
+        self._error_code: str | None = None
+        self._error_text: "pi3d.String | MockText | None" = None
+        self._error_code_text: "pi3d.String | MockText | None" = None
+        self._error_animation_start: float = 0.0
+
         logger.info(f"TextRenderer initialized: {display_width}x{display_height}, mock={mock}")
 
     def _get_code_font(self) -> "pi3d.Font | MockFont":
@@ -316,3 +323,149 @@ class TextRenderer:
     def current_code(self) -> str | None:
         """Get the current registration code, if any."""
         return self._registration_code
+
+    def set_error_message(self, message: str, code: str = "ERROR") -> None:
+        """
+        Set an error message to display.
+
+        Creates text objects for the error message display.
+        Shows a user-friendly error message with an error code.
+
+        Args:
+            message: User-friendly error message
+            code: Error code for display (e.g., "NETWORK", "IMAGE")
+        """
+        self._error_message = message
+        self._error_code = code
+        self._error_animation_start = time.time()
+
+        # Create error display text objects
+        self._create_error_display()
+
+        logger.info(f"Error message set: [{code}] {message}")
+
+    def _create_error_display(self) -> None:
+        """Create text objects for error display."""
+        if self._error_message is None:
+            return
+
+        label_font = self._get_label_font()
+
+        # Position calculations - center the display
+        center_x = 0  # Pi3D uses center-origin coordinates
+        message_y = 0  # Center of screen
+        code_y = message_y + self.display_height * 0.15  # Above the message
+
+        # Wrap long messages (max ~40 characters per line)
+        wrapped_message = self._wrap_text(self._error_message, 40)
+
+        if self.mock:
+            # Create mock text objects
+            self._error_code_text = MockText(
+                text=f"Error: {self._error_code}",
+                x=center_x,
+                y=code_y,
+                scale=1.2,
+                color=(1.0, 0.4, 0.4, 1.0),  # Reddish
+            )
+            self._error_text = MockText(
+                text=wrapped_message,
+                x=center_x,
+                y=message_y,
+                scale=1.0,
+            )
+        else:
+            import pi3d
+
+            # Error code heading (red/warning color)
+            self._error_code_text = pi3d.String(
+                font=label_font,
+                string=f"Error: {self._error_code}",
+                x=center_x,
+                y=code_y,
+                z=1.0,
+                justify="C",
+            )
+            self._error_code_text.set_shader(pi3d.Shader("uv_flat"))
+
+            # Error message (white)
+            self._error_text = pi3d.String(
+                font=label_font,
+                string=wrapped_message,
+                x=center_x,
+                y=message_y,
+                z=1.0,
+                justify="C",
+            )
+            self._error_text.set_shader(pi3d.Shader("uv_flat"))
+
+        logger.debug("Error display created")
+
+    def _wrap_text(self, text: str, max_chars: int = 40) -> str:
+        """Wrap text to fit within max characters per line."""
+        words = text.split()
+        lines = []
+        current_line = []
+        current_length = 0
+
+        for word in words:
+            if current_length + len(word) + 1 > max_chars and current_line:
+                lines.append(" ".join(current_line))
+                current_line = [word]
+                current_length = len(word)
+            else:
+                current_line.append(word)
+                current_length += len(word) + 1
+
+        if current_line:
+            lines.append(" ".join(current_line))
+
+        return "\n".join(lines)
+
+    def clear_error(self) -> None:
+        """Clear the error display."""
+        self._error_message = None
+        self._error_code = None
+        self._error_text = None
+        self._error_code_text = None
+        logger.info("Error display cleared")
+
+    def render_error(self) -> bool:
+        """
+        Render the error display.
+
+        Draws the error message with a subtle pulsing animation.
+        Call this each frame when in error mode.
+
+        Returns:
+            True if there is an error to display, False otherwise
+        """
+        if self._error_message is None or self._error_text is None:
+            return False
+
+        current_time = time.time()
+        elapsed = current_time - self._error_animation_start
+
+        # Calculate pulse alpha for error code (pulsing red warning)
+        pulse = 0.7 + 0.3 * math.sin(elapsed * 2 * math.pi / 1.5)
+
+        # Draw error code heading with pulse effect
+        if self._error_code_text:
+            self._error_code_text.set_alpha(pulse)
+            self._error_code_text.draw()
+
+        # Draw error message (static)
+        self._error_text.set_alpha(0.9)
+        self._error_text.draw()
+
+        return True
+
+    @property
+    def has_error(self) -> bool:
+        """Check if an error message is currently set."""
+        return self._error_message is not None
+
+    @property
+    def current_error_message(self) -> str | None:
+        """Get the current error message, if any."""
+        return self._error_message

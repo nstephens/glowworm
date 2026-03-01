@@ -74,10 +74,6 @@ Thumbs.db
 # Docker publishing materials (maintainer only)
 docker-publish/
 
-# Test files
-test_*.py
-*_test.py
-
 # Test results and reports
 *test_results*.json
 *_test_results.json

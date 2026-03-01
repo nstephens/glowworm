@@ -30,6 +30,22 @@ class RendererState(str, Enum):
     TRANSITIONING = "transitioning"  # Transitioning between images
     PAUSED = "paused"  # Paused, not updating display
     REGISTRATION = "registration"  # Showing registration code
+    ERROR = "error"  # Showing error message
+
+
+@dataclass
+class ErrorInfo:
+    """Information about a display error."""
+
+    message: str  # User-friendly error message
+    code: str = "UNKNOWN"  # Error code for categorization
+    details: str | None = None  # Technical details (for logging)
+    timestamp: float = 0.0  # When the error occurred
+    recoverable: bool = True  # Whether the system can recover
+
+    def __post_init__(self) -> None:
+        if self.timestamp == 0.0:
+            self.timestamp = time.time()
 
 
 @dataclass
@@ -43,6 +59,7 @@ class RenderStats:
     max_frame_time: float = 0.0
     transition_count: int = 0
     images_displayed: int = 0
+    errors_count: int = 0
 
     @property
     def avg_frame_time(self) -> float:
@@ -122,12 +139,16 @@ class Renderer:
         # Current transition (if any)
         self._transition: Transition | None = None
 
-        # Text renderer for registration display
+        # Text renderer for registration display and error messages
         self._text_renderer = TextRenderer(
             display_width=display.width,
             display_height=display.height,
             mock=mock,
         )
+
+        # Error state
+        self._current_error: ErrorInfo | None = None
+        self._previous_state: RendererState | None = None  # State before error
 
         # Statistics
         self.stats = RenderStats()
@@ -165,6 +186,16 @@ class Renderer:
     def queue_length(self) -> int:
         """Get number of images in the queue."""
         return len(self._image_queue)
+
+    @property
+    def current_error(self) -> ErrorInfo | None:
+        """Get current error info, if in error state."""
+        return self._current_error
+
+    @property
+    def has_error(self) -> bool:
+        """Check if renderer is in error state."""
+        return self._state == RendererState.ERROR
 
     def _set_state(self, new_state: RendererState) -> None:
         """
@@ -354,6 +385,10 @@ class Renderer:
             # Draw registration display with animation
             self._text_renderer.render_registration()
 
+        elif self._state == RendererState.ERROR:
+            # Draw error message
+            self._text_renderer.render_error()
+
     def pause(self) -> None:
         """
         Pause the renderer.
@@ -451,6 +486,67 @@ class Renderer:
         self._set_state(RendererState.IDLE)
         logger.info("Registration display hidden")
 
+    def show_error(
+        self,
+        message: str,
+        code: str = "UNKNOWN",
+        details: str | None = None,
+        recoverable: bool = True,
+    ) -> None:
+        """
+        Display an error message on screen.
+
+        Shows a user-friendly error message. The error will remain
+        displayed until clear_error() is called or a new image is loaded.
+
+        Args:
+            message: User-friendly error message
+            code: Error code for categorization (e.g., "NETWORK", "IMAGE_LOAD")
+            details: Technical details for logging (not shown to user)
+            recoverable: Whether the system can recover from this error
+        """
+        # Log the error with full details
+        log_msg = f"Display error [{code}]: {message}"
+        if details:
+            log_msg += f" - {details}"
+        logger.error(log_msg)
+
+        # Store error info
+        self._current_error = ErrorInfo(
+            message=message,
+            code=code,
+            details=details,
+            recoverable=recoverable,
+        )
+        self.stats.errors_count += 1
+
+        # Save previous state for recovery
+        if self._state != RendererState.ERROR:
+            self._previous_state = self._state
+
+        # Show error on text renderer
+        self._text_renderer.set_error_message(message, code)
+        self._set_state(RendererState.ERROR)
+
+    def clear_error(self) -> None:
+        """
+        Clear the error display and return to previous state.
+
+        If there was a recoverable error, attempts to return to
+        the state before the error occurred.
+        """
+        self._text_renderer.clear_error()
+        self._current_error = None
+
+        # Return to previous state if available
+        if self._previous_state:
+            self._set_state(self._previous_state)
+            self._previous_state = None
+        else:
+            self._set_state(RendererState.IDLE)
+
+        logger.info("Error display cleared")
+
     @property
     def is_showing_registration(self) -> bool:
         """Check if currently showing registration code."""
@@ -532,12 +628,13 @@ class Renderer:
         Returns:
             Dict with current state and statistics
         """
-        return {
+        status = {
             "state": self._state.value,
             "is_running": self._running,
             "is_paused": self.is_paused,
             "is_registration": self.is_showing_registration,
             "registration_code": self.registration_code,
+            "has_error": self.has_error,
             "current_image": self.current_image_path,
             "queue_length": self.queue_length,
             "stats": {
@@ -545,5 +642,17 @@ class Renderer:
                 "avg_fps": round(self.stats.avg_fps, 1),
                 "images_displayed": self.stats.images_displayed,
                 "transition_count": self.stats.transition_count,
+                "errors_count": self.stats.errors_count,
             },
         }
+
+        # Include error details if in error state
+        if self._current_error:
+            status["error"] = {
+                "message": self._current_error.message,
+                "code": self._current_error.code,
+                "timestamp": self._current_error.timestamp,
+                "recoverable": self._current_error.recoverable,
+            }
+
+        return status

@@ -56,6 +56,13 @@ interface RealtimeDeviceStatus {
   };
   uptime_seconds?: number;
   timestamp?: number;
+  // Error info (v3.0)
+  has_error?: boolean;
+  error?: {
+    message?: string;
+    code?: string;
+    timestamp?: number;
+  } | null;
 }
 
 const DisplaysWebSocket: React.FC = () => {
@@ -810,6 +817,19 @@ const DisplaysWebSocket: React.FC = () => {
                               )}
                             </span>
                           )}
+                        </div>
+                      )}
+
+                      {/* Error Display (Pi3D devices) */}
+                      {isPi3dDevice(device) && realtimeStatus?.has_error && realtimeStatus?.error && (
+                        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs">
+                          <div className="flex items-center text-red-700">
+                            <AlertCircle className="w-4 h-4 mr-2 flex-shrink-0" />
+                            <div>
+                              <span className="font-medium">[{realtimeStatus.error.code || 'ERROR'}]</span>{' '}
+                              {realtimeStatus.error.message || 'An error occurred'}
+                            </div>
+                          </div>
                         </div>
                       )}
 
