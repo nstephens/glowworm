@@ -3,13 +3,19 @@ Image Loading and Display for GlowWorm Display Engine.
 
 Handles loading images from file paths, creating Pi3D textures,
 calculating aspect ratios, and positioning sprites for display.
+
+Performance optimizations:
+- Image resizing before GPU upload (reduces memory)
+- Texture recycling pool (reduces allocations)
+- Lazy shader loading
 """
 
 import logging
-from dataclasses import dataclass
+from collections import OrderedDict
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from PIL import Image
 
@@ -17,11 +23,19 @@ from glowworm_display.config import Rotation
 
 if TYPE_CHECKING:
     import pi3d
+    from glowworm_display.performance import PerformanceMonitor
 
 logger = logging.getLogger(__name__)
 
 # Supported image formats
 SUPPORTED_FORMATS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}
+
+# Default max texture dimension (optimized for Pi GPU memory)
+# Images larger than this will be resized before upload
+DEFAULT_MAX_TEXTURE_SIZE = 2048
+
+# Default texture pool size (number of textures to keep in memory)
+DEFAULT_TEXTURE_POOL_SIZE = 4
 
 
 class ScaleMode(str, Enum):
@@ -60,13 +74,58 @@ class ImageLoadError(Exception):
     pass
 
 
+@dataclass
+class ImageLoaderConfig:
+    """Configuration for image loader optimizations."""
+
+    # Maximum texture dimension (images larger are resized)
+    max_texture_size: int = DEFAULT_MAX_TEXTURE_SIZE
+
+    # Number of textures to keep in recycling pool
+    texture_pool_size: int = DEFAULT_TEXTURE_POOL_SIZE
+
+    # Enable image resizing before GPU upload
+    resize_large_images: bool = True
+
+    # JPEG quality for resized images (1-100)
+    resize_quality: int = 90
+
+    # Use mipmaps (better quality at cost of memory)
+    use_mipmaps: bool = True
+
+    # Enable texture blending (for alpha)
+    enable_blending: bool = True
+
+
+@dataclass
+class TextureInfo:
+    """Information about a loaded texture for tracking."""
+
+    file_path: str
+    width: int
+    height: int
+    original_width: int
+    original_height: int
+    size_bytes: int = 0
+    was_resized: bool = False
+
+
 class MockTexture:
     """Mock Pi3D texture for development/testing."""
 
-    def __init__(self, file_path: str, width: int, height: int) -> None:
+    def __init__(
+        self,
+        file_path: str,
+        width: int,
+        height: int,
+        original_width: int | None = None,
+        original_height: int | None = None,
+    ) -> None:
         self.file_path = file_path
         self.ix = width
         self.iy = height
+        self.original_width = original_width or width
+        self.original_height = original_height or height
         logger.debug(f"MockTexture created: {width}x{height} from {file_path}")
 
 
@@ -127,11 +186,17 @@ class ImageLoader:
     Handles image loading, texture creation, aspect ratio calculation,
     and sprite positioning for proper display within the screen bounds.
 
+    Performance optimizations:
+    - Resizes large images before GPU upload to reduce memory
+    - Maintains a texture recycling pool to reduce allocations
+    - Integrates with PerformanceMonitor for tracking
+
     Attributes:
         display_width: Width of the display in pixels
         display_height: Height of the display in pixels
         rotation: Display rotation in degrees
         mock: Whether running in mock mode
+        config: Image loader configuration
     """
 
     def __init__(
@@ -140,6 +205,8 @@ class ImageLoader:
         display_height: int,
         rotation: Rotation = Rotation.DEG_0,
         mock: bool = False,
+        config: ImageLoaderConfig | None = None,
+        performance_monitor: "PerformanceMonitor | None" = None,
     ) -> None:
         """
         Initialize the image loader.
@@ -149,18 +216,36 @@ class ImageLoader:
             display_height: Height of the display in pixels
             rotation: Display rotation in degrees
             mock: If True, use mock objects for development
+            config: Optional configuration for optimizations
+            performance_monitor: Optional monitor for tracking metrics
         """
         self.display_width = display_width
         self.display_height = display_height
         self.rotation = rotation
         self.mock = mock
+        self.config = config or ImageLoaderConfig()
+        self._perf_monitor = performance_monitor
 
         # Pi3D shader for sprites (loaded lazily)
         self._shader: "pi3d.Shader | None" = None
 
+        # Texture recycling pool: OrderedDict for LRU behavior
+        # Maps file_path -> (texture, TextureInfo)
+        self._texture_pool: OrderedDict[str, tuple] = OrderedDict()
+
+        # Track texture info for all loaded textures
+        self._texture_info: dict[str, TextureInfo] = {}
+
+        # Statistics
+        self._textures_loaded: int = 0
+        self._textures_recycled: int = 0
+        self._textures_evicted: int = 0
+        self._bytes_saved_by_resize: int = 0
+
         logger.info(
             f"ImageLoader initialized: {display_width}x{display_height}, "
-            f"rotation={rotation.value}, mock={mock}"
+            f"rotation={rotation.value}, mock={mock}, "
+            f"max_texture_size={self.config.max_texture_size}"
         )
 
     def _get_shader(self) -> "pi3d.Shader":
@@ -222,6 +307,190 @@ class ImageLoader:
                 return img.size
         except Exception as e:
             raise ImageLoadError(f"Failed to read image dimensions: {e}") from e
+
+    def _should_resize(self, width: int, height: int) -> bool:
+        """Check if an image should be resized based on configuration."""
+        if not self.config.resize_large_images:
+            return False
+        max_size = self.config.max_texture_size
+        return width > max_size or height > max_size
+
+    def _calculate_resize_dimensions(
+        self, width: int, height: int
+    ) -> tuple[int, int]:
+        """
+        Calculate new dimensions that fit within max_texture_size.
+
+        Maintains aspect ratio while ensuring neither dimension
+        exceeds the maximum.
+
+        Args:
+            width: Original width
+            height: Original height
+
+        Returns:
+            Tuple of (new_width, new_height)
+        """
+        max_size = self.config.max_texture_size
+
+        if width <= max_size and height <= max_size:
+            return width, height
+
+        # Calculate scale factor to fit within max_size
+        scale = min(max_size / width, max_size / height)
+        new_width = int(width * scale)
+        new_height = int(height * scale)
+
+        # Ensure dimensions are at least 1
+        return max(1, new_width), max(1, new_height)
+
+    def _resize_image(self, path: Path) -> tuple[Image.Image, bool]:
+        """
+        Load and optionally resize an image.
+
+        Args:
+            path: Path to the image file
+
+        Returns:
+            Tuple of (PIL Image, was_resized)
+
+        Raises:
+            ImageLoadError: If image cannot be loaded
+        """
+        try:
+            img = Image.open(path)
+
+            # Convert to RGB if necessary (handles RGBA, P, etc.)
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGBA" if "A" in img.mode else "RGB")
+
+            original_width, original_height = img.size
+
+            if self._should_resize(original_width, original_height):
+                new_width, new_height = self._calculate_resize_dimensions(
+                    original_width, original_height
+                )
+
+                # Use LANCZOS for high-quality downsampling
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+                # Calculate memory saved (approximate)
+                original_bytes = original_width * original_height * 4  # RGBA
+                new_bytes = new_width * new_height * 4
+                self._bytes_saved_by_resize += original_bytes - new_bytes
+
+                logger.debug(
+                    f"Resized image {path.name}: "
+                    f"{original_width}x{original_height} -> {new_width}x{new_height}"
+                )
+                return img, True
+
+            return img, False
+
+        except Exception as e:
+            raise ImageLoadError(f"Failed to load/resize image: {e}") from e
+
+    def _get_texture_from_pool(
+        self, file_path: str
+    ) -> "MockTexture | pi3d.Texture | None":
+        """
+        Try to get a texture from the recycling pool.
+
+        If found, moves it to the end (most recently used).
+
+        Args:
+            file_path: Path to look up
+
+        Returns:
+            Texture if found in pool, None otherwise
+        """
+        if file_path in self._texture_pool:
+            # Move to end (most recently used)
+            self._texture_pool.move_to_end(file_path)
+            texture, info = self._texture_pool[file_path]
+            self._textures_recycled += 1
+            logger.debug(f"Recycled texture from pool: {file_path}")
+            return texture
+        return None
+
+    def _add_texture_to_pool(
+        self,
+        file_path: str,
+        texture: "MockTexture | pi3d.Texture",
+        info: TextureInfo,
+    ) -> None:
+        """
+        Add a texture to the recycling pool.
+
+        Evicts oldest textures if pool is full.
+
+        Args:
+            file_path: Path key for the texture
+            texture: The texture object
+            info: Texture information
+        """
+        # Evict oldest if pool is full
+        while len(self._texture_pool) >= self.config.texture_pool_size:
+            oldest_path, (old_texture, old_info) = self._texture_pool.popitem(last=False)
+            self._textures_evicted += 1
+
+            # Track in performance monitor
+            if self._perf_monitor:
+                self._perf_monitor.track_texture_unload(old_info.size_bytes)
+
+            logger.debug(f"Evicted texture from pool: {oldest_path}")
+
+        self._texture_pool[file_path] = (texture, info)
+        self._texture_info[file_path] = info
+
+    def clear_texture_pool(self) -> int:
+        """
+        Clear all textures from the recycling pool.
+
+        Useful for freeing memory during idle periods.
+
+        Returns:
+            Number of textures cleared
+        """
+        count = len(self._texture_pool)
+
+        for file_path, (texture, info) in self._texture_pool.items():
+            if self._perf_monitor:
+                self._perf_monitor.track_texture_unload(info.size_bytes)
+
+        self._texture_pool.clear()
+        logger.info(f"Cleared {count} textures from pool")
+        return count
+
+    def get_pool_stats(self) -> dict:
+        """
+        Get statistics about the texture pool.
+
+        Returns:
+            Dict with pool statistics
+        """
+        total_size = sum(
+            info.size_bytes for _, (_, info) in self._texture_pool.items()
+        )
+
+        return {
+            "pool_size": len(self._texture_pool),
+            "pool_capacity": self.config.texture_pool_size,
+            "total_bytes": total_size,
+            "total_mb": round(total_size / (1024 * 1024), 2),
+            "textures_loaded": self._textures_loaded,
+            "textures_recycled": self._textures_recycled,
+            "textures_evicted": self._textures_evicted,
+            "recycle_rate": (
+                self._textures_recycled / self._textures_loaded
+                if self._textures_loaded > 0
+                else 0.0
+            ),
+            "bytes_saved_by_resize": self._bytes_saved_by_resize,
+            "mb_saved_by_resize": round(
+                self._bytes_saved_by_resize / (1024 * 1024), 2
+            ),
+        }
 
     def calculate_dimensions(
         self,
@@ -320,13 +589,21 @@ class ImageLoader:
             )
 
     def load_texture(
-        self, file_path: str | Path
+        self,
+        file_path: str | Path,
+        use_pool: bool = True,
     ) -> "MockTexture | pi3d.Texture":
         """
         Load an image file as a Pi3D texture.
 
+        Includes optimizations:
+        - Checks texture pool first to avoid reloading
+        - Resizes large images to fit max_texture_size
+        - Tracks texture in performance monitor
+
         Args:
             file_path: Path to the image file
+            use_pool: If True, check/use texture pool
 
         Returns:
             Pi3D Texture object (or MockTexture in mock mode)
@@ -335,20 +612,118 @@ class ImageLoader:
             ImageLoadError: If image cannot be loaded
         """
         path = self._validate_path(file_path)
+        path_str = str(path)
+
+        # Check texture pool first
+        if use_pool:
+            pooled = self._get_texture_from_pool(path_str)
+            if pooled is not None:
+                return pooled
 
         logger.debug(f"Loading texture: {path}")
+        self._textures_loaded += 1
 
         if self.mock:
-            # Load with PIL just to get dimensions
-            width, height = self._load_image_dimensions(path)
-            return MockTexture(str(path), width, height)
+            # Load with PIL and optionally resize
+            img, was_resized = self._resize_image(path)
+            width, height = img.size
+            original_width, original_height = (
+                self._load_image_dimensions(path) if was_resized else (width, height)
+            )
+            img.close()
+
+            texture = MockTexture(
+                path_str, width, height, original_width, original_height
+            )
+
+            # Calculate approximate size (RGBA)
+            size_bytes = width * height * 4
+
+            info = TextureInfo(
+                file_path=path_str,
+                width=width,
+                height=height,
+                original_width=original_width,
+                original_height=original_height,
+                size_bytes=size_bytes,
+                was_resized=was_resized,
+            )
+
+            # Track in performance monitor
+            if self._perf_monitor:
+                self._perf_monitor.track_texture_load(size_bytes)
+
+            # Add to pool
+            if use_pool:
+                self._add_texture_to_pool(path_str, texture, info)
+
+            return texture
 
         try:
             import pi3d
 
-            texture = pi3d.Texture(str(path), blend=True, mipmap=True)
-            logger.debug(f"Texture loaded: {texture.ix}x{texture.iy}")
+            # Get original dimensions first
+            original_width, original_height = self._load_image_dimensions(path)
+
+            # Check if resizing is needed
+            if self._should_resize(original_width, original_height):
+                # Load, resize, and create texture from PIL image
+                img, was_resized = self._resize_image(path)
+                width, height = img.size
+
+                # Create texture from PIL image array
+                import numpy as np
+
+                # Convert to numpy array for pi3d
+                img_array = np.array(img)
+                img.close()
+
+                # pi3d.Texture can accept numpy array
+                texture = pi3d.Texture(
+                    img_array,
+                    blend=self.config.enable_blending,
+                    mipmap=self.config.use_mipmaps,
+                )
+            else:
+                # Load directly (no resize needed)
+                texture = pi3d.Texture(
+                    path_str,
+                    blend=self.config.enable_blending,
+                    mipmap=self.config.use_mipmaps,
+                )
+                width, height = texture.ix, texture.iy
+                was_resized = False
+
+            # Calculate approximate GPU memory usage
+            # RGBA with mipmaps is roughly 1.33x base size
+            size_bytes = width * height * 4
+            if self.config.use_mipmaps:
+                size_bytes = int(size_bytes * 1.33)
+
+            info = TextureInfo(
+                file_path=path_str,
+                width=width,
+                height=height,
+                original_width=original_width,
+                original_height=original_height,
+                size_bytes=size_bytes,
+                was_resized=was_resized,
+            )
+
+            # Track in performance monitor
+            if self._perf_monitor:
+                self._perf_monitor.track_texture_load(size_bytes)
+
+            # Add to pool
+            if use_pool:
+                self._add_texture_to_pool(path_str, texture, info)
+
+            logger.debug(
+                f"Texture loaded: {width}x{height}"
+                f"{' (resized from ' + str(original_width) + 'x' + str(original_height) + ')' if was_resized else ''}"
+            )
             return texture
+
         except Exception as e:
             raise ImageLoadError(f"Failed to load texture: {e}") from e
 

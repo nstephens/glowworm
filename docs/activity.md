@@ -2283,3 +2283,128 @@ pytest daemon/tests/test_error_handling.py -v
 
 ### Next Task
 Task 7.2: Performance Monitoring
+
+## 2026-02-28 20:15 - Task 7.2: Performance Optimization
+
+### What Changed
+Implemented comprehensive performance optimization across the Pi3D display engine, daemon cache, and image loading with real-time metrics tracking and background I/O.
+
+### Files Created
+
+**Display Engine:**
+- `display/glowworm_display/performance.py`:
+  - `PerformanceMetrics` dataclass for metric snapshots
+  - `PerformanceConfig` dataclass for configuration
+  - `PerformanceMonitor` class with:
+    - FPS tracking with rolling average
+    - Frame timing statistics (min/max/avg)
+    - Memory usage monitoring via /proc/self/status
+    - Texture load/unload tracking
+    - Dropped frame detection
+    - Performance alerts via callbacks
+    - Periodic performance logging
+    - GC optimization (adjusts thresholds for real-time rendering)
+    - Manual GC triggering during idle periods
+
+**Tests:**
+- `display/tests/test_performance.py`: 16 tests for performance monitoring
+- `display/tests/test_image_loader_optimization.py`: 13 tests for image optimizations
+- `daemon/tests/test_cache_optimization.py`: 11 tests for cache background I/O
+
+### Files Modified
+
+**Display Engine:**
+- `display/glowworm_display/image_loader.py`:
+  - Added `ImageLoaderConfig` dataclass for optimization settings
+  - Added `TextureInfo` dataclass for texture tracking
+  - Added texture recycling pool with LRU eviction
+  - Added image resizing for large images (reduces GPU memory)
+  - Added `_should_resize()`, `_calculate_resize_dimensions()`, `_resize_image()` methods
+  - Added `_get_texture_from_pool()`, `_add_texture_to_pool()` methods
+  - Added `clear_texture_pool()` and `get_pool_stats()` methods
+  - Modified `load_texture()` to use pool and resize large images
+  - Added performance monitor integration
+
+- `display/glowworm_display/renderer.py`:
+  - Integrated `PerformanceMonitor` for real-time metrics
+  - Added `_on_performance_alert()` callback handler
+  - Added `_maybe_run_gc()` for scheduled GC during idle
+  - Updated `run_once()` with frame_start/frame_end tracking
+  - Updated `run()` to start/stop performance monitoring
+  - Updated `get_status()` to include performance metrics
+  - Added `get_performance_metrics()` method
+
+- `display/glowworm_display/__init__.py`:
+  - Exported new classes: `PerformanceConfig`, `PerformanceMetrics`, `PerformanceMonitor`, `ImageLoaderConfig`, `TextureInfo`, `create_performance_monitor`
+
+**Daemon:**
+- `daemon/glowworm_daemon/cache.py`:
+  - Added `EvictionCallback` type for eviction notifications
+  - Added background I/O fields to `CacheConfig`: `io_workers`, `enable_background_eviction`, `eviction_batch_size`
+  - Added `ThreadPoolExecutor` for background I/O
+  - Added `_evict_lru_background()` for non-blocking eviction
+  - Added `evict_lru_async()` for async eviction
+  - Added `schedule_eviction_if_needed()` for automatic maintenance
+  - Added `shutdown()` for graceful cleanup
+  - Updated `create_cache()` to accept eviction callback
+
+### Performance Features Implemented
+
+1. **FPS Monitoring**: Rolling average FPS with min/max/current tracking
+2. **Memory Monitoring**: Process memory via /proc/self/status, peak tracking
+3. **Texture Recycling**: LRU pool to avoid repeated GPU uploads
+4. **Image Resizing**: Large images resized to max_texture_size before GPU upload
+5. **GC Optimization**: Raised GC thresholds, manual GC during idle periods
+6. **Background Eviction**: Cache eviction runs in thread pool to avoid blocking
+7. **Performance Alerts**: Callbacks when FPS drops or frames are slow
+8. **Metrics Reporting**: Performance data included in get_status()
+
+### Configuration Options
+
+**ImageLoaderConfig:**
+- `max_texture_size`: 2048 (images larger are resized)
+- `texture_pool_size`: 4 (number of textures to keep in pool)
+- `resize_large_images`: True
+- `resize_quality`: 90 (JPEG quality for resized images)
+
+**PerformanceConfig:**
+- `target_fps`: 30
+- `fps_window_size`: 60 (frames for rolling average)
+- `memory_check_interval`: 30 (frames between memory checks)
+- `log_interval_seconds`: 60.0
+- `fps_alert_threshold`: 25.0
+- `memory_alert_threshold_mb`: 180.0
+
+**CacheConfig:**
+- `io_workers`: 2 (thread pool size)
+- `enable_background_eviction`: True
+- `eviction_batch_size`: 5
+
+### Verification
+```
+pytest display/tests/test_performance.py -v
+# 16 passed
+
+pytest display/tests/test_image_loader_optimization.py -v
+# 13 passed
+
+pytest daemon/tests/test_cache_optimization.py -v
+# 11 passed
+
+pytest display/tests/ -v
+# 53 passed
+
+pytest daemon/tests/ -v
+# 430 passed (3 pre-existing flaky websocket tests failed)
+```
+
+### Notes
+- Performance monitoring integrates with Renderer automatically
+- Texture pool uses LRU eviction when pool is full
+- Large images are resized using PIL LANCZOS filter for quality
+- GC is scheduled to run after transitions complete (not during)
+- Background eviction uses ThreadPoolExecutor for non-blocking I/O
+- All optimizations are configurable and can be disabled
+
+### Next Task
+Task 7.3: Installation Automation

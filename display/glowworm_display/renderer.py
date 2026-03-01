@@ -2,6 +2,11 @@
 Renderer Main Loop for GlowWorm Display Engine.
 
 Manages image display, transitions, and state machine for the slideshow.
+
+Performance features:
+- Integrates with PerformanceMonitor for real-time metrics
+- Runs GC during idle periods (between images)
+- Tracks frame timing and memory usage
 """
 
 import logging
@@ -12,6 +17,7 @@ from typing import TYPE_CHECKING, Callable
 
 from glowworm_display.display import Display
 from glowworm_display.image_loader import ImageLoader, ImageLoadError, ScaleMode
+from glowworm_display.performance import PerformanceMonitor, PerformanceConfig
 from glowworm_display.text_renderer import TextRenderer
 from glowworm_display.transitions import CrossfadeTransition, Transition, TransitionState
 
@@ -110,6 +116,8 @@ class Renderer:
         default_transition_duration: float = 1.0,
         on_state_change: StateChangeCallback | None = None,
         mock: bool = False,
+        enable_performance_monitoring: bool = True,
+        performance_log_interval: float = 60.0,
     ) -> None:
         """
         Initialize the renderer.
@@ -120,6 +128,8 @@ class Renderer:
             default_transition_duration: Default transition duration in seconds
             on_state_change: Optional callback when state changes
             mock: If True, use mock rendering for development
+            enable_performance_monitoring: If True, track performance metrics
+            performance_log_interval: How often to log performance (seconds)
         """
         self.display = display
         self.image_loader = image_loader
@@ -156,7 +166,34 @@ class Renderer:
         # Running flag
         self._running = False
 
+        # Performance monitoring
+        self._perf_monitor: PerformanceMonitor | None = None
+        if enable_performance_monitoring:
+            perf_config = PerformanceConfig(
+                target_fps=display.fps_target if hasattr(display, 'fps_target') else 30,
+                log_interval_seconds=performance_log_interval,
+            )
+            self._perf_monitor = PerformanceMonitor(
+                perf_config,
+                on_alert=self._on_performance_alert,
+            )
+
+        # Track last image display time for GC scheduling
+        self._last_image_change: float = 0.0
+        self._gc_scheduled: bool = False
+
         logger.info("Renderer initialized")
+
+    def _on_performance_alert(self, alert_type: str, data: dict) -> None:
+        """Handle performance alerts from the monitor."""
+        if alert_type == "low_fps":
+            logger.warning(
+                f"Performance alert: Low FPS ({data['fps']:.1f} < {data['threshold']})"
+            )
+        elif alert_type == "slow_frame":
+            logger.warning(
+                f"Performance alert: Slow frame ({data['time_ms']:.1f}ms > {data['threshold']}ms)"
+            )
 
     @property
     def state(self) -> RendererState:
@@ -346,6 +383,11 @@ class Renderer:
             self._transition = None
             self._set_state(RendererState.DISPLAYING)
             self.stats.images_displayed += 1
+
+            # Track image change time and schedule GC
+            self._last_image_change = time.time()
+            self._gc_scheduled = True
+
             logger.debug("Transition complete, now displaying new image")
 
         elif self._transition.state == TransitionState.CANCELLED:
@@ -572,6 +614,10 @@ class Renderer:
 
         frame_start = time.time()
 
+        # Performance monitoring - frame start
+        if self._perf_monitor:
+            self._perf_monitor.frame_start()
+
         # Update transition if active
         if self._state == RendererState.TRANSITIONING:
             self._update_transition()
@@ -579,6 +625,9 @@ class Renderer:
         # Process queue if idle or displaying
         if self._state in (RendererState.IDLE, RendererState.DISPLAYING):
             self._process_queue()
+
+            # Schedule GC during idle periods (between image changes)
+            self._maybe_run_gc()
 
         # Render frame
         with self.display.frame():
@@ -592,7 +641,29 @@ class Renderer:
         self.stats.min_frame_time = min(self.stats.min_frame_time, frame_time)
         self.stats.max_frame_time = max(self.stats.max_frame_time, frame_time)
 
+        # Performance monitoring - frame end
+        if self._perf_monitor:
+            self._perf_monitor.frame_end()
+
         return True
+
+    def _maybe_run_gc(self) -> None:
+        """
+        Run garbage collection during idle periods.
+
+        Schedules GC to run after a transition completes and the
+        display is stable, to avoid GC pauses during animations.
+        """
+        if not self._gc_scheduled:
+            return
+
+        # Only run GC if we've been displaying for a bit (after transition)
+        time_since_change = time.time() - self._last_image_change
+        if time_since_change > 0.5 and self._state == RendererState.DISPLAYING:
+            if self._perf_monitor:
+                self._perf_monitor.run_gc()
+            self._gc_scheduled = False
+            logger.debug("Ran scheduled GC after transition")
 
     def run(self) -> None:
         """
@@ -603,6 +674,10 @@ class Renderer:
         logger.info("Starting render loop")
         self._running = True
 
+        # Start performance monitoring
+        if self._perf_monitor:
+            self._perf_monitor.start()
+
         try:
             while self._running and self.display.is_running:
                 if not self.run_once():
@@ -611,6 +686,11 @@ class Renderer:
             logger.info("Render loop interrupted")
         finally:
             self._running = False
+
+            # Stop performance monitoring
+            if self._perf_monitor:
+                self._perf_monitor.stop()
+
             logger.info(
                 f"Render loop ended: {self.stats.frame_count} frames, "
                 f"{self.stats.avg_fps:.1f} avg FPS"
@@ -655,4 +735,24 @@ class Renderer:
                 "recoverable": self._current_error.recoverable,
             }
 
+        # Include performance metrics if monitoring is enabled
+        if self._perf_monitor:
+            perf_metrics = self._perf_monitor.get_metrics()
+            status["performance"] = perf_metrics.to_dict()
+
+        # Include texture pool stats if available
+        if hasattr(self.image_loader, 'get_pool_stats'):
+            status["texture_pool"] = self.image_loader.get_pool_stats()
+
         return status
+
+    def get_performance_metrics(self) -> dict | None:
+        """
+        Get detailed performance metrics.
+
+        Returns:
+            Performance metrics dict, or None if monitoring disabled
+        """
+        if self._perf_monitor:
+            return self._perf_monitor.get_metrics().to_dict()
+        return None

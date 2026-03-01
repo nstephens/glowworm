@@ -6,18 +6,25 @@ Provides:
 - LRU eviction when max size exceeded
 - Minimum free space protection
 - Cache statistics (count, size, hit rate)
+- Background eviction to avoid blocking I/O
+- Async-friendly operations
 """
+import asyncio
 import logging
 import os
 import shutil
 import sqlite3
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+# Default thread pool size for background I/O
+DEFAULT_IO_WORKERS = 2
 
 
 @dataclass
@@ -27,6 +34,10 @@ class CacheConfig:
     max_size_mb: int = 500  # Maximum cache size in MB
     min_free_space_mb: int = 100  # Minimum free disk space to maintain
     db_filename: str = "cache.db"
+    # Background I/O settings
+    io_workers: int = DEFAULT_IO_WORKERS  # Thread pool size for I/O
+    enable_background_eviction: bool = True  # Evict in background thread
+    eviction_batch_size: int = 5  # Files to evict per batch
 
     def __post_init__(self):
         # Ensure cache directory exists
@@ -87,6 +98,10 @@ class CacheStats:
         }
 
 
+# Type for eviction callback
+EvictionCallback = Callable[[int, str], None]  # (image_id, size)
+
+
 class ImageCache:
     """
     Local image cache with SQLite metadata storage and LRU eviction.
@@ -97,17 +112,35 @@ class ImageCache:
     - Free space protection (won't fill disk below min_free_space_mb)
     - Thread-safe operations
     - Cache statistics tracking (hits, misses, evictions)
+    - Background eviction to avoid blocking the main thread
+    - Async-friendly operations via thread pool
     """
 
-    def __init__(self, config: CacheConfig):
+    def __init__(
+        self,
+        config: CacheConfig,
+        on_eviction: EvictionCallback | None = None,
+    ):
         self.config = config
         self._db_path = Path(config.cache_dir) / config.db_filename
         self._lock = Lock()
+        self._on_eviction = on_eviction
 
         # Statistics counters
         self._hits = 0
         self._misses = 0
         self._evictions = 0
+
+        # Background I/O
+        self._io_executor: ThreadPoolExecutor | None = None
+        if config.enable_background_eviction and config.io_workers > 0:
+            self._io_executor = ThreadPoolExecutor(
+                max_workers=config.io_workers,
+                thread_name_prefix="cache-io",
+            )
+
+        # Pending background evictions
+        self._pending_evictions: int = 0
 
         # Initialize database
         self._init_db()
@@ -462,6 +495,13 @@ class ImageCache:
                         "UPDATE cache_stats SET value = value + 1 WHERE key = 'evictions'"
                     )
 
+                    # Notify callback
+                    if self._on_eviction:
+                        try:
+                            self._on_eviction(entry["image_id"], entry["size"])
+                        except Exception as e:
+                            logger.warning(f"Eviction callback error: {e}")
+
                     logger.debug(
                         f"Evicted image {entry['image_id']}:{entry['size']} "
                         f"({entry['file_size']} bytes, freed {freed} total)"
@@ -473,6 +513,106 @@ class ImageCache:
                 conn.close()
 
         return freed
+
+    def _evict_lru_background(self, bytes_to_free: int) -> None:
+        """
+        Schedule LRU eviction in background thread.
+
+        This is non-blocking - the eviction happens asynchronously.
+
+        Args:
+            bytes_to_free: Target bytes to free
+        """
+        if self._io_executor is None:
+            # No background executor, run synchronously
+            self._evict_lru(bytes_to_free)
+            return
+
+        self._pending_evictions += 1
+
+        def do_eviction():
+            try:
+                freed = self._evict_lru(bytes_to_free)
+                logger.debug(f"Background eviction freed {freed} bytes")
+            except Exception as e:
+                logger.error(f"Background eviction error: {e}")
+            finally:
+                self._pending_evictions -= 1
+
+        self._io_executor.submit(do_eviction)
+        logger.debug(f"Scheduled background eviction for {bytes_to_free} bytes")
+
+    async def evict_lru_async(self, bytes_to_free: int) -> int:
+        """
+        Evict LRU entries asynchronously.
+
+        Runs the eviction in a thread pool to avoid blocking.
+
+        Args:
+            bytes_to_free: Target bytes to free
+
+        Returns:
+            Number of bytes freed
+        """
+        if self._io_executor is None:
+            # No executor, run in default executor
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(
+                None, self._evict_lru, bytes_to_free
+            )
+
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            self._io_executor, self._evict_lru, bytes_to_free
+        )
+
+    def schedule_eviction_if_needed(self) -> bool:
+        """
+        Check if eviction is needed and schedule it in background.
+
+        This is non-blocking and can be called frequently.
+
+        Returns:
+            True if eviction was scheduled, False if not needed.
+        """
+        # Skip if already evicting
+        if self._pending_evictions > 0:
+            return False
+
+        max_bytes = self.config.max_size_mb * 1024 * 1024
+        current_size = self._get_total_size()
+
+        # Check if we're over 90% capacity
+        if current_size > max_bytes * 0.9:
+            # Target getting back to 80%
+            bytes_to_free = int(current_size - max_bytes * 0.8)
+            if bytes_to_free > 0:
+                self._evict_lru_background(bytes_to_free)
+                return True
+
+        # Also check free space
+        free_space = self._get_free_space()
+        min_free = self.config.min_free_space_mb * 1024 * 1024
+
+        if free_space < min_free * 1.2:  # Buffer of 20%
+            # Free up some space
+            bytes_to_free = int(min_free * 0.2)  # Free 20% of min
+            self._evict_lru_background(bytes_to_free)
+            return True
+
+        return False
+
+    def shutdown(self) -> None:
+        """
+        Shutdown the cache and cleanup resources.
+
+        Waits for pending background operations to complete.
+        """
+        if self._io_executor:
+            logger.info("Shutting down cache I/O executor...")
+            self._io_executor.shutdown(wait=True)
+            self._io_executor = None
+            logger.info("Cache I/O executor shutdown complete")
 
     def _get_total_size(self) -> int:
         """Get total size of cached files in bytes."""
@@ -667,6 +807,9 @@ class ImageCache:
                 conn.close()
 
 
-def create_cache(config: CacheConfig) -> ImageCache:
+def create_cache(
+    config: CacheConfig,
+    on_eviction: EvictionCallback | None = None,
+) -> ImageCache:
     """Factory function to create an ImageCache instance."""
-    return ImageCache(config)
+    return ImageCache(config, on_eviction)
