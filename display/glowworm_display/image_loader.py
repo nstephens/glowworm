@@ -953,21 +953,24 @@ class ImageLoader:
 
         if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
             # Rotated display: position along X axis (which becomes vertical visually)
+            # Note: rotateToZ rotates counter-clockwise, so 270° = 90° clockwise
+            # This means hardware +Y becomes visual +X (right), and hardware +X becomes visual -Y (bottom)
+            # So for visual top (positive visual Y), we need negative hardware X
             if self.rotation == Rotation.DEG_270:
-                # 270°: visual top is positive X in hardware coords
+                # 270° CCW = 90° CW: visual top is negative X in hardware coords
                 if position == 'top':
-                    x_offset = quarter_offset
+                    x_offset = -quarter_offset
                     y_offset = 0.0
                 else:
-                    x_offset = -quarter_offset
+                    x_offset = quarter_offset
                     y_offset = 0.0
             else:  # DEG_90
-                # 90°: visual top is negative X in hardware coords
+                # 90° CCW: visual top is positive X in hardware coords
                 if position == 'top':
-                    x_offset = -quarter_offset
+                    x_offset = quarter_offset
                     y_offset = 0.0
                 else:
-                    x_offset = quarter_offset
+                    x_offset = -quarter_offset
                     y_offset = 0.0
         else:
             # Non-rotated display: position along Y axis
