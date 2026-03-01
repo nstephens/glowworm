@@ -105,6 +105,7 @@ class GlowwormDaemonV3:
         print("Display started successfully", flush=True)
 
         # Initialize managers
+        print("Initializing image manager...", flush=True)
         image_config = ImageManagerConfig(
             backend_url=self.config.backend.url,
             device_token=self.config.backend.device_token,
@@ -112,15 +113,19 @@ class GlowwormDaemonV3:
         )
         self.image_manager = ImageManager(config=image_config, cache=self.cache)
         await self.image_manager.start()
+        print("Image manager started", flush=True)
 
+        print("Initializing playlist manager...", flush=True)
         playlist_config = PlaylistManagerConfig(
             backend_url=self.config.backend.url,
             device_token=self.config.backend.device_token,
         )
         self.playlist_manager = PlaylistManager(config=playlist_config)
         await self.playlist_manager.start()
+        print("Playlist manager started", flush=True)
 
         # Initialize slideshow orchestrator
+        print("Initializing slideshow orchestrator...", flush=True)
         slideshow_config = SlideshowConfig(
             default_display_time=self.config.slideshow.display_time,
             transition_duration=self.config.slideshow.transition_duration,
@@ -132,9 +137,11 @@ class GlowwormDaemonV3:
             images=self.image_manager,
             config=slideshow_config,
         )
+        print("Slideshow orchestrator created", flush=True)
 
         # Initialize WebSocket client
         ws_url = self.config.backend.effective_websocket_url
+        print(f"Initializing WebSocket client: {ws_url}", flush=True)
         ws_config = WebSocketConfig(
             url=ws_url,
             device_token=self.config.backend.device_token,
@@ -172,25 +179,33 @@ class GlowwormDaemonV3:
         )
 
         # Start WebSocket connection
+        print(f"Connecting to WebSocket: {ws_url}", flush=True)
         logger.info(f"Connecting to WebSocket: {ws_url}")
         await self.websocket.connect()
+        print("WebSocket connected", flush=True)
 
         # Load playlist and start slideshow
+        print("Loading playlist...", flush=True)
         logger.info("Loading playlist...")
         try:
             await self.playlist_manager.fetch_playlist()
             playlist = self.playlist_manager.playlist
             count = playlist.entry_count if playlist else 0
+            print(f"Playlist loaded: {count} entries", flush=True)
             logger.info(f"Playlist loaded: {count} entries")
         except Exception as e:
+            print(f"Failed to load playlist: {e}", flush=True)
             logger.warning(f"Failed to load playlist: {e}")
 
         # Start slideshow
+        print("Starting slideshow...", flush=True)
         logger.info("Starting slideshow...")
         await self.slideshow.start()
+        print("Slideshow started", flush=True)
 
         # Start status reporter
         await self.status_reporter.start()
+        print("Status reporter started", flush=True)
 
         logger.info("Daemon fully initialized and running")
 
