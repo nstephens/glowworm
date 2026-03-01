@@ -560,18 +560,25 @@ class SlideshowOrchestrator:
                     await asyncio.sleep(1.0)
                     continue
 
-                # Display the current image(s)
-                print(f"Displaying {len(images)} image(s)...", flush=True)
-                success = await self._display_images(images)
-                print(f"Display result: {success}", flush=True)
-
-                if success:
-                    self._stats.images_displayed += 1
+                # Check if we're already displaying this exact image
+                # (single-image playlist shouldn't keep re-transitioning)
+                current_image_id = images[0].id if images else None
+                if current_image_id == self._stats.current_image_id and self._stats.images_displayed > 0:
+                    # Already displaying this image, just wait for display time
+                    print(f"Already displaying image {current_image_id}, skipping reload", flush=True)
                 else:
-                    self._stats.images_skipped += 1
-                    # Skip to next immediately on failure
-                    self.playlist.next()
-                    continue
+                    # Display the current image(s)
+                    print(f"Displaying {len(images)} image(s)...", flush=True)
+                    success = await self._display_images(images)
+                    print(f"Display result: {success}", flush=True)
+
+                    if not success:
+                        self._stats.images_skipped += 1
+                        # Skip to next immediately on failure
+                        self.playlist.next()
+                        continue
+
+                    self._stats.images_displayed += 1
 
                 # Update preloader queue after displaying
                 if self.preloader:
