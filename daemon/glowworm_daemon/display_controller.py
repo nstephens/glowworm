@@ -465,6 +465,12 @@ class DisplayController:
             if self.config.display_config_json:
                 env["GLOWWORM_DISPLAY_CONFIG"] = self.config.display_config_json
 
+            # Remove stale socket if it exists
+            socket_path = Path(self.config.socket_path)
+            if socket_path.exists():
+                logger.debug(f"Removing stale socket: {socket_path}")
+                socket_path.unlink()
+
             logger.info(f"Starting display process: {' '.join(cmd)}")
 
             # Start subprocess
@@ -484,7 +490,7 @@ class DisplayController:
                 self._set_state(DisplayState.CRASHED)
                 return False
 
-            # Connect IPC client
+            # Connect IPC client with retries (cage takes time to start)
             self._ipc_client = IPCClient(
                 self.config.socket_path,
                 timeout=self.config.health_check_interval,
@@ -494,8 +500,16 @@ class DisplayController:
             for callback in self._notification_callbacks:
                 self._ipc_client.add_notification_callback(callback)
 
-            if not await self._ipc_client.connect():
-                logger.error("Failed to connect IPC client")
+            # Retry IPC connection (display inside cage may take a moment)
+            max_connect_attempts = 10
+            for attempt in range(max_connect_attempts):
+                if await self._ipc_client.connect():
+                    logger.info(f"IPC connected on attempt {attempt + 1}")
+                    break
+                logger.debug(f"IPC connect attempt {attempt + 1}/{max_connect_attempts} failed, retrying...")
+                await asyncio.sleep(1.0)
+            else:
+                logger.error(f"Failed to connect IPC client after {max_connect_attempts} attempts")
                 await self._kill_process()
                 self._set_state(DisplayState.CRASHED)
                 return False
