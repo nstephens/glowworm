@@ -436,6 +436,13 @@ class PlaylistManager:
                     checksum=item.get("checksum"),
                 )
 
+        # If sequence is empty or incomplete, use all images from manifest
+        # This handles the case where images are added but sequence isn't updated
+        if manifest and (not sequence or len(sequence) < len(manifest)):
+            all_image_ids = sorted([int(item["id"]) for item in manifest])
+            print(f"_parse_playlist_dict: sequence incomplete ({len(sequence)} < {len(manifest)}), using all images: {all_image_ids}", flush=True)
+            sequence = all_image_ids
+
         # Compute version hash
         version_hash = self._compute_version_hash(sequence, images)
 
