@@ -461,6 +461,17 @@ class DisplayController:
                 os.makedirs(runtime_dir, mode=0o700, exist_ok=True)
                 env["XDG_RUNTIME_DIR"] = runtime_dir
 
+            # Set SDL2/Wayland environment variables for Pi3D
+            # These are required for Pi3D's SDL2 backend to work with Cage compositor
+            if self.config.use_cage:
+                # Force SDL2 to use Wayland backend (not X11 or KMSDRM)
+                env["SDL_VIDEODRIVER"] = "wayland"
+                # Use OpenGL ES 2.0 renderer (required for Pi GPU)
+                env["SDL_RENDER_DRIVER"] = "opengles2"
+                # Wayland display will be set by cage, but ensure it's available
+                if "WAYLAND_DISPLAY" not in env:
+                    env["WAYLAND_DISPLAY"] = "wayland-0"
+
             # Pass display config via environment variable if provided
             if self.config.display_config_json:
                 env["GLOWWORM_DISPLAY_CONFIG"] = self.config.display_config_json

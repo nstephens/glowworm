@@ -244,6 +244,15 @@ class Display:
         bg_rgb: tuple[float, float, float],
     ) -> None:
         """Initialize real Pi3D display."""
+        import os
+
+        # Log environment for debugging
+        logger.info("Display environment:")
+        logger.info(f"  SDL_VIDEODRIVER={os.environ.get('SDL_VIDEODRIVER', 'unset')}")
+        logger.info(f"  WAYLAND_DISPLAY={os.environ.get('WAYLAND_DISPLAY', 'unset')}")
+        logger.info(f"  XDG_RUNTIME_DIR={os.environ.get('XDG_RUNTIME_DIR', 'unset')}")
+        logger.info(f"  DISPLAY={os.environ.get('DISPLAY', 'unset')}")
+
         try:
             import pi3d
         except ImportError as e:
@@ -251,12 +260,20 @@ class Display:
                 "Pi3D library not found. Install it with: pip install pi3d"
             ) from e
 
+        # Log pi3d configuration for debugging
         logger.info("Creating Pi3D display...")
+        logger.info(f"Pi3D version: {getattr(pi3d, '__version__', 'unknown')}")
+        logger.info(f"Pi3D PLATFORM: {getattr(pi3d, 'PLATFORM', 'unknown')}")
+        logger.info(f"Pi3D USE_PYGAME: {getattr(pi3d, 'USE_PYGAME', 'unknown')}")
+        logger.info(f"Pi3D USE_SDL2: {getattr(pi3d, 'USE_SDL2', 'unknown')}")
 
         # Create display with configuration
         display_kwargs: dict = {
             "background": (bg_rgb[0], bg_rgb[1], bg_rgb[2], 1.0),
             "frames_per_second": self.config.fps_target,
+            # Use 16-bit depth buffer for better Pi4/Pi5 compatibility
+            # Pi4+ has issues with 24-bit depth in SDL2 mode
+            "depth": 16,
         }
 
         # Handle fullscreen vs windowed
@@ -271,6 +288,8 @@ class Display:
             # Windowed mode for debugging
             display_kwargs["w"] = width if width > 0 else 800
             display_kwargs["h"] = height if height > 0 else 600
+
+        logger.info(f"Display kwargs: {display_kwargs}")
 
         try:
             self._display = pi3d.Display.create(**display_kwargs)
