@@ -338,31 +338,48 @@ create_default_config() {
     echo -e "\n${BLUE}Creating default configuration...${NC}"
 
     CONFIG_FILE="$CONFIG_DIR/config.yaml"
-    EXISTING_TOKEN=""
+
+    # These will be exported for use by run_wizard
+    export SAVED_TOKEN=""
+    export SAVED_URL=""
+    export SAVED_ORIENTATION=""
+    export SAVED_ROTATION=""
+    export SAVED_CEC=""
 
     if [ -f "$CONFIG_FILE" ]; then
-        # Extract existing device_token if present
-        EXISTING_TOKEN=$("$INSTALL_DIR/venv/bin/python" -c "
+        # Extract ALL existing settings before overwriting
+        eval $("$INSTALL_DIR/venv/bin/python" << 'PYTHON_SCRIPT'
 import yaml
 try:
-    with open('$CONFIG_FILE', 'r') as f:
+    with open("/etc/glowworm/config.yaml", "r") as f:
         config = yaml.safe_load(f)
-        token = config.get('backend', {}).get('device_token', '')
-        if token:
-            print(token)
-except:
-    pass
-" 2>/dev/null)
 
-        if [ -n "$EXISTING_TOKEN" ]; then
+        token = config.get("backend", {}).get("device_token", "")
+        url = config.get("backend", {}).get("url", "")
+        orientation = config.get("display", {}).get("orientation", "")
+        rotation = config.get("display", {}).get("rotation", "")
+        cec = config.get("cec", {}).get("enabled", False)
+
+        if token:
+            print(f'SAVED_TOKEN="{token}"')
+        if url:
+            print(f'SAVED_URL="{url}"')
+        if orientation:
+            print(f'SAVED_ORIENTATION="{orientation}"')
+        if rotation is not None:
+            print(f'SAVED_ROTATION="{rotation}"')
+        if cec:
+            print('SAVED_CEC="yes"')
+except Exception as e:
+    pass
+PYTHON_SCRIPT
+)
+
+        if [ -n "$SAVED_TOKEN" ]; then
             echo -e "${GREEN}Found existing device token - preserving registration${NC}"
-            echo "Backing up to $CONFIG_FILE.backup"
-            cp "$CONFIG_FILE" "$CONFIG_FILE.backup"
-        else
-            echo -e "${YELLOW}Configuration file exists but no device token${NC}"
-            echo "Backing up to $CONFIG_FILE.backup"
-            cp "$CONFIG_FILE" "$CONFIG_FILE.backup"
         fi
+        echo "Backing up to $CONFIG_FILE.backup"
+        cp "$CONFIG_FILE" "$CONFIG_FILE.backup"
     fi
 
     cat > "$CONFIG_FILE" << 'EOF'
@@ -419,22 +436,32 @@ EOF
 
     chmod 600 "$CONFIG_FILE"
 
-    # Restore device token if we had one
-    if [ -n "$EXISTING_TOKEN" ]; then
+    # Restore all saved settings
+    if [ -n "$SAVED_TOKEN" ] || [ -n "$SAVED_URL" ]; then
         "$INSTALL_DIR/venv/bin/python" << PYTHON_SCRIPT
 import yaml
 
 with open("$CONFIG_FILE", "r") as f:
     config = yaml.safe_load(f)
 
-config["backend"]["device_token"] = "$EXISTING_TOKEN"
+# Restore saved values
+if "$SAVED_TOKEN":
+    config["backend"]["device_token"] = "$SAVED_TOKEN"
+if "$SAVED_URL":
+    config["backend"]["url"] = "$SAVED_URL"
+if "$SAVED_ORIENTATION":
+    config["display"]["orientation"] = "$SAVED_ORIENTATION"
+if "$SAVED_ROTATION":
+    config["display"]["rotation"] = int("$SAVED_ROTATION") if "$SAVED_ROTATION" else 0
+if "$SAVED_CEC" == "yes":
+    config["cec"]["enabled"] = True
 
 with open("$CONFIG_FILE", "w") as f:
     yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
-print("Device token restored")
+print("Settings restored")
 PYTHON_SCRIPT
-        echo -e "${GREEN}[OK]${NC} Configuration created with preserved device token"
+        echo -e "${GREEN}[OK]${NC} Configuration created with preserved settings"
     else
         echo -e "${GREEN}[OK]${NC} Default configuration created: $CONFIG_FILE"
     fi
@@ -492,32 +519,11 @@ run_wizard() {
 
     CONFIG_FILE="$CONFIG_DIR/config.yaml"
 
-    # Check for existing config values
-    CURRENT_URL=""
-    CURRENT_ORIENTATION=""
-    CURRENT_ROTATION=""
-    HAS_TOKEN=""
-
-    if [ -f "$CONFIG_FILE" ]; then
-        eval $("$INSTALL_DIR/venv/bin/python" << 'PYTHON_SCRIPT'
-import yaml
-try:
-    with open("/etc/glowworm/config.yaml", "r") as f:
-        config = yaml.safe_load(f)
-        url = config.get("backend", {}).get("url", "")
-        token = config.get("backend", {}).get("device_token", "")
-        orientation = config.get("display", {}).get("orientation", "portrait")
-        rotation = config.get("display", {}).get("rotation", 0)
-        print(f'CURRENT_URL="{url}"')
-        print(f'CURRENT_ORIENTATION="{orientation}"')
-        print(f'CURRENT_ROTATION="{rotation}"')
-        if token:
-            print('HAS_TOKEN="yes"')
-except:
-    pass
-PYTHON_SCRIPT
-)
-    fi
+    # Use values saved by create_default_config (before config was overwritten)
+    CURRENT_URL="${SAVED_URL:-}"
+    CURRENT_ORIENTATION="${SAVED_ORIENTATION:-portrait}"
+    CURRENT_ROTATION="${SAVED_ROTATION:-0}"
+    HAS_TOKEN="${SAVED_TOKEN:+yes}"
 
     if [ -n "$HAS_TOKEN" ]; then
         echo -e "${GREEN}Device is already registered!${NC}"
