@@ -415,7 +415,7 @@ class Display:
                 # draw sprites/shapes here
                 pass
         """
-        if self._mock:
+        if self.mock:
             # Mock mode: no actual display operations
             self._frames += 1
             yield
