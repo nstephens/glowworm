@@ -1,0 +1,46 @@
+[Unit]
+Description=GlowWorm Display Daemon
+Documentation=https://github.com/nstephens/glowworm
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# Main process - daemon controls display subprocess
+ExecStart=/opt/glowworm/venv/bin/python -m glowworm_daemon.main
+ExecStopPost=/bin/rm -f /run/glowworm/display.sock
+
+# Restart configuration
+Restart=always
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Security settings (relaxed for GPIO/GPU access on Raspberry Pi)
+NoNewPrivileges=true
+
+# Resource limits
+CPUQuota=80%
+MemoryMax=256M
+
+# Environment
+Environment="PYTHONUNBUFFERED=1"
+Environment="PATH=/opt/glowworm/venv/bin:/usr/local/bin:/usr/bin:/bin"
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=glowworm-daemon
+
+# Working directory
+WorkingDirectory=/var/lib/glowworm
+
+# Runtime directory for sockets
+RuntimeDirectory=glowworm
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target

@@ -2408,3 +2408,94 @@ pytest daemon/tests/ -v
 
 ### Next Task
 Task 7.3: Installation Automation
+
+## 2026-02-28 20:00 - Task 7.3: Installation Automation
+
+### What Changed
+Created comprehensive installation scripts for the Pi3D display system, including install, configure, and uninstall scripts with systemd service integration.
+
+### Files Created
+
+**Installation Scripts (`pi3d/scripts/`):**
+- `install.sh` - Main installation script:
+  - Detects Raspberry Pi hardware and OS
+  - Checks Python 3.11+ requirement
+  - Installs system dependencies (Pi3D, OpenGL ES, image libraries, CEC)
+  - Creates directory structure (`/opt/glowworm`, `/etc/glowworm`, `/var/log/glowworm`, etc.)
+  - Creates Python virtual environment
+  - Installs both daemon and display packages
+  - Installs systemd service
+  - Runs configuration wizard
+  - Configures GPU memory on Raspberry Pi
+
+- `configure.sh` - Interactive configuration wizard:
+  - Menu-driven interface for all settings
+  - Configures: backend URL, orientation, rotation, display time, transitions, CEC, cache size
+  - Preserves existing device token
+  - Test connection functionality
+  - Reset to defaults option
+  - Restarts daemon after saving if running
+
+- `uninstall.sh` - Clean removal script:
+  - Stops and disables systemd services
+  - Removes installation directory and symlinks
+  - Optional removal of config, state/cache, and logs
+  - Preserves user data by default
+
+**Systemd Service (`pi3d/systemd/`):**
+- `glowworm-daemon.service`:
+  - Starts after network-online.target
+  - Auto-restart on failure with backoff
+  - CPU (80%) and memory (256MB) limits
+  - Runtime directory for sockets
+  - Clean socket removal on stop
+
+### Features
+1. **Single Install Script**: One command to install complete system
+2. **Raspberry Pi Detection**: Auto-detects Pi hardware and configures appropriately
+3. **GPU Memory Configuration**: Prompts to set optimal GPU memory (128MB)
+4. **Interactive Wizard**: User-friendly configuration with validation
+5. **Systemd Integration**: Proper service management with journald logging
+6. **Clean Uninstall**: Safe removal with data preservation options
+
+### Verification
+```bash
+# Syntax verification
+bash -n pi3d/scripts/install.sh     # OK
+bash -n pi3d/scripts/configure.sh   # OK
+bash -n pi3d/scripts/uninstall.sh   # OK
+
+# Config module tests
+pytest daemon/tests/test_unified_config.py -v
+# 38 passed
+```
+
+### Installation Usage
+```bash
+# From repository
+sudo bash pi3d/scripts/install.sh
+
+# Configuration only
+sudo bash pi3d/scripts/configure.sh
+
+# Uninstall
+sudo bash pi3d/scripts/uninstall.sh
+```
+
+### Service Commands
+```bash
+sudo systemctl start glowworm-daemon
+sudo systemctl enable glowworm-daemon
+sudo systemctl status glowworm-daemon
+sudo journalctl -u glowworm-daemon -f
+```
+
+### Notes
+- Scripts support both local repository installation and GitHub installation
+- Installation creates symlinks at `/usr/local/bin/` for easy command access
+- Configuration file uses YAML format at `/etc/glowworm/config.yaml`
+- tmpfiles.d config ensures `/run/glowworm` exists after reboot
+- Full hardware testing (Task 7.5) will verify on actual Raspberry Pi
+
+### Next Task
+Task 7.4: Documentation
