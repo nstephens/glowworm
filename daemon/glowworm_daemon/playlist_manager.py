@@ -296,6 +296,16 @@ class PlaylistManager:
 
                     # Parse and validate playlist
                     playlist = self._parse_playlist_response(data, playlist_id)
+
+                    # If manifest is incomplete (no images or fewer than sequence),
+                    # fetch full images list from dedicated endpoint
+                    if not playlist.images or playlist.image_count < len(playlist.sequence):
+                        logger.info(
+                            f"Manifest incomplete: {playlist.image_count} images, "
+                            f"{len(playlist.sequence)} in sequence. Fetching full list..."
+                        )
+                        playlist = await self._fetch_playlist_images(playlist)
+
                     self._playlist = playlist
 
                     # Initialize or update position
@@ -349,6 +359,78 @@ class PlaylistManager:
             f"Failed to fetch playlist after {self.config.max_retries} "
             f"attempts: {last_error}"
         )
+
+    async def _fetch_playlist_images(self, playlist: PlaylistData) -> PlaylistData:
+        """
+        Fetch full images list for a playlist.
+
+        Called when the initial playlist response has incomplete image data.
+        Fetches from /api/playlists/{id}/images endpoint.
+
+        Args:
+            playlist: PlaylistData with incomplete images
+
+        Returns:
+            Updated PlaylistData with all images
+        """
+        import aiohttp
+
+        if not self._session:
+            logger.warning("No session available for fetching images")
+            return playlist
+
+        url = self._build_url(f"/api/playlists/{playlist.id}/images")
+        logger.info(f"Fetching full images list from {url}")
+
+        try:
+            async with self._session.get(url) as response:
+                if response.status != 200:
+                    logger.warning(f"Failed to fetch images: status {response.status}")
+                    return playlist
+
+                data = await response.json()
+                images_list = data.get("images", [])
+
+                if not images_list:
+                    logger.warning("No images in response")
+                    return playlist
+
+                # Parse images
+                images = {}
+                sequence = []
+                for item in images_list:
+                    image_id = int(item["id"])
+                    images[image_id] = PlaylistImage(
+                        id=image_id,
+                        url=item.get("url", f"/api/images/{image_id}/file"),
+                        filename=item.get("filename", f"{image_id}.jpg"),
+                        width=item.get("width"),
+                        height=item.get("height"),
+                        mime_type=item.get("mime_type", "image/jpeg"),
+                        file_size=item.get("file_size", 0),
+                        checksum=item.get("file_hash"),
+                    )
+                    sequence.append(image_id)
+
+                logger.info(f"Fetched {len(images)} images for playlist {playlist.id}")
+
+                # Update playlist with full images
+                # Use the fetched sequence if the original was incomplete
+                if len(playlist.sequence) < len(sequence):
+                    playlist.sequence = sequence
+
+                playlist.images = images
+
+                # Recompute version hash
+                playlist.version_hash = self._compute_version_hash(
+                    playlist.sequence, images
+                )
+
+                return playlist
+
+        except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
+            logger.warning(f"Failed to fetch playlist images: {e}")
+            return playlist
 
     def _parse_playlist_response(
         self,
