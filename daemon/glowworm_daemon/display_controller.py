@@ -434,6 +434,7 @@ class DisplayController:
 
     async def _start_process(self) -> bool:
         """Start the subprocess and establish IPC connection."""
+        print("DisplayController._start_process() called", flush=True)
         try:
             # Build display command
             display_cmd = list(self.config.display_command)
@@ -482,6 +483,7 @@ class DisplayController:
                 logger.debug(f"Removing stale socket: {socket_path}")
                 socket_path.unlink()
 
+            print(f"Starting display process: {' '.join(cmd)}", flush=True)
             logger.info(f"Starting display process: {' '.join(cmd)}")
 
             # Start subprocess
@@ -492,11 +494,23 @@ class DisplayController:
                 stderr=asyncio.subprocess.PIPE,
             )
 
+            print(f"Display process started: PID {self._process.pid}", flush=True)
             logger.info(f"Display process started: PID {self._process.pid}")
 
             # Wait for IPC socket to be available
+            print("Waiting for IPC socket...", flush=True)
             if not await self._wait_for_socket():
+                # Read any subprocess output for debugging
+                if self._process.stdout:
+                    stdout = await self._process.stdout.read()
+                    if stdout:
+                        print(f"Display stdout: {stdout.decode()}", flush=True)
+                if self._process.stderr:
+                    stderr = await self._process.stderr.read()
+                    if stderr:
+                        print(f"Display stderr: {stderr.decode()}", flush=True)
                 logger.error("Timeout waiting for display socket")
+                print("Timeout waiting for display socket", flush=True)
                 await self._kill_process()
                 self._set_state(DisplayState.CRASHED)
                 return False
