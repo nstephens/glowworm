@@ -667,13 +667,18 @@ async def get_device_playlist(
                 "url": f"/api/images/{image.id}/display",
             })
 
+    # Return in format expected by daemon's _parse_playlist_response
+    # It expects either {"playlist": ..., "manifest": ...} or {"manifest": ...}
     return {
-        "id": playlist.id,
-        "name": playlist.name,
-        "version": getattr(playlist, 'version', 1) or 1,
-        "default_display_time": playlist.display_time_seconds or 30,
-        "images": images,
-        "image_count": len(images),
+        "playlist": {
+            "id": playlist.id,
+            "name": playlist.name,
+            "slug": playlist.slug,
+            "sequence": sequence,  # Original sequence for the daemon
+            "display_time_seconds": playlist.display_time_seconds or 30,
+            "display_mode": playlist.display_mode.value if playlist.display_mode else "default",
+        },
+        "manifest": images,
     }
 
 
