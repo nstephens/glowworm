@@ -111,7 +111,7 @@ class GlowwormDaemonV3:
 
         # Initialize slideshow orchestrator
         slideshow_config = SlideshowConfig(
-            display_time=self.config.slideshow.display_time,
+            default_display_time=self.config.slideshow.display_time,
             transition_duration=self.config.slideshow.transition_duration,
             preload_count=self.config.slideshow.preload_count,
         )
