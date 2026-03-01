@@ -22,7 +22,7 @@ from .command_handler import CommandHandler, CommandHandlerConfig
 from .slideshow_orchestrator import SlideshowOrchestrator, SlideshowConfig
 from .playlist_manager import PlaylistManager
 from .image_manager import ImageManager
-from .cache import create_cache
+from .cache import create_cache, CacheConfig
 from .logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -59,10 +59,12 @@ class GlowwormDaemonV3:
         self.running = True
 
         # Initialize cache
-        self.cache = create_cache(
-            cache_dir=Path(self.config.cache.directory),
+        cache_config = CacheConfig(
+            cache_dir=self.config.cache.directory,
             max_size_mb=self.config.cache.max_size_mb,
+            min_free_space_mb=self.config.cache.min_free_space_mb,
         )
+        self.cache = create_cache(cache_config)
 
         # Initialize display controller
         display_config = DisplayControllerConfig.from_unified_config(self.config)
