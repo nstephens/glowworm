@@ -819,9 +819,12 @@ class ImageLoader:
         texture = self.load_texture(file_path)
         sprite = self.create_sprite(texture, scale_mode, z)
 
+        # Pi3D Sprite uses .width and .height, MockSprite uses .w and .h
+        sprite_w = getattr(sprite, 'width', getattr(sprite, 'w', 0))
+        sprite_h = getattr(sprite, 'height', getattr(sprite, 'h', 0))
         logger.info(
             f"Image loaded: {texture.ix}x{texture.iy} -> "
-            f"{sprite.w:.0f}x{sprite.h:.0f}"
+            f"{sprite_w:.0f}x{sprite_h:.0f}"
         )
 
         return sprite
