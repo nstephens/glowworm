@@ -260,8 +260,8 @@ class Display:
         }
 
         # Handle fullscreen vs windowed
+        # Note: use_pygame removed in newer Pi3D versions - DRM/KMS is default
         if self.config.fullscreen:
-            display_kwargs["use_pygame"] = False
             # Auto-detect if width/height are 0
             if width > 0:
                 display_kwargs["w"] = width
@@ -269,7 +269,6 @@ class Display:
                 display_kwargs["h"] = height
         else:
             # Windowed mode for debugging
-            display_kwargs["use_pygame"] = True
             display_kwargs["w"] = width if width > 0 else 800
             display_kwargs["h"] = height if height > 0 else 600
 
