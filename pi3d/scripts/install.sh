@@ -338,11 +338,31 @@ create_default_config() {
     echo -e "\n${BLUE}Creating default configuration...${NC}"
 
     CONFIG_FILE="$CONFIG_DIR/config.yaml"
+    EXISTING_TOKEN=""
 
     if [ -f "$CONFIG_FILE" ]; then
-        echo -e "${YELLOW}Configuration file already exists${NC}"
-        echo "Backing up to $CONFIG_FILE.backup"
-        cp "$CONFIG_FILE" "$CONFIG_FILE.backup"
+        # Extract existing device_token if present
+        EXISTING_TOKEN=$("$INSTALL_DIR/venv/bin/python" -c "
+import yaml
+try:
+    with open('$CONFIG_FILE', 'r') as f:
+        config = yaml.safe_load(f)
+        token = config.get('backend', {}).get('device_token', '')
+        if token:
+            print(token)
+except:
+    pass
+" 2>/dev/null)
+
+        if [ -n "$EXISTING_TOKEN" ]; then
+            echo -e "${GREEN}Found existing device token - preserving registration${NC}"
+            echo "Backing up to $CONFIG_FILE.backup"
+            cp "$CONFIG_FILE" "$CONFIG_FILE.backup"
+        else
+            echo -e "${YELLOW}Configuration file exists but no device token${NC}"
+            echo "Backing up to $CONFIG_FILE.backup"
+            cp "$CONFIG_FILE" "$CONFIG_FILE.backup"
+        fi
     fi
 
     cat > "$CONFIG_FILE" << 'EOF'
@@ -399,7 +419,25 @@ EOF
 
     chmod 600 "$CONFIG_FILE"
 
-    echo -e "${GREEN}[OK]${NC} Default configuration created: $CONFIG_FILE"
+    # Restore device token if we had one
+    if [ -n "$EXISTING_TOKEN" ]; then
+        "$INSTALL_DIR/venv/bin/python" << PYTHON_SCRIPT
+import yaml
+
+with open("$CONFIG_FILE", "r") as f:
+    config = yaml.safe_load(f)
+
+config["backend"]["device_token"] = "$EXISTING_TOKEN"
+
+with open("$CONFIG_FILE", "w") as f:
+    yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+
+print("Device token restored")
+PYTHON_SCRIPT
+        echo -e "${GREEN}[OK]${NC} Configuration created with preserved device token"
+    else
+        echo -e "${GREEN}[OK]${NC} Default configuration created: $CONFIG_FILE"
+    fi
 }
 
 # Configure GPU memory (Raspberry Pi specific)
@@ -454,30 +492,72 @@ run_wizard() {
 
     CONFIG_FILE="$CONFIG_DIR/config.yaml"
 
+    # Check for existing config values
+    CURRENT_URL=""
+    CURRENT_ORIENTATION=""
+    CURRENT_ROTATION=""
+    HAS_TOKEN=""
+
+    if [ -f "$CONFIG_FILE" ]; then
+        eval $("$INSTALL_DIR/venv/bin/python" << 'PYTHON_SCRIPT'
+import yaml
+try:
+    with open("/etc/glowworm/config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+        url = config.get("backend", {}).get("url", "")
+        token = config.get("backend", {}).get("device_token", "")
+        orientation = config.get("display", {}).get("orientation", "portrait")
+        rotation = config.get("display", {}).get("rotation", 0)
+        print(f'CURRENT_URL="{url}"')
+        print(f'CURRENT_ORIENTATION="{orientation}"')
+        print(f'CURRENT_ROTATION="{rotation}"')
+        if token:
+            print('HAS_TOKEN="yes"')
+except:
+    pass
+PYTHON_SCRIPT
+)
+    fi
+
+    if [ -n "$HAS_TOKEN" ]; then
+        echo -e "${GREEN}Device is already registered!${NC}"
+        echo "Current settings will be preserved. Press Enter to keep current values."
+        echo ""
+    fi
+
     # Backend URL
     echo ""
     echo "Enter the URL of your GlowWorm server."
     echo "This is the URL you use to access the admin interface."
     echo "Example: http://192.168.1.100:3003"
+    if [ -n "$CURRENT_URL" ]; then
+        echo -e "Current: ${CYAN}$CURRENT_URL${NC}"
+    fi
     echo ""
-    read -p "GlowWorm Server URL: " BACKEND_URL
+    read -p "GlowWorm Server URL [$CURRENT_URL]: " BACKEND_URL
 
     if [ -z "$BACKEND_URL" ]; then
-        echo -e "${YELLOW}Using default: http://localhost:3003${NC}"
-        BACKEND_URL="http://localhost:3003"
+        if [ -n "$CURRENT_URL" ]; then
+            BACKEND_URL="$CURRENT_URL"
+        else
+            echo -e "${YELLOW}Using default: http://localhost:3003${NC}"
+            BACKEND_URL="http://localhost:3003"
+        fi
     fi
 
     # Display orientation
     echo ""
     echo "Display orientation (portrait/landscape):"
-    read -p "Orientation [portrait]: " ORIENTATION
-    ORIENTATION=${ORIENTATION:-portrait}
+    DEFAULT_ORIENTATION=${CURRENT_ORIENTATION:-portrait}
+    read -p "Orientation [$DEFAULT_ORIENTATION]: " ORIENTATION
+    ORIENTATION=${ORIENTATION:-$DEFAULT_ORIENTATION}
 
     # Display rotation
     echo ""
     echo "Display rotation (0, 90, 180, 270):"
-    read -p "Rotation [0]: " ROTATION
-    ROTATION=${ROTATION:-0}
+    DEFAULT_ROTATION=${CURRENT_ROTATION:-0}
+    read -p "Rotation [$DEFAULT_ROTATION]: " ROTATION
+    ROTATION=${ROTATION:-$DEFAULT_ROTATION}
 
     # CEC
     echo ""
