@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-from glowworm_display.config import DisplayConfig, load_config
+from glowworm_display.config import DisplayConfig, load_config, load_config_auto
 from glowworm_display.display import Display
 from glowworm_display.image_loader import ImageLoader, ImageLoadError, ScaleMode
 from glowworm_display.ipc_server import IPCServer, IPCServerConfig
@@ -135,12 +135,14 @@ def main() -> int:
     logger.info("GlowWorm Display Engine starting...")
 
     # Load configuration
+    # Priority: 1. GLOWWORM_DISPLAY_CONFIG env (from daemon)
+    #           2. --config argument
+    #           3. default config files
+    #           4. built-in defaults
     try:
-        if args.config:
-            config = load_config(args.config)
-        else:
-            config = DisplayConfig()
-        logger.info(f"Configuration loaded: orientation={config.orientation}")
+        full_config = load_config_auto(args.config)
+        config = full_config.display
+        logger.info(f"Configuration loaded: orientation={config.orientation}, rotation={config.rotation.value}")
     except Exception as e:
         logger.error(f"Failed to load configuration: {e}")
         return 1
