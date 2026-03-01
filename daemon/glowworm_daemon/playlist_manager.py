@@ -406,9 +406,12 @@ class PlaylistManager:
         manifest: Optional[List[Dict]] = None
     ) -> PlaylistData:
         """Parse playlist dictionary."""
+        print(f"_parse_playlist_dict: playlist={playlist}", flush=True)
+        print(f"_parse_playlist_dict: manifest has {len(manifest) if manifest else 0} items", flush=True)
         playlist_id = playlist.get("id", 0)
         sequence = playlist.get("sequence", [])
         computed = playlist.get("computed_sequence", [])
+        print(f"_parse_playlist_dict: sequence={sequence}, computed={computed}", flush=True)
 
         # Parse computed sequence
         computed_sequence = []
