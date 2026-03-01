@@ -50,6 +50,7 @@ class GlowwormDaemonV3:
 
     async def start(self):
         """Start the daemon and all components."""
+        print("daemon.start() entered", flush=True)
         logger.info("=" * 60)
         logger.info(f"GlowWorm Display Daemon v{VERSION}")
         logger.info("=" * 60)
@@ -59,6 +60,7 @@ class GlowwormDaemonV3:
         self.running = True
 
         # Initialize cache
+        print("Initializing cache...", flush=True)
         cache_config = CacheConfig(
             cache_dir=self.config.cache.directory,
             max_size_mb=self.config.cache.max_size_mb,
@@ -67,6 +69,7 @@ class GlowwormDaemonV3:
         self.cache = create_cache(cache_config)
 
         # Initialize display controller
+        print("Initializing display controller...", flush=True)
         display_config = DisplayControllerConfig.from_unified_config(self.config)
         self.display = DisplayController(display_config)
 
@@ -76,24 +79,30 @@ class GlowwormDaemonV3:
             success = await self._run_registration()
             if not success:
                 logger.error("Registration failed or was cancelled")
+                print("Registration failed, returning", flush=True)
                 return
             # Reload config to get the saved token
             self.config = load_config()
 
         # Start display
+        print("Starting Pi3D display...", flush=True)
         logger.info("Starting Pi3D display...")
         await self.display.start()
+        print(f"Display.start() returned, is_running={self.display.is_running}", flush=True)
 
         # Wait for display to be ready
-        for _ in range(30):
+        for i in range(30):
             if self.display.is_running:
+                print(f"Display is running after {i} iterations", flush=True)
                 break
             await asyncio.sleep(0.5)
         else:
             logger.error("Display failed to start within timeout")
+            print("Display failed to start within timeout, returning", flush=True)
             return
 
         logger.info("Display started successfully")
+        print("Display started successfully", flush=True)
 
         # Initialize managers
         image_config = ImageManagerConfig(
