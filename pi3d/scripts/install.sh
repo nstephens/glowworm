@@ -483,9 +483,9 @@ run_wizard() {
     echo ""
     read -p "Enable HDMI-CEC power control? (y/n) [n]: " CEC_ENABLED
     if [[ "$CEC_ENABLED" =~ ^[Yy] ]]; then
-        CEC_ENABLED="true"
+        CEC_ENABLED="True"
     else
-        CEC_ENABLED="false"
+        CEC_ENABLED="False"
     fi
 
     # Update configuration
