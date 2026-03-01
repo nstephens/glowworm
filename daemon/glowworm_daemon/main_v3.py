@@ -282,16 +282,21 @@ async def async_main():
         sys.exit(1)
 
     # Setup logging
+    print("Setting up logging...", flush=True)
     setup_logging(
         log_level=config.logging.level,
         log_file=config.logging.file,
         use_systemd=True,
     )
+    print("Logging configured", flush=True)
 
     # Create daemon
+    print("Creating daemon instance...", flush=True)
     daemon = GlowwormDaemonV3(config)
+    print("Daemon created", flush=True)
 
     # Setup signal handlers
+    print("Setting up signal handlers...", flush=True)
     loop = asyncio.get_event_loop()
 
     def signal_handler():
@@ -302,9 +307,14 @@ async def async_main():
         loop.add_signal_handler(sig, signal_handler)
 
     # Run daemon
+    print("Starting daemon.start()...", flush=True)
     try:
         await daemon.start()
+        print("daemon.start() returned", flush=True)
     except Exception as e:
+        print(f"Daemon error: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
         logger.error(f"Daemon error: {e}", exc_info=True)
         sys.exit(1)
 
