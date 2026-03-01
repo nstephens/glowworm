@@ -881,6 +881,16 @@ class ImageLoader:
             f"calculate_stacked_dimensions: display={effective_width}x{effective_height}, "
             f"image={image_width}x{image_height}, position={position}, rotation={self.rotation.value}"
         )
+        # Also write to a debug file since logging may not be visible
+        try:
+            with open("/tmp/glowworm_stacked_debug.log", "a") as f:
+                f.write(
+                    f"calculate_stacked: display={effective_width}x{effective_height}, "
+                    f"image={image_width}x{image_height}, position={position}, "
+                    f"rotation={self.rotation.value}\n"
+                )
+        except:
+            pass
 
         # Each image gets half the display height
         half_height = effective_height / 2.0
@@ -969,6 +979,16 @@ class ImageLoader:
             f"y_offset={dims.y_offset:.0f}, "
             f"rotation={self.rotation.value}"
         )
+        # Also write to a debug file
+        try:
+            with open("/tmp/glowworm_stacked_debug.log", "a") as f:
+                f.write(
+                    f"stacked sprite ({position}): image={image_width}x{image_height}, "
+                    f"scaled={dims.width:.0f}x{dims.height:.0f}, "
+                    f"y_offset={dims.y_offset:.0f}, rotation={self.rotation.value}\n"
+                )
+        except:
+            pass
 
         if self.mock:
             sprite = MockSprite(
