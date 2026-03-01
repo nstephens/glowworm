@@ -210,10 +210,8 @@ class GlowwormDaemonV3:
         def on_state_change(old_state: RegistrationState, new_state: RegistrationState):
             logger.info(f"Registration state: {old_state.value} -> {new_state.value}")
 
-        registration = RegistrationManager(
-            config=reg_config,
-            state_callback=on_state_change,
-        )
+        registration = RegistrationManager(config=reg_config)
+        registration.add_state_callback(on_state_change)
 
         # Run registration
         result = await registration.run_registration(self.display)
