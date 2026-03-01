@@ -14,6 +14,8 @@ from models.database import get_db
 from models.display_device import DisplayDevice, DeviceStatus
 from models.device_daemon_status import DeviceDaemonStatus, DaemonStatus
 from models.device_command import DeviceCommand, CommandType, CommandStatus
+from models.playlist import Playlist
+from models.image import Image
 from services.device_daemon_service import DeviceDaemonService, DeviceCommandService
 from utils.rate_limiter import RateLimiter
 
@@ -606,6 +608,65 @@ async def scan_display_inputs(
         "message": "CEC input scan command queued",
         "command_id": command.id,
     }
+
+@router.get("/playlist")
+async def get_device_playlist(
+    device: DisplayDevice = Depends(get_daemon_device),
+    db: Session = Depends(get_db),
+):
+    """
+    Get the playlist assigned to this device.
+
+    Returns playlist with all images in display order.
+    """
+    if not device.playlist_id:
+        raise HTTPException(
+            status_code=404,
+            detail="No playlist assigned to this device"
+        )
+
+    playlist = db.query(Playlist).filter(Playlist.id == device.playlist_id).first()
+    if not playlist:
+        raise HTTPException(
+            status_code=404,
+            detail="Assigned playlist not found"
+        )
+
+    # Build the manifest format expected by the daemon
+    images = []
+    sequence = playlist.computed_sequence or playlist.sequence or []
+    default_time = playlist.display_time_seconds or 30
+
+    for entry in sequence:
+        # Handle both formats: simple int or dict with image_id
+        if isinstance(entry, int):
+            image_id = entry
+            display_time = default_time
+        elif isinstance(entry, dict):
+            image_id = entry.get("image_id") or entry.get("id")
+            display_time = entry.get("display_time", default_time)
+        else:
+            continue
+
+        image = db.query(Image).filter(Image.id == image_id).first()
+        if image:
+            images.append({
+                "id": image.id,
+                "filename": image.filename,
+                "display_time": display_time,
+                "transition": "crossfade",
+                "url": f"/api/images/{image.id}/display",
+            })
+
+    return {
+        "id": playlist.id,
+        "name": playlist.name,
+        "version": getattr(playlist, 'version', 1) or 1,
+        "default_display_time": playlist.display_time_seconds or 30,
+        "images": images,
+        "image_count": len(images),
+    }
+
 
 @router.get("/health")
 async def health_check():
