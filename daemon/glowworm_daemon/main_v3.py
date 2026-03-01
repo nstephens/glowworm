@@ -102,12 +102,14 @@ class GlowwormDaemonV3:
             cache_dir=str(self.config.cache.directory),
         )
         self.image_manager = ImageManager(config=image_config, cache=self.cache)
+        await self.image_manager.start()
 
         playlist_config = PlaylistManagerConfig(
             backend_url=self.config.backend.url,
             device_token=self.config.backend.device_token,
         )
         self.playlist_manager = PlaylistManager(config=playlist_config)
+        await self.playlist_manager.start()
 
         # Initialize slideshow orchestrator
         slideshow_config = SlideshowConfig(
@@ -132,8 +134,8 @@ class GlowwormDaemonV3:
         )
         self.websocket = WebSocketClient(
             config=ws_config,
-            message_handler=self._on_websocket_message,
-            state_callback=self._on_websocket_state,
+            on_message=self._on_websocket_message,
+            on_state_change=self._on_websocket_state,
         )
 
         # Initialize status reporter
@@ -167,8 +169,10 @@ class GlowwormDaemonV3:
         # Load playlist and start slideshow
         logger.info("Loading playlist...")
         try:
-            await self.playlist_manager.load_playlist()
-            logger.info(f"Playlist loaded: {len(self.playlist_manager.entries)} entries")
+            await self.playlist_manager.fetch_playlist()
+            playlist = self.playlist_manager.playlist
+            count = playlist.entry_count if playlist else 0
+            logger.info(f"Playlist loaded: {count} entries")
         except Exception as e:
             logger.warning(f"Failed to load playlist: {e}")
 
@@ -234,7 +238,7 @@ class GlowwormDaemonV3:
         elif msg_type == "playlist_update":
             logger.info("Received playlist update notification")
             if self.playlist_manager:
-                asyncio.create_task(self.playlist_manager.load_playlist())
+                asyncio.create_task(self.playlist_manager.fetch_playlist())
 
     def _on_websocket_state(self, old_state: ConnectionState, new_state: ConnectionState):
         """Handle WebSocket state changes."""
