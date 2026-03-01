@@ -897,6 +897,9 @@ class SlideshowOrchestrator:
                         logger.info("Playlist updated, reloading...")
                         await self.playlist.fetch_playlist()
 
+                        # Recompute pairing sequence for the new playlist
+                        await self._compute_pairing()
+
                         # Update preloader
                         if self.preloader:
                             await self.preloader.update_preload_queue(self.playlist)
