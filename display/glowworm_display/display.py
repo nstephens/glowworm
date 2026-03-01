@@ -408,14 +408,9 @@ class Display:
         """
         Context manager for a single frame.
 
-        For Pi3D, loop_running() must be called to handle the display loop.
-        It returns True if the display should continue, False to exit.
-
-        The loop_running() call handles:
-        - End of previous frame (swap_buffers on subsequent calls)
-        - Start of new frame (clear)
-        - Event processing
-        - Frame timing
+        For Pi3D with pygame/SDL2 backend, we use loop_running() which
+        handles the full frame lifecycle including clear, event processing,
+        frame timing, and buffer swap.
 
         Usage:
             with display.frame():
@@ -432,19 +427,18 @@ class Display:
             yield
             return
 
-        # Pi3D mode: loop_running() manages the frame lifecycle
-        # Call it to start a new frame (clears buffer, processes events)
-        # It also ends the previous frame (swap_buffers) except on first call
-        if not self._display.loop_running():
-            self._running = False
-            yield
-            return
+        # Pi3D with USE_PYGAME=True uses pygame/SDL2 for display
+        # loop_running() handles: clear, event processing, frame timing
+        # The swap happens at the END of loop_running() call
+        # So we need to: 1) draw, 2) call loop_running() to swap
 
-        # Frame is now ready for drawing
+        # Yield to let caller draw first
         yield
 
-        # Note: The next call to loop_running() will swap buffers
-        # This is how Pi3D's display loop is designed to work
+        # Now call loop_running() to process events and swap buffers
+        # This also clears for the next frame
+        if not self._display.loop_running():
+            self._running = False
 
     def __enter__(self) -> "Display":
         """Context manager entry - initialize display."""
