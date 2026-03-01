@@ -408,17 +408,14 @@ class Display:
         """
         Context manager for a single frame.
 
-        For Pi3D with pygame/SDL2 backend, the render loop pattern is:
-            while DISPLAY.loop_running():
-                sprite.draw()
+        Pi3D's loop_running() does everything:
+        - First call: _loop_begin() (clear screen)
+        - Subsequent calls: _loop_end() (swap previous), _loop_begin() (clear)
 
-        loop_running() at the START of each frame:
-        - Clears the screen
-        - Processes events
-        - Handles frame timing from previous frame
+        The pattern is: while DISPLAY.loop_running(): sprite.draw()
 
-        Drawing happens AFTER loop_running(), then the buffer swap
-        happens at the NEXT loop_running() call.
+        loop_running() clears the screen, we draw, then the NEXT call
+        to loop_running() swaps the buffer.
 
         Usage:
             with display.frame():
@@ -435,15 +432,18 @@ class Display:
             yield
             return
 
-        # Pi3D pattern: loop_running() FIRST, then draw
-        # loop_running() clears screen and handles events
+        # Pi3D pattern: loop_running() handles clear AND swap
+        # On each call it: swaps previous frame, clears for new frame
+        # Then we draw, and the NEXT loop_running() swaps our drawing
         if not self._display.loop_running():
             self._running = False
             yield
             return
 
-        # Yield to let caller draw after clear
+        # Yield to let caller draw (screen is now cleared)
         yield
+
+        # No explicit swap needed - next loop_running() call will swap
 
     def __enter__(self) -> "Display":
         """Context manager entry - initialize display."""
