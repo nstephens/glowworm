@@ -621,13 +621,12 @@ class SlideshowOrchestrator:
                 if self._state == SlideshowState.PAUSED:
                     continue
 
-                # Advance to next image (unless we already moved due to manual nav)
-                # The _direction will be 0 if go_to was called
-                if self._direction == 1 or self._direction == 0:
-                    # Already advanced or go_to was called, just continue
-                    pass
-                else:
-                    # Regular timed advance
+                # Advance to next image
+                # _direction: 1 = forward (normal timed advance)
+                #             0 = go_to was called (don't advance, already positioned)
+                #            -1 = previous was called (handled by previous())
+                if self._direction != 0:
+                    # Regular timed advance - move to next image
                     self.playlist.next()
 
                 # Reset direction for next iteration
