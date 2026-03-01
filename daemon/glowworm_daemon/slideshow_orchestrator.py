@@ -648,15 +648,19 @@ class SlideshowOrchestrator:
         """
         # Currently only handle single images (pair support can be added later)
         if not images:
+            print("_display_images: no images", flush=True)
             return False
 
         image = images[0]
         self._stats.current_image_id = image.id
 
         # Get cached path or download
+        print(f"_display_images: getting path for image {image.id}", flush=True)
         image_path = await self._get_image_path(image)
+        print(f"_display_images: image_path = {image_path}", flush=True)
 
         if not image_path:
+            print(f"_display_images: no image path for {image.id}", flush=True)
             await self._report_error(
                 message=f"Image unavailable (ID: {image.id})",
                 code="IMAGE_LOAD",
@@ -671,11 +675,13 @@ class SlideshowOrchestrator:
         # Send to display
         self._set_state(SlideshowState.TRANSITIONING)
 
+        print(f"_display_images: calling display.load_image({image_path})", flush=True)
         success = await self.display.load_image(
             path=str(image_path),
             scale_mode=self.config.scale_mode,
             transition_duration=self.config.transition_duration,
         )
+        print(f"_display_images: load_image returned {success}", flush=True)
 
         if success:
             self._stats.transitions_completed += 1
@@ -683,6 +689,7 @@ class SlideshowOrchestrator:
             logger.info(f"Displayed image {image.id}")
             return True
         else:
+            print(f"_display_images: display.load_image failed for {image_path}", flush=True)
             await self._report_error(
                 message=f"Display error for image {image.id}",
                 code="DISPLAY",
