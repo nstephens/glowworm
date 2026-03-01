@@ -934,8 +934,20 @@ class ImageLoader:
                 scaled_width = image_width * scale
                 scaled_height = half_height
 
-        # Calculate position offset based on rotation
-        # Pi3D coordinates are in hardware space, but we position based on visual layout.
+        # For rotated displays, sprite dimensions need to be swapped so that
+        # after rotation they appear correct. A sprite created as WxH and rotated
+        # 90° becomes visually HxW.
+        if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
+            # Swap dimensions - they'll be un-swapped by the rotation
+            final_width = scaled_height
+            final_height = scaled_width
+        else:
+            final_width = scaled_width
+            final_height = scaled_height
+
+        # Calculate position offset
+        # Pi3D coordinates are in hardware space. For rotated displays, visual Y
+        # maps to hardware X (or -X depending on rotation direction).
         # Quarter offset = visual_height / 4 (center of each half)
         quarter_offset = visual_height / 4.0
 
@@ -973,8 +985,8 @@ class ImageLoader:
                     y_offset = -quarter_offset
 
         return ImageDimensions(
-            width=scaled_width,
-            height=scaled_height,
+            width=final_width,
+            height=final_height,
             x_offset=x_offset,
             y_offset=y_offset,
             scale_x=scaled_width / image_width if image_width > 0 else 1.0,
