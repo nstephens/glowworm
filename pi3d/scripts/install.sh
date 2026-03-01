@@ -137,9 +137,14 @@ install_dependencies() {
         curl
     )
 
-    # Pi3D dependencies
+    # Pi3D dependencies (handle both Bookworm and Trixie package names)
+    if apt-cache show libopengles2 &>/dev/null; then
+        PACKAGES+=(libopengles2)
+    elif apt-cache show libgles2 &>/dev/null; then
+        PACKAGES+=(libgles2)
+    fi
+
     PACKAGES+=(
-        libopengles2
         libegl1
         libgles2-mesa-dev
         libegl1-mesa-dev
