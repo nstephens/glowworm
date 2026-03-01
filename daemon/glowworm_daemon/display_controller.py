@@ -469,9 +469,11 @@ class DisplayController:
                 env["SDL_VIDEODRIVER"] = "wayland"
                 # Use OpenGL ES 2.0 renderer (required for Pi GPU)
                 env["SDL_RENDER_DRIVER"] = "opengles2"
-                # Wayland display will be set by cage, but ensure it's available
-                if "WAYLAND_DISPLAY" not in env:
-                    env["WAYLAND_DISPLAY"] = "wayland-0"
+                # IMPORTANT: Do NOT set WAYLAND_DISPLAY here - cage will set it for the child process
+                # If WAYLAND_DISPLAY is set in the parent environment, cage tries to nest
+                # under that compositor instead of using DRM backend directly
+                env.pop("WAYLAND_DISPLAY", None)
+                env.pop("DISPLAY", None)  # Also remove X11 display
 
             # Pass display config via environment variable if provided
             if self.config.display_config_json:
