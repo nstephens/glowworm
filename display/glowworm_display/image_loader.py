@@ -872,13 +872,15 @@ class ImageLoader:
         Returns:
             ImageDimensions with calculated size and position
         """
-        # Account for rotation
-        if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
-            effective_width = self.display_height
-            effective_height = self.display_width
-        else:
-            effective_width = self.display_width
-            effective_height = self.display_height
+        # Use display dimensions directly - Pi3D already reports actual screen size
+        # Rotation is applied to images, not to the coordinate system
+        effective_width = self.display_width
+        effective_height = self.display_height
+
+        logger.info(
+            f"calculate_stacked_dimensions: display={effective_width}x{effective_height}, "
+            f"image={image_width}x{image_height}, position={position}, rotation={self.rotation.value}"
+        )
 
         # Each image gets half the display height
         half_height = effective_height / 2.0
@@ -960,11 +962,12 @@ class ImageLoader:
             image_width, image_height, position, scale_mode
         )
 
-        logger.debug(
+        logger.info(
             f"Creating stacked sprite ({position}): "
             f"image={image_width}x{image_height}, "
-            f"display={dims.width:.0f}x{dims.height:.0f}, "
-            f"y_offset={dims.y_offset:.0f}"
+            f"scaled={dims.width:.0f}x{dims.height:.0f}, "
+            f"y_offset={dims.y_offset:.0f}, "
+            f"rotation={self.rotation.value}"
         )
 
         if self.mock:
