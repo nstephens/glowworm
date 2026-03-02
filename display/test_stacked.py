@@ -97,12 +97,17 @@ def main():
     # Add 270° rotation like the real display
     rotation = 270
 
-    # TOP sprite (red)
-    sprite_top = pi3d.Sprite(w=sprite_w, h=sprite_h, x=x_pos, y=y_pos, z=5.0)
+    # Use EXACTLY the same values as daemon for comparison
+    # From daemon log: pi3d.Sprite(w=2160, h=1215, x=965, y=0, z=1.0), rotateToZ(270)
+    print(f"\nUsing daemon's exact values for comparison:")
+    print(f"Top: w=2160, h=1215, x=965, y=0, z=1.0, rot=270")
+    print(f"Bottom: w=2160, h=1215, x=-965, y=0, z=1.0, rot=270")
+
+    # TOP sprite (red) - exact daemon values
+    sprite_top = pi3d.Sprite(w=2160, h=1215, x=965, y=0, z=1.0)
     sprite_top.set_shader(shader)
     sprite_top.set_textures([texture])
-    if rotation != 0:
-        sprite_top.rotateToZ(float(rotation))
+    sprite_top.rotateToZ(270.0)
 
     # BOTTOM sprite - create blue texture
     img_array_blue = np.zeros((100, 200, 4), dtype=np.uint8)
@@ -114,15 +119,11 @@ def main():
     img_array_blue[:, -5:, :3] = 255
     texture_blue = pi3d.Texture(img_array_blue)
 
-    # Bottom half: negative of top position, same scaled size
-    x_pos_bottom = -x_pos
-    sprite_bottom = pi3d.Sprite(w=sprite_w, h=sprite_h, x=x_pos_bottom, y=y_pos, z=5.0)
-    print(f"Top position: ({x_pos:.0f}, {y_pos})")
-    print(f"Bottom position: ({x_pos_bottom:.0f}, {y_pos})")
+    # Bottom sprite (blue) - exact daemon values
+    sprite_bottom = pi3d.Sprite(w=2160, h=1215, x=-965, y=0, z=1.0)
     sprite_bottom.set_shader(shader)
     sprite_bottom.set_textures([texture_blue])
-    if rotation != 0:
-        sprite_bottom.rotateToZ(float(rotation))
+    sprite_bottom.rotateToZ(270.0)
 
     print(f"Hardware display: {hw_width}x{hw_height}")
     print(f"Sprite size: {sprite_w}x{sprite_h}")
