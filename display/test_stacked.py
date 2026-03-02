@@ -52,16 +52,29 @@ def main():
 
     texture = pi3d.Texture(img_array)
 
-    # TEST: Small centered sprite - NO rotation first to establish baseline
-    # Pi3D uses OpenGL coordinates where the display spans -1 to 1 (or uses pixels?)
-    # Let's test with very small values
+    # Position for TOP stacked image on portrait display (270° rotation)
+    # Visual layout after rotation:
+    #   - Visual width = 2160 (hw height)
+    #   - Visual height = 3840 (hw width)
+    #   - Each stacked image gets half = 1920 visual height
+    #
+    # Coordinate mapping (confirmed by testing):
+    #   +X = visual top
+    #   +Y = visual left
+    #
+    # For a landscape image (e.g., 1920x1080 visual) in top half:
+    #   - Sprite dimensions should match visual size (will be rotated)
+    #   - Position X = +960 (center of top half = 3840/4)
 
-    sprite_w = 400
-    sprite_h = 200
+    # Simulating a landscape image scaled to fit top half
+    # Visual size: 2160 wide x 1080 tall (landscape fitting in 2160x1920 half)
+    # But sprite is created BEFORE rotation, so swap: 1080 wide x 2160 tall
+    sprite_w = 1080  # becomes visual height after 270° rotation
+    sprite_h = 2160  # becomes visual width after 270° rotation
 
-    # Test Y axis now
-    x_pos = 0
-    y_pos = 500
+    # Position in top half
+    x_pos = 960   # center of top half (+X = visual up)
+    y_pos = 0     # centered horizontally
 
     # Add 270° rotation like the real display
     rotation = 270
