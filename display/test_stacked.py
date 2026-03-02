@@ -66,17 +66,31 @@ def main():
     #   - Visual target: 2160 wide x ~1000 tall (landscape in top half)
     #   - Create sprite at that size, texture will be rotated inside
 
-    # Create landscape-shaped sprite to fill top half (with gap)
-    # Visual portrait display is 2160 wide x 3840 tall
-    # Add a gap between images
-    gap = 20  # pixels between images
+    # Test with SCALED dimensions like the daemon does
+    # Simulating a landscape image (e.g., 2048x1152) scaled to fit in half
+    gap = 20
     half_height = (3840 - gap) / 2  # 1910 each
+    target_w = 2160
+    target_h = half_height
 
-    sprite_w = 2160  # visual width (full width of portrait display)
-    sprite_h = half_height  # visual height (half minus gap)
+    # Simulate scaling a 2048x1152 image to fit
+    image_w, image_h = 2048, 1152
+    image_aspect = image_w / image_h
+    target_aspect = target_w / target_h
 
-    # Position in top half
-    # Center of top half is at: gap/2 + half_height/2 = 10 + 955 = 965
+    # FIT mode: scale to fit within target
+    if image_aspect > target_aspect:
+        # Image wider than target - fit to width
+        scale = target_w / image_w
+    else:
+        scale = target_h / image_h
+
+    sprite_w = image_w * scale  # Should be 2160
+    sprite_h = image_h * scale  # Should be ~1215
+
+    print(f"Scaled sprite: {sprite_w:.0f}x{sprite_h:.0f}")
+
+    # Position in top half - same formula as before
     x_pos = gap/2 + half_height/2   # center of top half (+X = visual up)
     y_pos = 0     # centered horizontally
 
@@ -100,9 +114,11 @@ def main():
     img_array_blue[:, -5:, :3] = 255
     texture_blue = pi3d.Texture(img_array_blue)
 
-    # Bottom half: negative of top position
+    # Bottom half: negative of top position, same scaled size
     x_pos_bottom = -x_pos
     sprite_bottom = pi3d.Sprite(w=sprite_w, h=sprite_h, x=x_pos_bottom, y=y_pos, z=5.0)
+    print(f"Top position: ({x_pos:.0f}, {y_pos})")
+    print(f"Bottom position: ({x_pos_bottom:.0f}, {y_pos})")
     sprite_bottom.set_shader(shader)
     sprite_bottom.set_textures([texture_blue])
     if rotation != 0:
