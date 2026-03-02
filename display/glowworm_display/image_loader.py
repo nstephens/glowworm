@@ -1120,9 +1120,10 @@ class ImageLoader:
         image_width = texture.ix
         image_height = texture.iy
 
+        # Note: focus_point cropping is already applied when loading the texture
+        # via _load_texture_with_focus_crop, so we don't need it here
         dims = self.calculate_stacked_dimensions(
-            image_width, image_height, position, scale_mode,
-            focus_point=focus_point
+            image_width, image_height, position, scale_mode
         )
 
         logger.info(
