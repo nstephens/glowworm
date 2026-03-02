@@ -66,17 +66,18 @@ def main():
     #   - Visual target: 2160 wide x ~1000 tall (landscape in top half)
     #   - Create sprite at that size, texture will be rotated inside
 
-    # Create landscape-shaped sprite to fill top half
+    # Create landscape-shaped sprite to fill top half (with gap)
     # Visual portrait display is 2160 wide x 3840 tall
-    # Top half is 2160 wide x 1920 tall
+    # Add a gap between images
+    gap = 20  # pixels between images
+    half_height = (3840 - gap) / 2  # 1910 each
+
     sprite_w = 2160  # visual width (full width of portrait display)
-    sprite_h = 1920  # visual height (full half height)
+    sprite_h = half_height  # visual height (half minus gap)
 
     # Position in top half
-    # The top half spans from visual Y = 0 to Y = 1920
-    # Center of top half is at visual Y = 960
-    # But visual Y maps to hardware X, so x_pos = 960
-    x_pos = 960   # center of top half (+X = visual up)
+    # Center of top half is at: gap/2 + half_height/2 = 10 + 955 = 965
+    x_pos = gap/2 + half_height/2   # center of top half (+X = visual up)
     y_pos = 0     # centered horizontally
 
     # Add 270° rotation like the real display
@@ -99,8 +100,8 @@ def main():
     img_array_blue[:, -5:, :3] = 255
     texture_blue = pi3d.Texture(img_array_blue)
 
-    # Bottom half: x_pos = -960 (negative X = visual bottom)
-    x_pos_bottom = -960
+    # Bottom half: negative of top position
+    x_pos_bottom = -x_pos
     sprite_bottom = pi3d.Sprite(w=sprite_w, h=sprite_h, x=x_pos_bottom, y=y_pos, z=5.0)
     sprite_bottom.set_shader(shader)
     sprite_bottom.set_textures([texture_blue])
