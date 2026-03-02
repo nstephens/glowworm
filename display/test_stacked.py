@@ -82,18 +82,36 @@ def main():
     # Add 270° rotation like the real display
     rotation = 270
 
-    sprite = pi3d.Sprite(w=sprite_w, h=sprite_h, x=x_pos, y=y_pos, z=5.0)
-    sprite.set_shader(shader)
-    sprite.set_textures([texture])
-
+    # TOP sprite (red)
+    sprite_top = pi3d.Sprite(w=sprite_w, h=sprite_h, x=x_pos, y=y_pos, z=5.0)
+    sprite_top.set_shader(shader)
+    sprite_top.set_textures([texture])
     if rotation != 0:
-        sprite.rotateToZ(float(rotation))
+        sprite_top.rotateToZ(float(rotation))
+
+    # BOTTOM sprite - create blue texture
+    img_array_blue = np.zeros((100, 200, 4), dtype=np.uint8)
+    img_array_blue[:, :, 2] = 255  # Blue
+    img_array_blue[:, :, 3] = 255  # Alpha
+    img_array_blue[0:5, :, :3] = 255   # White border
+    img_array_blue[-5:, :, :3] = 255
+    img_array_blue[:, 0:5, :3] = 255
+    img_array_blue[:, -5:, :3] = 255
+    texture_blue = pi3d.Texture(img_array_blue)
+
+    # Bottom half: x_pos = -960 (negative X = visual bottom)
+    x_pos_bottom = -960
+    sprite_bottom = pi3d.Sprite(w=sprite_w, h=sprite_h, x=x_pos_bottom, y=y_pos, z=5.0)
+    sprite_bottom.set_shader(shader)
+    sprite_bottom.set_textures([texture_blue])
+    if rotation != 0:
+        sprite_bottom.rotateToZ(float(rotation))
 
     print(f"Hardware display: {hw_width}x{hw_height}")
     print(f"Sprite size: {sprite_w}x{sprite_h}")
-    print(f"Sprite position: ({x_pos}, {y_pos})")
+    print(f"Top position: ({x_pos}, {y_pos})")
+    print(f"Bottom position: ({x_pos_bottom}, {y_pos})")
     print(f"Rotation: {rotation}°")
-    print(f"Z depth: 5.0")
     print("Press Ctrl+C to exit")
     print()
     print("The image should appear at the TOP of the portrait display.")
@@ -101,7 +119,8 @@ def main():
 
     try:
         while display.loop_running():
-            sprite.draw()
+            sprite_top.draw()
+            sprite_bottom.draw()
             time.sleep(0.033)  # ~30 fps
     except KeyboardInterrupt:
         print("\nExiting...")
