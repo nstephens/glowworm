@@ -49,8 +49,10 @@ def main():
 
     texture = pi3d.Texture(img_array)
 
-    # TEST: Small centered sprite with rotation
-    # Make sprite MUCH smaller - about 1/4 of the smallest display dimension
+    # TEST: Small centered sprite - NO rotation first to establish baseline
+    # Pi3D uses OpenGL coordinates where the display spans -1 to 1 (or uses pixels?)
+    # Let's test with very small values
+
     sprite_w = 400
     sprite_h = 200
 
@@ -58,15 +60,21 @@ def main():
     x_pos = 0
     y_pos = 0
 
-    sprite = pi3d.Sprite(w=sprite_w, h=sprite_h, x=x_pos, y=y_pos, z=1.0)
+    # NO rotation for this test - let's see the baseline first
+    rotation = 0
+
+    sprite = pi3d.Sprite(w=sprite_w, h=sprite_h, x=x_pos, y=y_pos, z=5.0)
     sprite.set_shader(shader)
     sprite.set_textures([texture])
-    sprite.rotateToZ(float(ROTATION))
+
+    if rotation != 0:
+        sprite.rotateToZ(float(rotation))
 
     print(f"Hardware display: {hw_width}x{hw_height}")
     print(f"Sprite size: {sprite_w}x{sprite_h}")
     print(f"Sprite position: ({x_pos}, {y_pos})")
-    print(f"Rotation: {ROTATION}°")
+    print(f"Rotation: {rotation}°")
+    print(f"Z depth: 5.0")
     print("Press Ctrl+C to exit")
     print()
     print("The image should appear at the TOP of the portrait display.")
