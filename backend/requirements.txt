@@ -24,6 +24,7 @@ email-validator==2.1.0
 Pillow==10.1.0
 python-magic==0.4.27
 colorthief==0.2.1
+numpy<2  # Required for opencv compatibility
 opencv-contrib-python-headless==4.9.0.80  # For saliency detection (smart cropping)
 
 # WebSocket support
