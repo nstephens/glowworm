@@ -24,6 +24,7 @@ from .playlist_manager import PlaylistManager, PlaylistManagerConfig
 from .image_manager import ImageManager, ImageManagerConfig
 from .cache import create_cache, CacheConfig
 from .logging_config import setup_logging
+from .cec_controller import CECController
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,7 @@ class GlowwormDaemonV3:
         self.playlist_manager: PlaylistManager | None = None
         self.image_manager: ImageManager | None = None
         self.cache = None
+        self.cec_controller: CECController | None = None
 
     async def start(self):
         """Start the daemon and all components."""
@@ -58,6 +60,32 @@ class GlowwormDaemonV3:
         logger.info(f"Config file: {self.config._source_file if hasattr(self.config, '_source_file') else 'default'}")
 
         self.running = True
+
+        # Initialize CEC controller if enabled
+        if self.config.cec.enabled:
+            print("Initializing CEC controller...", flush=True)
+            logger.info("Initializing CEC controller...")
+            try:
+                self.cec_controller = CECController(
+                    adapter=self.config.cec.adapter,
+                    display_address=self.config.cec.display_address,
+                )
+                if self.cec_controller.available:
+                    logger.info(f"✓ CEC controller initialized (adapter: {self.config.cec.adapter})")
+                    # Try to scan for devices on startup
+                    success, devices = self.cec_controller.scan_devices(timeout=10)
+                    if success:
+                        self.cec_controller.cached_devices = devices
+                        logger.info(f"✓ Found {len(devices)} CEC device(s)")
+                    else:
+                        self.cec_controller.cached_devices = []
+                else:
+                    logger.warning("CEC enabled in config but not available on system")
+            except Exception as e:
+                logger.warning(f"Failed to initialize CEC controller: {e}")
+                self.cec_controller = None
+        else:
+            logger.info("CEC control disabled in configuration")
 
         # Initialize cache
         print("Initializing cache...", flush=True)
@@ -164,6 +192,7 @@ class GlowwormDaemonV3:
             slideshow=self.slideshow,
             display=self.display,
             cache=self.cache,
+            cec_controller=self.cec_controller,
             config=status_config,
         )
 
@@ -175,6 +204,7 @@ class GlowwormDaemonV3:
             websocket=self.websocket,
             slideshow=self.slideshow,
             playlist=self.playlist_manager,
+            cec_controller=self.cec_controller,
             config=cmd_config,
         )
 

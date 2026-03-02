@@ -5,8 +5,9 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from models.database import get_db
+from models.database import get_db, SessionLocal
 from models.display_device import DisplayDevice
+from models.device_daemon_status import DeviceDaemonStatus, DaemonStatus
 from services.display_device_service import DisplayDeviceService
 from utils.cookies import cookie_manager
 from utils.middleware import get_current_user
@@ -20,6 +21,58 @@ from .device_status_cache import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def update_device_cec_status(device_token: str, cec_info: dict) -> None:
+    """
+    Update CEC availability and devices in the database for a device.
+
+    Args:
+        device_token: The device's authentication token
+        cec_info: Dict containing 'available' and 'devices' keys
+    """
+    try:
+        db = SessionLocal()
+        try:
+            # Find the device by token
+            device = db.query(DisplayDevice).filter(
+                DisplayDevice.device_token == device_token
+            ).first()
+
+            if not device:
+                logger.warning(f"Device not found for token: {device_token[:8]}...")
+                return
+
+            # Get or create daemon status
+            daemon_status = db.query(DeviceDaemonStatus).filter(
+                DeviceDaemonStatus.device_id == device.id
+            ).first()
+
+            if daemon_status:
+                # Update existing status
+                daemon_status.cec_available = cec_info.get('available', False)
+                daemon_status.cec_devices = cec_info.get('devices', [])
+                daemon_status.last_heartbeat = datetime.now()
+                daemon_status.daemon_status = DaemonStatus.ONLINE
+            else:
+                # Create new daemon status
+                daemon_status = DeviceDaemonStatus(
+                    device_id=device.id,
+                    daemon_version="3.0.0",
+                    capabilities={"cec_control": cec_info.get('available', False)},
+                    cec_available=cec_info.get('available', False),
+                    cec_devices=cec_info.get('devices', []),
+                    daemon_status=DaemonStatus.ONLINE,
+                    last_heartbeat=datetime.now(),
+                )
+                db.add(daemon_status)
+
+            db.commit()
+            logger.debug(f"Updated CEC status for device {device_token[:8]}...: available={cec_info.get('available')}")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to update CEC status for device {device_token[:8]}...: {e}")
 
 router = APIRouter(prefix="/api/ws", tags=["websocket"])
 
@@ -212,6 +265,11 @@ async def handle_device_message(connection_id: str, device_token: str, message: 
 
         # Store status in Redis for quick access
         store_device_status(device_token, payload)
+
+        # Update CEC info in database if present
+        cec_info = payload.get('cec')
+        if cec_info:
+            await update_device_cec_status(device_token, cec_info)
 
         # Broadcast to all admins with full status
         await connection_manager.broadcast_device_status_update({

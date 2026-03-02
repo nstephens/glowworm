@@ -94,6 +94,10 @@ class DeviceStatus:
     error_code: Optional[str] = None
     error_timestamp: Optional[float] = None
 
+    # CEC capabilities (v3.0)
+    cec_available: bool = False
+    cec_devices: list = field(default_factory=list)
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -132,6 +136,10 @@ class DeviceStatus:
                 "code": self.error_code,
                 "timestamp": self.error_timestamp,
             } if self.has_error else None,
+            "cec": {
+                "available": self.cec_available,
+                "devices": self.cec_devices,
+            },
         }
 
 
@@ -171,6 +179,7 @@ class StatusReporter:
         images: Optional["ImageManager"] = None,
         display: Optional["DisplayController"] = None,
         cache: Optional["ImageCache"] = None,
+        cec_controller: Optional[Any] = None,
         config: Optional[StatusReporterConfig] = None,
     ) -> None:
         """
@@ -182,6 +191,7 @@ class StatusReporter:
             images: Optional ImageManager for cache info
             display: Optional DisplayController for display state
             cache: Optional ImageCache for cache statistics
+            cec_controller: Optional CECController for CEC capabilities
             config: Reporter configuration
         """
         self.websocket = websocket
@@ -189,6 +199,7 @@ class StatusReporter:
         self.images = images
         self.display = display
         self.cache = cache
+        self.cec_controller = cec_controller
         self.config = config or StatusReporterConfig()
 
         self._state = ReporterState.STOPPED
@@ -393,6 +404,13 @@ class StatusReporter:
             status.display_running = self.display.is_running
             status.display_state = self.display.state.value
 
+        # CEC state
+        if self.cec_controller:
+            status.cec_available = self.cec_controller.available
+            # Get cached devices if available
+            if hasattr(self.cec_controller, 'cached_devices'):
+                status.cec_devices = self.cec_controller.cached_devices or []
+
         status.timestamp = time.time()
         return status
 
@@ -448,6 +466,7 @@ def create_status_reporter(
     images: Optional["ImageManager"] = None,
     display: Optional["DisplayController"] = None,
     cache: Optional["ImageCache"] = None,
+    cec_controller: Optional[Any] = None,
     report_interval: float = 30.0,
     report_on_state_change: bool = True,
 ) -> StatusReporter:
@@ -460,6 +479,7 @@ def create_status_reporter(
         images: Optional ImageManager
         display: Optional DisplayController
         cache: Optional ImageCache
+        cec_controller: Optional CECController for CEC capabilities
         report_interval: Interval between periodic reports
         report_on_state_change: Whether to report on state changes
 
@@ -476,5 +496,6 @@ def create_status_reporter(
         images=images,
         display=display,
         cache=cache,
+        cec_controller=cec_controller,
         config=config,
     )

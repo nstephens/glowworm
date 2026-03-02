@@ -35,6 +35,11 @@ class CommandType(str, Enum):
     CLEAR = "clear"
     CLEAR_CACHE = "clear_cache"
     STATUS = "status"
+    # CEC commands
+    CEC_POWER_ON = "cec_power_on"
+    CEC_POWER_OFF = "cec_power_off"
+    CEC_SET_INPUT = "cec_set_input"
+    CEC_SCAN = "cec_scan"
 
 
 class CommandStatus(str, Enum):
@@ -117,6 +122,7 @@ class CommandHandler:
         websocket: "WebSocketClient",
         slideshow: Optional["SlideshowOrchestrator"] = None,
         playlist: Optional["PlaylistManager"] = None,
+        cec_controller: Optional[Any] = None,
         config: Optional[CommandHandlerConfig] = None,
     ) -> None:
         """
@@ -126,11 +132,13 @@ class CommandHandler:
             websocket: WebSocket client for sending responses
             slideshow: Optional SlideshowOrchestrator for playback commands
             playlist: Optional PlaylistManager for playlist commands
+            cec_controller: Optional CECController for CEC commands
             config: Handler configuration
         """
         self.websocket = websocket
         self.slideshow = slideshow
         self.playlist = playlist
+        self.cec_controller = cec_controller
         self.config = config or CommandHandlerConfig()
 
         self._running = False
@@ -270,6 +278,20 @@ class CommandHandler:
 
             elif command == CommandType.STATUS.value:
                 return await self._handle_status(request_id)
+
+            # CEC commands
+            elif command == CommandType.CEC_POWER_ON.value:
+                return await self._handle_cec_power(True, request_id)
+
+            elif command == CommandType.CEC_POWER_OFF.value:
+                return await self._handle_cec_power(False, request_id)
+
+            elif command == CommandType.CEC_SET_INPUT.value:
+                input_address = params.get("input_address")
+                return await self._handle_cec_set_input(input_address, request_id)
+
+            elif command == CommandType.CEC_SCAN.value:
+                return await self._handle_cec_scan(request_id)
 
             else:
                 logger.warning(f"Unknown command: {command}")
@@ -571,6 +593,168 @@ class CommandHandler:
             data=status_data,
             request_id=request_id,
         )
+
+    async def _handle_cec_power(
+        self,
+        power_on: bool,
+        request_id: Optional[str] = None,
+    ) -> CommandResult:
+        """Handle CEC power on/off commands."""
+        command = "cec_power_on" if power_on else "cec_power_off"
+
+        if not self.cec_controller:
+            return CommandResult(
+                command=command,
+                status=CommandStatus.FAILED,
+                message="CEC controller not available",
+                request_id=request_id,
+            )
+
+        if not self.cec_controller.available:
+            return CommandResult(
+                command=command,
+                status=CommandStatus.FAILED,
+                message="CEC not available on this device",
+                request_id=request_id,
+            )
+
+        try:
+            if power_on:
+                success, message = self.cec_controller.power_on()
+            else:
+                success, message = self.cec_controller.power_off()
+
+            if success:
+                return CommandResult(
+                    command=command,
+                    status=CommandStatus.SUCCESS,
+                    message=message,
+                    request_id=request_id,
+                )
+            else:
+                return CommandResult(
+                    command=command,
+                    status=CommandStatus.FAILED,
+                    message=message,
+                    request_id=request_id,
+                )
+        except Exception as e:
+            logger.error(f"CEC power command failed: {e}")
+            return CommandResult(
+                command=command,
+                status=CommandStatus.ERROR,
+                message=str(e),
+                request_id=request_id,
+            )
+
+    async def _handle_cec_set_input(
+        self,
+        input_address: Optional[str],
+        request_id: Optional[str] = None,
+    ) -> CommandResult:
+        """Handle CEC input selection command."""
+        if not self.cec_controller:
+            return CommandResult(
+                command="cec_set_input",
+                status=CommandStatus.FAILED,
+                message="CEC controller not available",
+                request_id=request_id,
+            )
+
+        if not self.cec_controller.available:
+            return CommandResult(
+                command="cec_set_input",
+                status=CommandStatus.FAILED,
+                message="CEC not available on this device",
+                request_id=request_id,
+            )
+
+        if not input_address:
+            return CommandResult(
+                command="cec_set_input",
+                status=CommandStatus.FAILED,
+                message="No input address specified",
+                request_id=request_id,
+            )
+
+        try:
+            success, message = self.cec_controller.set_input(input_address)
+
+            if success:
+                return CommandResult(
+                    command="cec_set_input",
+                    status=CommandStatus.SUCCESS,
+                    message=message,
+                    data={"input_address": input_address},
+                    request_id=request_id,
+                )
+            else:
+                return CommandResult(
+                    command="cec_set_input",
+                    status=CommandStatus.FAILED,
+                    message=message,
+                    request_id=request_id,
+                )
+        except Exception as e:
+            logger.error(f"CEC set input command failed: {e}")
+            return CommandResult(
+                command="cec_set_input",
+                status=CommandStatus.ERROR,
+                message=str(e),
+                request_id=request_id,
+            )
+
+    async def _handle_cec_scan(
+        self,
+        request_id: Optional[str] = None,
+    ) -> CommandResult:
+        """Handle CEC device scan command."""
+        if not self.cec_controller:
+            return CommandResult(
+                command="cec_scan",
+                status=CommandStatus.FAILED,
+                message="CEC controller not available",
+                request_id=request_id,
+            )
+
+        if not self.cec_controller.available:
+            return CommandResult(
+                command="cec_scan",
+                status=CommandStatus.FAILED,
+                message="CEC not available on this device",
+                request_id=request_id,
+            )
+
+        try:
+            success, devices = self.cec_controller.scan_devices(timeout=15)
+
+            if success:
+                # Update cached devices
+                if hasattr(self.cec_controller, 'cached_devices'):
+                    self.cec_controller.cached_devices = devices
+
+                return CommandResult(
+                    command="cec_scan",
+                    status=CommandStatus.SUCCESS,
+                    message=f"Found {len(devices)} CEC device(s)",
+                    data={"devices": devices},
+                    request_id=request_id,
+                )
+            else:
+                return CommandResult(
+                    command="cec_scan",
+                    status=CommandStatus.FAILED,
+                    message="CEC scan failed",
+                    request_id=request_id,
+                )
+        except Exception as e:
+            logger.error(f"CEC scan command failed: {e}")
+            return CommandResult(
+                command="cec_scan",
+                status=CommandStatus.ERROR,
+                message=str(e),
+                request_id=request_id,
+            )
 
     async def _send_response(self, result: CommandResult) -> bool:
         """
