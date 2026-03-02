@@ -872,125 +872,102 @@ class ImageLoader:
         Returns:
             ImageDimensions with calculated size and position
         """
-        # Pi3D reports hardware dimensions. For rotated displays, we need to
-        # calculate based on VISUAL dimensions (what the user sees).
-        # Hardware 3840x2160 rotated 270° = Visual 2160x3840 (portrait)
-        if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
-            # Rotated: visual width/height are swapped from hardware
-            visual_width = self.display_height   # 2160
-            visual_height = self.display_width   # 3840
-        else:
-            visual_width = self.display_width
-            visual_height = self.display_height
+        # Use hardware dimensions directly - same as calculate_dimensions for single images
+        # The rotation is applied to the sprite content, positions are in hardware/world coords
+        #
+        # For 90/270 rotation, we work in hardware space:
+        # - Hardware is 3840x2160 (landscape)
+        # - We stack images LEFT/RIGHT in hardware space
+        # - After 270° rotation, left becomes top, right becomes bottom
 
-        logger.info(
-            f"calculate_stacked_dimensions: hardware={self.display_width}x{self.display_height}, "
-            f"visual={visual_width}x{visual_height}, "
-            f"image={image_width}x{image_height}, position={position}, rotation={self.rotation.value}"
-        )
-        # Also write to a debug file since logging may not be visible
+        # Gap creates visible separation between the two stacked images
+        gap_pixels = 20
+
+        # For rotated displays, stacking is along X axis (hardware), which appears
+        # as vertical (visual) after rotation
+        if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
+            # Each image gets half the hardware WIDTH (becomes visual height after rotation)
+            half_size = (self.display_width - gap_pixels) / 2.0
+            target_width = half_size  # This becomes visual height
+            target_height = float(self.display_height)  # This becomes visual width (2160)
+        else:
+            # Non-rotated: stack along Y axis
+            half_size = (self.display_height - gap_pixels) / 2.0
+            target_width = float(self.display_width)
+            target_height = half_size
+
+        # Debug log
         try:
             with open("/tmp/glowworm_stacked_debug.log", "a") as f:
                 f.write(
-                    f"calculate_stacked: hardware={self.display_width}x{self.display_height}, "
-                    f"visual={visual_width}x{visual_height}, "
-                    f"image={image_width}x{image_height}, position={position}, "
-                    f"rotation={self.rotation.value}\n"
+                    f"calculate_stacked: hw={self.display_width}x{self.display_height}, "
+                    f"target={target_width:.0f}x{target_height:.0f}, "
+                    f"image={image_width}x{image_height}, pos={position}, rot={self.rotation.value}\n"
                 )
         except:
             pass
 
-        # Each image gets half the VISUAL height, minus a small gap
-        # Gap creates visible separation between the two stacked images
-        gap_pixels = 20  # Gap between images (10 pixels on each side of center)
-        half_height = (visual_height - gap_pixels) / 2.0
-
-        # Calculate aspect ratios based on visual dimensions
+        # Calculate scaling to fit image in target area
         image_aspect = image_width / image_height
-        half_aspect = visual_width / half_height
+        target_aspect = target_width / target_height
 
         if scale_mode == ScaleMode.STRETCH:
-            # Stretch to fill half
-            scaled_width = float(visual_width)
-            scaled_height = half_height
+            scaled_width = target_width
+            scaled_height = target_height
         elif scale_mode == ScaleMode.FILL:
-            # Fill the half, cropping as needed
-            if image_aspect > half_aspect:
-                scale = half_height / image_height
-                scaled_width = image_width * scale
-                scaled_height = half_height
+            # Fill target, cropping as needed
+            if image_aspect > target_aspect:
+                # Image wider than target - fit height, crop width
+                scale = target_height / image_height
             else:
-                scale = visual_width / image_width
-                scaled_width = float(visual_width)
-                scaled_height = image_height * scale
+                # Image taller than target - fit width, crop height
+                scale = target_width / image_width
+            scaled_width = image_width * scale
+            scaled_height = image_height * scale
         else:
-            # FIT mode - fit within half, letterbox if needed
-            if image_aspect > half_aspect:
-                # Image is wider - fit to width
-                scale = visual_width / image_width
-                scaled_width = float(visual_width)
-                scaled_height = image_height * scale
+            # FIT mode - fit within target, letterbox if needed
+            if image_aspect > target_aspect:
+                # Image wider - fit to width
+                scale = target_width / image_width
             else:
-                # Image is taller - fit to half height
-                scale = half_height / image_height
-                scaled_width = image_width * scale
-                scaled_height = half_height
+                # Image taller - fit to height
+                scale = target_height / image_height
+            scaled_width = image_width * scale
+            scaled_height = image_height * scale
 
-        # For rotated displays, sprite dimensions need to be swapped so that
-        # after rotation they appear correct. A sprite created as WxH and rotated
-        # 90° becomes visually HxW.
-        if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
-            # Swap dimensions - they'll be un-swapped by the rotation
-            final_width = scaled_height
-            final_height = scaled_width
-        else:
-            final_width = scaled_width
-            final_height = scaled_height
-
-        # Calculate position offset
-        # Pi3D coordinates are in hardware space. For rotated displays, visual Y
-        # maps to hardware X (or -X depending on rotation direction).
-        # Each image center is at: half_height/2 + gap/2 from center
-        quarter_offset = half_height / 2.0 + gap_pixels / 2.0
+        # Calculate position offset - place centers at quarter points
+        quarter_offset = half_size / 2.0 + gap_pixels / 2.0
 
         if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
-            # Rotated display: position along X axis (which becomes vertical visually)
-            # 270° CCW rotation: visual top = hardware +X, visual right = hardware -Y
-            # 90° CCW rotation: visual top = hardware -X, visual right = hardware +Y
+            # Stack along X axis in hardware space
+            # 270°: +X is visual top, -X is visual bottom
+            # 90°: -X is visual top, +X is visual bottom
+            y_offset = 0.0
             if self.rotation == Rotation.DEG_270:
-                # 270° CCW: visual top is +X in hardware coords
-                if position == 'top':
-                    x_offset = quarter_offset
-                    y_offset = 0.0
-                else:
-                    x_offset = -quarter_offset
-                    y_offset = 0.0
+                x_offset = quarter_offset if position == 'top' else -quarter_offset
             else:  # DEG_90
-                # 90° CCW: visual top is -X in hardware coords
-                if position == 'top':
-                    x_offset = -quarter_offset
-                    y_offset = 0.0
-                else:
-                    x_offset = quarter_offset
-                    y_offset = 0.0
+                x_offset = -quarter_offset if position == 'top' else quarter_offset
         else:
-            # Non-rotated display: position along Y axis
+            # Stack along Y axis
             x_offset = 0.0
             if self.rotation == Rotation.DEG_180:
-                # 180°: Y is flipped
-                if position == 'top':
-                    y_offset = -quarter_offset
-                else:
-                    y_offset = quarter_offset
+                y_offset = -quarter_offset if position == 'top' else quarter_offset
             else:  # DEG_0
-                if position == 'top':
-                    y_offset = quarter_offset
-                else:
-                    y_offset = -quarter_offset
+                y_offset = quarter_offset if position == 'top' else -quarter_offset
+
+        # Debug output
+        try:
+            with open("/tmp/glowworm_stacked_debug.log", "a") as f:
+                f.write(
+                    f"  -> sprite: {scaled_width:.0f}x{scaled_height:.0f}, "
+                    f"offset=({x_offset:.0f}, {y_offset:.0f})\n"
+                )
+        except:
+            pass
 
         return ImageDimensions(
-            width=final_width,
-            height=final_height,
+            width=scaled_width,
+            height=scaled_height,
             x_offset=x_offset,
             y_offset=y_offset,
             scale_x=scaled_width / image_width if image_width > 0 else 1.0,
