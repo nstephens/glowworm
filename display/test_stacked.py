@@ -63,8 +63,8 @@ def main():
     x_pos = 0
     y_pos = 0
 
-    # NO rotation for this test - let's see the baseline first
-    rotation = 0
+    # Add 270° rotation like the real display
+    rotation = 270
 
     sprite = pi3d.Sprite(w=sprite_w, h=sprite_h, x=x_pos, y=y_pos, z=5.0)
     sprite.set_shader(shader)
