@@ -311,6 +311,9 @@ class Display:
         # Apply background color
         self._display.set_background(*bg_rgb, 1.0)
 
+        # Hide mouse cursor
+        self._display.mouse = None
+
         # Create 2D camera for image display
         # Rotation is handled by rotating sprites, not the camera
         self._camera = pi3d.Camera(is_3d=False)
