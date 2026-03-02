@@ -49,14 +49,12 @@ def main():
 
     texture = pi3d.Texture(img_array)
 
-    # TEST 1: Start with a small centered sprite, no rotation
-    # This establishes baseline - should appear centered on screen
+    # TEST: Small centered sprite with rotation
+    # Make sprite MUCH smaller - about 1/4 of the smallest display dimension
+    sprite_w = 400
+    sprite_h = 200
 
-    # Make sprite small enough to clearly see position
-    sprite_w = 800   # Small width
-    sprite_h = 400   # Small height
-
-    # Start at center
+    # Start at center (0,0)
     x_pos = 0
     y_pos = 0
 
@@ -65,7 +63,10 @@ def main():
     sprite.set_textures([texture])
     sprite.rotateToZ(float(ROTATION))
 
-    print(f"Sprite: {sprite_w}x{sprite_h} at ({x_pos}, {y_pos}), rotation={ROTATION}")
+    print(f"Hardware display: {hw_width}x{hw_height}")
+    print(f"Sprite size: {sprite_w}x{sprite_h}")
+    print(f"Sprite position: ({x_pos}, {y_pos})")
+    print(f"Rotation: {ROTATION}°")
     print("Press Ctrl+C to exit")
     print()
     print("The image should appear at the TOP of the portrait display.")
