@@ -447,8 +447,9 @@ class DisplayController:
                 display_cmd.extend(["--config", self.config.config_file])
 
             # Wrap with cage if enabled (required on Pi5/headless)
+            # -m flag hides the mouse cursor
             if self.config.use_cage:
-                cmd = [self.config.cage_command, "--"] + display_cmd
+                cmd = [self.config.cage_command, "-m", "--"] + display_cmd
             else:
                 cmd = display_cmd
 
