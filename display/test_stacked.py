@@ -59,8 +59,9 @@ def main():
     sprite_w = 400
     sprite_h = 200
 
-    # Start at center (0,0)
-    x_pos = 0
+    # Move to "top" of portrait display
+    # Try positive X first - should move toward visual top or bottom
+    x_pos = 1000
     y_pos = 0
 
     # Add 270° rotation like the real display
