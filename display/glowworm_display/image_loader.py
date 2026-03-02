@@ -872,29 +872,32 @@ class ImageLoader:
         Returns:
             ImageDimensions with calculated size and position
         """
-        # Use hardware dimensions directly - same as calculate_dimensions for single images
-        # The rotation is applied to the sprite content, positions are in hardware/world coords
+        # Based on testing with test_stacked.py:
+        # - Sprite dimensions should be in VISUAL space (what user sees)
+        # - Position offsets move the sprite in hardware space
+        # - For 270° rotation: +X = visual top, +Y = visual left
         #
-        # For 90/270 rotation, we work in hardware space:
-        # - Hardware is 3840x2160 (landscape)
-        # - We stack images LEFT/RIGHT in hardware space
-        # - After 270° rotation, left becomes top, right becomes bottom
+        # Visual portrait display (after 270° rotation):
+        #   - Visual width = hardware height (2160)
+        #   - Visual height = hardware width (3840)
 
         # Gap creates visible separation between the two stacked images
         gap_pixels = 20
 
-        # For rotated displays, stacking is along X axis (hardware), which appears
-        # as vertical (visual) after rotation
         if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
-            # Each image gets half the hardware WIDTH (becomes visual height after rotation)
-            half_size = (self.display_width - gap_pixels) / 2.0
-            target_width = half_size  # This becomes visual height
-            target_height = float(self.display_height)  # This becomes visual width (2160)
+            # Rotated display: visual dimensions are swapped from hardware
+            visual_width = float(self.display_height)   # 2160
+            visual_height = float(self.display_width)   # 3840
         else:
-            # Non-rotated: stack along Y axis
-            half_size = (self.display_height - gap_pixels) / 2.0
-            target_width = float(self.display_width)
-            target_height = half_size
+            visual_width = float(self.display_width)
+            visual_height = float(self.display_height)
+
+        # Each image gets half the visual height minus gap
+        half_height = (visual_height - gap_pixels) / 2.0
+
+        # Target area for each image (in visual space)
+        target_width = visual_width      # Full visual width
+        target_height = half_height      # Half visual height
 
         # Debug log
         try:
@@ -935,20 +938,21 @@ class ImageLoader:
             scaled_width = image_width * scale
             scaled_height = image_height * scale
 
-        # Calculate position offset - place centers at quarter points
-        quarter_offset = half_size / 2.0 + gap_pixels / 2.0
+        # Calculate position offset
+        # Center of each half is at: gap/2 + half_height/2 from center
+        quarter_offset = gap_pixels / 2.0 + half_height / 2.0
 
         if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
-            # Stack along X axis in hardware space
-            # 270°: +X is visual top, -X is visual bottom
-            # 90°: -X is visual top, +X is visual bottom
+            # Rotated display: position along X axis (hardware)
+            # 270°: +X = visual top, -X = visual bottom
+            # 90°: -X = visual top, +X = visual bottom
             y_offset = 0.0
             if self.rotation == Rotation.DEG_270:
                 x_offset = quarter_offset if position == 'top' else -quarter_offset
             else:  # DEG_90
                 x_offset = -quarter_offset if position == 'top' else quarter_offset
         else:
-            # Stack along Y axis
+            # Non-rotated: position along Y axis
             x_offset = 0.0
             if self.rotation == Rotation.DEG_180:
                 y_offset = -quarter_offset if position == 'top' else quarter_offset
