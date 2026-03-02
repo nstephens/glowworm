@@ -126,14 +126,7 @@ def main():
     sprite_bottom.rotateToZ(270.0)
 
     print(f"Hardware display: {hw_width}x{hw_height}")
-    print(f"Sprite size: {sprite_w}x{sprite_h}")
-    print(f"Top position: ({x_pos}, {y_pos})")
-    print(f"Bottom position: ({x_pos_bottom}, {y_pos})")
-    print(f"Rotation: {rotation}°")
     print("Press Ctrl+C to exit")
-    print()
-    print("The image should appear at the TOP of the portrait display.")
-    print("Red should be on one side, blue on the other.")
 
     try:
         while display.loop_running():
