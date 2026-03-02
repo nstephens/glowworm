@@ -53,26 +53,25 @@ def main():
     texture = pi3d.Texture(img_array)
 
     # Position for TOP stacked image on portrait display (270° rotation)
-    # Visual layout after rotation:
-    #   - Visual width = 2160 (hw height)
-    #   - Visual height = 3840 (hw width)
-    #   - Each stacked image gets half = 1920 visual height
     #
     # Coordinate mapping (confirmed by testing):
     #   +X = visual top
     #   +Y = visual left
     #
-    # For a landscape image (e.g., 1920x1080 visual) in top half:
-    #   - Sprite dimensions should match visual size (will be rotated)
-    #   - Position X = +960 (center of top half = 3840/4)
+    # The sprite rotation rotates the IMAGE content, not its bounding box.
+    # So we create the sprite with the dimensions we want VISUALLY,
+    # and the 270° rotation will rotate the texture inside.
+    #
+    # For a landscape image in top half of portrait display:
+    #   - Visual target: 2160 wide x ~1000 tall (landscape in top half)
+    #   - Create sprite at that size, texture will be rotated inside
 
-    # Simulating a landscape image scaled to fit top half
-    # Visual size: 2160 wide x 1080 tall (landscape fitting in 2160x1920 half)
-    # But sprite is created BEFORE rotation, so swap: 1080 wide x 2160 tall
-    sprite_w = 1080  # becomes visual height after 270° rotation
-    sprite_h = 2160  # becomes visual width after 270° rotation
+    # Create landscape-shaped sprite (wider than tall)
+    sprite_w = 2160  # visual width (full width of portrait display)
+    sprite_h = 1000  # visual height (roughly half of the 1920 half-height)
 
     # Position in top half
+    # Top half center is at visual Y = +960 (which is hardware X = +960)
     x_pos = 960   # center of top half (+X = visual up)
     y_pos = 0     # centered horizontally
 
