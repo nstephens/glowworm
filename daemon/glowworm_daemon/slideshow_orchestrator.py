@@ -55,7 +55,8 @@ class SlideshowConfig:
     transition_duration: float = 1.0
 
     # Scale mode for images (fit, fill, stretch)
-    scale_mode: str = "fit"
+    # Using "fill" for stacked images to minimize black bars
+    scale_mode: str = "fill"
 
     # Preload count (number of upcoming images to preload)
     preload_count: int = 3
