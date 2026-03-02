@@ -478,7 +478,7 @@ class Renderer:
             stagger_delay=stagger_delay,
             top_duration=1.2,
             bottom_duration=1.5,
-            use_slide=True,
+            use_slide=False,  # Disabled for rotated displays - slide offsets are wrong
         )
         self._transition.start()
         self._set_state(RendererState.TRANSITIONING)
