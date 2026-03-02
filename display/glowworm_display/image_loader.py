@@ -1038,6 +1038,18 @@ class ImageLoader:
         import pi3d
 
         shader = self._get_shader()
+
+        # Debug: log exactly what we're creating
+        try:
+            with open("/tmp/glowworm_sprite_create.log", "a") as f:
+                f.write(
+                    f"pi3d.Sprite(w={dims.width:.0f}, h={dims.height:.0f}, "
+                    f"x={dims.x_offset:.0f}, y={dims.y_offset:.0f}, z={z})\n"
+                    f"  rotateToZ({self.rotation.value})\n"
+                )
+        except:
+            pass
+
         sprite = pi3d.Sprite(
             w=dims.width,
             h=dims.height,
