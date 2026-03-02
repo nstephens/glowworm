@@ -40,6 +40,8 @@ class PlaylistImage:
     filename: str
     width: Optional[int] = None
     height: Optional[int] = None
+    focus_x: float = 0.5  # Smart crop focus point (0.0-1.0 from left)
+    focus_y: float = 0.5  # Smart crop focus point (0.0-1.0 from top)
     mime_type: str = "image/jpeg"
     file_size: int = 0
     checksum: Optional[str] = None  # For cache invalidation
@@ -401,6 +403,8 @@ class PlaylistManager:
                         filename=item.get("filename", f"{image_id}.jpg"),
                         width=item.get("width"),
                         height=item.get("height"),
+                        focus_x=item.get("focus_x", 0.5),
+                        focus_y=item.get("focus_y", 0.5),
                         mime_type=item.get("mime_type", "image/jpeg"),
                         file_size=item.get("file_size", 0),
                         checksum=item.get("file_hash"),
@@ -459,6 +463,10 @@ class PlaylistManager:
                 id=image_id,
                 url=item.get("url", f"/api/images/{image_id}/file"),
                 filename=item.get("filename", f"{image_id}.jpg"),
+                width=item.get("width"),
+                height=item.get("height"),
+                focus_x=item.get("focus_x", 0.5),
+                focus_y=item.get("focus_y", 0.5),
                 mime_type=item.get("mime_type", "image/jpeg"),
                 file_size=item.get("file_size", 0),
                 checksum=item.get("checksum"),
@@ -508,6 +516,10 @@ class PlaylistManager:
                     id=image_id,
                     url=item.get("url", f"/api/images/{image_id}/file"),
                     filename=item.get("filename", f"{image_id}.jpg"),
+                    width=item.get("width"),
+                    height=item.get("height"),
+                    focus_x=item.get("focus_x", 0.5),
+                    focus_y=item.get("focus_y", 0.5),
                     mime_type=item.get("mime_type", "image/jpeg"),
                     file_size=item.get("file_size", 0),
                     checksum=item.get("checksum"),
@@ -553,7 +565,11 @@ class PlaylistManager:
 
     async def check_for_updates(self) -> bool:
         """
-        Check if playlist has been updated on backend.
+        Check if the assigned playlist has changed or been updated on backend.
+
+        This checks both:
+        1. Whether a different playlist has been assigned to this device
+        2. Whether the current playlist's content has changed
 
         Returns:
             True if playlist has changed, False otherwise.
@@ -562,10 +578,19 @@ class PlaylistManager:
             return True  # No playlist loaded
 
         try:
-            # Fetch current playlist
-            new_playlist = await self.fetch_playlist(self._playlist.id)
+            # Fetch the device's assigned playlist (may be different from current)
+            # Pass None to force re-fetching from device endpoint
+            new_playlist = await self.fetch_playlist(playlist_id=None)
 
-            # Compare version hashes
+            # Check if playlist ID changed (device was reassigned)
+            if new_playlist.id != self._playlist.id:
+                logger.info(
+                    f"Device reassigned to different playlist: "
+                    f"{self._playlist.id} -> {new_playlist.id}"
+                )
+                return True
+
+            # Compare version hashes for content changes
             if new_playlist.version_hash != self._playlist.version_hash:
                 logger.info(
                     f"Playlist updated: {self._playlist.version_hash} -> "

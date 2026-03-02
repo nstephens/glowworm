@@ -733,6 +733,10 @@ async def get_playlist_images_manifest(
                 "id": str(image.id),  # String for IndexedDB key
                 "url": image_url,
                 "filename": image.filename,
+                "width": image.width,
+                "height": image.height,
+                "focus_x": image.focus_x if image.focus_x is not None else 0.5,
+                "focus_y": image.focus_y if image.focus_y is not None else 0.5,
                 "mime_type": image.mime_type or "image/jpeg",
                 "file_size": image.file_size or 0,
                 "checksum": image.file_hash,  # MD5 hash for cache invalidation

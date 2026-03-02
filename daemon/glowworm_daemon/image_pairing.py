@@ -29,7 +29,7 @@ def classify_image(width: int, height: int) -> Literal['landscape', 'portrait']:
         'landscape' if aspect ratio > 1.1
         'portrait' if aspect ratio <= 1.1 (includes square)
     """
-    if width <= 0 or height <= 0:
+    if width is None or height is None or width <= 0 or height <= 0:
         logger.warning(f"Invalid image dimensions: {width}x{height}, defaulting to portrait")
         return 'portrait'
 
@@ -75,8 +75,8 @@ def compute_portrait_sequence(images: List[Dict[str, Any]]) -> List[PairingEntry
     landscape_buffer: List[Dict[str, Any]] = []
 
     for image in images:
-        width = image.get('width', 0)
-        height = image.get('height', 0)
+        width = image.get('width') or 0
+        height = image.get('height') or 0
         image_type = classify_image(width, height)
 
         if image_type == 'landscape':
@@ -133,8 +133,8 @@ def compute_landscape_sequence(images: List[Dict[str, Any]]) -> List[PairingEntr
     portrait_buffer: List[Dict[str, Any]] = []
 
     for image in images:
-        width = image.get('width', 0)
-        height = image.get('height', 0)
+        width = image.get('width') or 0
+        height = image.get('height') or 0
         image_type = classify_image(width, height)
 
         if image_type == 'portrait':

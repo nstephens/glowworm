@@ -405,6 +405,8 @@ class Renderer:
         scale_mode: ScaleMode = ScaleMode.FIT,
         transition_duration: float | None = None,
         stagger_delay: float = 0.3,
+        top_focus: tuple[float, float] = (0.5, 0.5),
+        bottom_focus: tuple[float, float] = (0.5, 0.5),
     ) -> bool:
         """
         Load a pair of images immediately for stacked display.
@@ -417,6 +419,8 @@ class Renderer:
             scale_mode: How to scale the images
             transition_duration: Override default transition duration
             stagger_delay: Delay between top and bottom image transitions
+            top_focus: Focus point (x, y) for top image cropping (0.0-1.0)
+            bottom_focus: Focus point (x, y) for bottom image cropping (0.0-1.0)
 
         Returns:
             True if images loaded successfully, False if failed
@@ -433,10 +437,12 @@ class Renderer:
         # Load the new images
         try:
             self._next_top_sprite = self.image_loader.load_stacked_image(
-                top_path, position='top', scale_mode=scale_mode
+                top_path, position='top', scale_mode=scale_mode,
+                focus_point=top_focus
             )
             self._next_bottom_sprite = self.image_loader.load_stacked_image(
-                bottom_path, position='bottom', scale_mode=scale_mode
+                bottom_path, position='bottom', scale_mode=scale_mode,
+                focus_point=bottom_focus
             )
         except ImageLoadError as e:
             logger.error(f"Failed to load image pair: {e}")

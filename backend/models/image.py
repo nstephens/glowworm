@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, Enum, Text
+from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, Enum, Text, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .database import Base
@@ -18,6 +18,11 @@ class Image(Base):
     exif = Column(JSON, nullable=True)
     dominant_colors = Column(JSON, nullable=True)  # Array of hex color strings ["#FF5733", "#33FF57", "#3357FF"]
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=True)
+
+    # Smart cropping focus point (0.0 to 1.0, percentage from top-left)
+    # Detected via ML saliency detection during image processing
+    focus_x = Column(Float, nullable=True, default=0.5)  # Horizontal focus point
+    focus_y = Column(Float, nullable=True, default=0.5)  # Vertical focus point
     
     # Background processing status fields
     processing_status = Column(
@@ -77,6 +82,8 @@ class Image(Base):
             "file_hash": self.file_hash,
             "exif": self.exif,
             "dominant_colors": self.dominant_colors,
+            "focus_x": self.focus_x,
+            "focus_y": self.focus_y,
             "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
             "playlist_id": self.playlist_id,
             "url": f"/api/images/{self.id}/file",

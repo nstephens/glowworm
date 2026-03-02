@@ -825,6 +825,10 @@ class SlideshowOrchestrator:
             scale_mode=self.config.scale_mode,
             transition_duration=self.config.pair_transition_duration,
             stagger_delay=self.config.stagger_delay,
+            top_focus_x=top_image.focus_x,
+            top_focus_y=top_image.focus_y,
+            bottom_focus_x=bottom_image.focus_x,
+            bottom_focus_y=bottom_image.focus_y,
         )
         print(f"_display_image_pair: load_image_pair returned {success}", flush=True)
 

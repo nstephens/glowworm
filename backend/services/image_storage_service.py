@@ -489,7 +489,10 @@ class ImageStorageService:
             save_kwargs = {'format': format_name, 'optimize': True}
             if format_name == 'JPEG':
                 save_kwargs['quality'] = 90
-            
+            # Explicitly do NOT include exif to strip orientation tag
+            # This prevents double-rotation when clients read the image
+            save_kwargs['exif'] = b''
+
             try:
                 img.save(output, **save_kwargs)
                 file_bytes = output.getvalue()

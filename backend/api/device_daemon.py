@@ -662,6 +662,10 @@ async def get_device_playlist(
             images.append({
                 "id": image.id,
                 "filename": image.filename,
+                "width": image.width,
+                "height": image.height,
+                "focus_x": image.focus_x if image.focus_x is not None else 0.5,
+                "focus_y": image.focus_y if image.focus_y is not None else 0.5,
                 "display_time": display_time,
                 "transition": "crossfade",
                 "url": f"/api/images/{image.id}/display",

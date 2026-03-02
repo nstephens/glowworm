@@ -344,6 +344,120 @@ class ImageLoader:
         # Ensure dimensions are at least 1
         return max(1, new_width), max(1, new_height)
 
+    def _apply_exif_orientation(self, img: Image.Image) -> Image.Image:
+        """
+        Apply EXIF orientation to correct image rotation.
+
+        Mobile devices often store images in a fixed orientation with an
+        EXIF tag indicating how to rotate them for display. This method
+        applies that rotation so the image displays correctly.
+
+        Args:
+            img: PIL Image to correct
+
+        Returns:
+            Rotated/flipped image if EXIF orientation found, original otherwise
+        """
+        try:
+            exif = img.getexif()
+            orientation = exif.get(274)  # 274 = Orientation tag
+
+            if orientation is None or orientation == 1:
+                return img  # Normal orientation, no change needed
+
+            # Apply transformation based on EXIF orientation value
+            if orientation == 2:
+                # Mirror horizontal
+                img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+            elif orientation == 3:
+                # Rotate 180
+                img = img.rotate(180, expand=True)
+            elif orientation == 4:
+                # Mirror vertical
+                img = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+            elif orientation == 5:
+                # Mirror horizontal + rotate 90 CCW
+                img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                img = img.rotate(90, expand=True)
+            elif orientation == 6:
+                # Rotate 90 CW (270 CCW)
+                img = img.rotate(-90, expand=True)
+            elif orientation == 7:
+                # Mirror horizontal + rotate 90 CW
+                img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                img = img.rotate(-90, expand=True)
+            elif orientation == 8:
+                # Rotate 90 CCW
+                img = img.rotate(90, expand=True)
+
+            logger.debug(f"Applied EXIF orientation {orientation}")
+            return img
+
+        except Exception as e:
+            logger.warning(f"Failed to apply EXIF orientation: {e}")
+            return img
+
+    def _crop_to_focus(
+        self,
+        img: Image.Image,
+        target_aspect: float,
+        focus_x: float = 0.5,
+        focus_y: float = 0.5,
+    ) -> Image.Image:
+        """
+        Crop image to target aspect ratio centered on focus point.
+
+        Used for FILL mode smart cropping - crops the image to match
+        the target aspect ratio while keeping the focus point visible.
+
+        Args:
+            img: PIL Image to crop
+            target_aspect: Target width/height ratio
+            focus_x: Focus point X (0.0-1.0 from left)
+            focus_y: Focus point Y (0.0-1.0 from top)
+
+        Returns:
+            Cropped PIL Image
+        """
+        img_width, img_height = img.size
+        img_aspect = img_width / img_height
+
+        if abs(img_aspect - target_aspect) < 0.01:
+            # Already close to target aspect ratio
+            return img
+
+        if img_aspect > target_aspect:
+            # Image wider than target - crop width
+            new_width = int(img_height * target_aspect)
+            new_height = img_height
+
+            # Calculate crop position based on focus point
+            # Focus point 0.0 = left edge, 1.0 = right edge
+            max_offset = img_width - new_width
+            left = int(focus_x * max_offset)
+            left = max(0, min(left, max_offset))
+
+            crop_box = (left, 0, left + new_width, new_height)
+        else:
+            # Image taller than target - crop height
+            new_width = img_width
+            new_height = int(img_width / target_aspect)
+
+            # Calculate crop position based on focus point
+            # Focus point 0.0 = top edge, 1.0 = bottom edge
+            max_offset = img_height - new_height
+            top = int(focus_y * max_offset)
+            top = max(0, min(top, max_offset))
+
+            crop_box = (0, top, new_width, top + new_height)
+
+        logger.debug(
+            f"Smart crop: {img_width}x{img_height} -> {new_width}x{new_height}, "
+            f"focus=({focus_x:.2f}, {focus_y:.2f}), box={crop_box}"
+        )
+
+        return img.crop(crop_box)
+
     def _resize_image(self, path: Path) -> tuple[Image.Image, bool]:
         """
         Load and optionally resize an image.
@@ -359,6 +473,10 @@ class ImageLoader:
         """
         try:
             img = Image.open(path)
+
+            # Apply EXIF orientation correction BEFORE any other processing
+            # This ensures mobile photos display correctly
+            img = self._apply_exif_orientation(img)
 
             # Convert to RGB if necessary (handles RGBA, P, etc.)
             if img.mode not in ("RGB", "RGBA"):
@@ -984,6 +1102,7 @@ class ImageLoader:
         position: str,
         scale_mode: ScaleMode = ScaleMode.FIT,
         z: float = 1.0,
+        focus_point: tuple[float, float] = (0.5, 0.5),
     ) -> "MockSprite | pi3d.Sprite":
         """
         Create a sprite positioned for stacked display.
@@ -993,6 +1112,7 @@ class ImageLoader:
             position: 'top' or 'bottom'
             scale_mode: How to scale the image within its half
             z: Z depth for layering
+            focus_point: (x, y) focus point for smart cropping (0.0-1.0)
 
         Returns:
             Pi3D Sprite positioned for stacked display
@@ -1001,7 +1121,8 @@ class ImageLoader:
         image_height = texture.iy
 
         dims = self.calculate_stacked_dimensions(
-            image_width, image_height, position, scale_mode
+            image_width, image_height, position, scale_mode,
+            focus_point=focus_point
         )
 
         logger.info(
@@ -1071,6 +1192,7 @@ class ImageLoader:
         position: str,
         scale_mode: ScaleMode = ScaleMode.FIT,
         z: float = 1.0,
+        focus_point: tuple[float, float] = (0.5, 0.5),
     ) -> "MockSprite | pi3d.Sprite":
         """
         Load an image positioned for stacked display.
@@ -1082,6 +1204,7 @@ class ImageLoader:
             position: 'top' or 'bottom'
             scale_mode: How to scale the image within its half
             z: Z depth for layering
+            focus_point: (x, y) focus point for smart cropping (0.0-1.0)
 
         Returns:
             Pi3D Sprite positioned for stacked display
@@ -1089,9 +1212,89 @@ class ImageLoader:
         Raises:
             ImageLoadError: If image cannot be loaded
         """
-        logger.info(f"Loading stacked image ({position}): {file_path}")
+        logger.info(f"Loading stacked image ({position}): {file_path}, focus={focus_point}")
 
-        texture = self.load_texture(file_path)
-        sprite = self.create_stacked_sprite(texture, position, scale_mode, z)
+        # For FILL mode, pre-crop the image to target aspect ratio using focus point
+        if scale_mode == ScaleMode.FILL:
+            texture = self._load_texture_with_focus_crop(
+                file_path, position, focus_point
+            )
+        else:
+            texture = self.load_texture(file_path)
+
+        sprite = self.create_stacked_sprite(
+            texture, position, scale_mode, z, focus_point=focus_point
+        )
 
         return sprite
+
+    def _load_texture_with_focus_crop(
+        self,
+        file_path: str | Path,
+        position: str,
+        focus_point: tuple[float, float],
+    ) -> "MockTexture | pi3d.Texture":
+        """
+        Load texture with smart cropping for FILL mode.
+
+        Pre-crops the image to the target aspect ratio for the stacked
+        position, centered on the focus point.
+
+        Args:
+            file_path: Path to the image file
+            position: 'top' or 'bottom'
+            focus_point: (x, y) focus point (0.0-1.0)
+
+        Returns:
+            Pi3D Texture or MockTexture
+        """
+        path = self._validate_path(file_path)
+
+        # Calculate target aspect ratio for stacked position
+        gap_pixels = 20
+        if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
+            visual_width = float(self.display_height)
+            visual_height = float(self.display_width)
+        else:
+            visual_width = float(self.display_width)
+            visual_height = float(self.display_height)
+
+        half_height = (visual_height - gap_pixels) / 2.0
+        target_aspect = visual_width / half_height
+
+        # Load and process image
+        try:
+            img = Image.open(path)
+            img = self._apply_exif_orientation(img)
+
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGBA" if "A" in img.mode else "RGB")
+
+            # Crop to target aspect ratio using focus point
+            img = self._crop_to_focus(
+                img, target_aspect,
+                focus_x=focus_point[0],
+                focus_y=focus_point[1]
+            )
+
+            # Resize if needed
+            if self._should_resize(img.width, img.height):
+                new_width, new_height = self._calculate_resize_dimensions(
+                    img.width, img.height
+                )
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+            # Convert to numpy array for Pi3D
+            import numpy as np
+            img_array = np.array(img)
+
+            if self.mock:
+                return MockTexture(img_array, path.name)
+
+            import pi3d
+            texture = pi3d.Texture(img_array)
+            logger.debug(f"Created focus-cropped texture: {texture.ix}x{texture.iy}")
+            return texture
+
+        except Exception as e:
+            raise ImageLoadError(f"Failed to load texture with focus crop: {e}") from e

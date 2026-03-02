@@ -276,6 +276,20 @@ def process_full_image(self, image_id: int, filename: str, user_id: int):
         
         # Process both thumbnails and variants
         try:
+            # Step 0: Saliency detection (smart cropping focus point)
+            try:
+                from services.saliency_service import saliency_service
+                image_path = image_storage_service.get_image_path(filename)
+                if image_path:
+                    focus_x, focus_y = saliency_service.detect_focus_point(image_path=image_path)
+                    image.focus_x = focus_x
+                    image.focus_y = focus_y
+                    self.db.commit()
+                    logger.info(f"✅ [Task] Focus point detected for image {image_id}: ({focus_x:.2f}, {focus_y:.2f})")
+            except Exception as e:
+                logger.warning(f"⚠️ [Task] Saliency detection failed for image {image_id}: {e}")
+                # Non-fatal - continue with default center focus
+
             # Step 1: Thumbnails
             thumbnail_paths = image_storage_service.process_thumbnails(filename, user_id)
             image.thumbnail_status = 'complete'

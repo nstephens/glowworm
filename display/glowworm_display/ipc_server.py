@@ -535,6 +535,10 @@ class IPCServer:
         scale_mode: str = "fit",
         transition_duration: float | None = None,
         stagger_delay: float = 0.3,
+        top_focus_x: float = 0.5,
+        top_focus_y: float = 0.5,
+        bottom_focus_x: float = 0.5,
+        bottom_focus_y: float = 0.5,
     ) -> dict[str, Any]:
         """
         Load a pair of images for stacked display.
@@ -548,6 +552,10 @@ class IPCServer:
             scale_mode: Scale mode (fit, fill, stretch)
             transition_duration: Optional transition duration override
             stagger_delay: Delay between top and bottom transitions
+            top_focus_x: Focus point X for top image (0.0-1.0)
+            top_focus_y: Focus point Y for top image (0.0-1.0)
+            bottom_focus_x: Focus point X for bottom image (0.0-1.0)
+            bottom_focus_y: Focus point Y for bottom image (0.0-1.0)
 
         Returns:
             Dict with success status
@@ -568,6 +576,8 @@ class IPCServer:
             scale_mode=mode,
             transition_duration=transition_duration,
             stagger_delay=stagger_delay,
+            top_focus=(top_focus_x, top_focus_y),
+            bottom_focus=(bottom_focus_x, bottom_focus_y),
         )
 
         return {"success": success}

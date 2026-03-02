@@ -869,6 +869,10 @@ class DisplayController:
         scale_mode: str = "fill",  # Use fill for stacked to minimize black bars
         transition_duration: float | None = None,
         stagger_delay: float = 0.3,
+        top_focus_x: float = 0.5,
+        top_focus_y: float = 0.5,
+        bottom_focus_x: float = 0.5,
+        bottom_focus_y: float = 0.5,
     ) -> bool:
         """
         Load a pair of images for stacked display.
@@ -882,6 +886,10 @@ class DisplayController:
             scale_mode: Scale mode (fit, fill, stretch)
             transition_duration: Optional transition duration
             stagger_delay: Delay between top and bottom transitions
+            top_focus_x: Focus point X for top image (0.0-1.0)
+            top_focus_y: Focus point Y for top image (0.0-1.0)
+            bottom_focus_x: Focus point X for bottom image (0.0-1.0)
+            bottom_focus_y: Focus point Y for bottom image (0.0-1.0)
 
         Returns:
             True if successful, False otherwise
@@ -895,6 +903,10 @@ class DisplayController:
             "bottom_path": bottom_path,
             "scale_mode": scale_mode,
             "stagger_delay": stagger_delay,
+            "top_focus_x": top_focus_x,
+            "top_focus_y": top_focus_y,
+            "bottom_focus_x": bottom_focus_x,
+            "bottom_focus_y": bottom_focus_y,
         }
         if transition_duration is not None:
             params["transition_duration"] = transition_duration
