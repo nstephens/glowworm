@@ -24,6 +24,9 @@ def main():
         frames_per_second=30,
     )
 
+    # IMPORTANT: Use 2D orthographic camera like the actual display code does
+    camera = pi3d.Camera(is_3d=False)
+
     print(f"Display size: {display.width}x{display.height}")
 
     # Hardware dimensions
