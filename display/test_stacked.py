@@ -3,7 +3,7 @@
 Test script for stacked image positioning on rotated display.
 
 Run on the Pi with:
-    sudo cage -- /opt/glowworm/venv/bin/python /home/nick/glowworm/display/test_stacked.py
+    sudo XDG_RUNTIME_DIR=/run/user/1000 cage -- /opt/glowworm/venv/bin/python /home/nick/glowworm/display/test_stacked.py
 
 This will display a single image positioned at the "top" of a portrait display
 (which is 270° rotated from landscape hardware).
@@ -11,9 +11,6 @@ This will display a single image positioned at the "top" of a portrait display
 
 import os
 import time
-
-# Set environment for pi3d to use wayland
-os.environ.setdefault('DISPLAY', ':0')
 
 import pi3d
 
