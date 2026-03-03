@@ -10,6 +10,7 @@ import ImageUpload from '../components/ImageUpload';
 import ImageGallery from '../components/ImageGallery';
 import AlbumManager from '../components/AlbumManager';
 import { ConfirmationModal } from '../components/ConfirmationModal';
+import { ImageDetailModal } from '../components/gallery/ImageDetailModal';
 import { useToast } from '../hooks/use-toast';
 import { apiService } from '../services/api';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
@@ -56,6 +57,10 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
   const [showDeleteAlbumModal, setShowDeleteAlbumModal] = useState(false);
   const [albumToDelete, setAlbumToDelete] = useState<Album | null>(null);
   const [deleteAlbumAction, setDeleteAlbumAction] = useState<'delete-images' | 'move-to-unsorted'>('move-to-unsorted');
+
+  // Image detail modal state
+  const [showImageDetailModal, setShowImageDetailModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<Image | null>(null);
 
   // Listen for real-time processing updates via WebSocket
   useProcessingUpdatesState(images, setImages);
@@ -284,8 +289,16 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
   };
 
   const handleImageSelect = (image: Image) => {
-    console.log('Selected image:', image);
-    // TODO: Implement image preview/modal
+    setSelectedImage(image);
+    setShowImageDetailModal(true);
+  };
+
+  const handleImageUpdate = (updatedImage: Image) => {
+    // Update the image in the local state
+    setImages(prev => prev.map(img =>
+      img.id === updatedImage.id ? updatedImage : img
+    ));
+    setSelectedImage(updatedImage);
   };
 
 
@@ -557,6 +570,20 @@ export const Images: React.FC<ImagesProps> = ({ headerContent, onDataChange, sho
           </Card>
         </div>
       )}
+
+      {/* Image Detail Modal */}
+      <ImageDetailModal
+        image={selectedImage}
+        open={showImageDetailModal}
+        onOpenChange={(open) => {
+          setShowImageDetailModal(open);
+          if (!open) setSelectedImage(null);
+        }}
+        onImageUpdate={handleImageUpdate}
+        albums={albums}
+        images={selectedAlbum ? images.filter(img => img.album_id === selectedAlbum.id) : images}
+        onNavigate={(img) => setSelectedImage(img)}
+      />
 
       {/* Individual Image Delete Confirmation Modal */}
       <ConfirmationModal
