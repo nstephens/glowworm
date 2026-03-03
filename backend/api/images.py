@@ -28,6 +28,7 @@ from websocket.processing_notifier import (
     notify_processing_complete,
     notify_processing_failed
 )
+from websocket.manager import connection_manager
 
 logger = logging.getLogger(__name__)
 
@@ -1466,6 +1467,8 @@ async def update_image(
     image_id: int,
     album_id: Optional[int] = Form(None),
     playlist_id: Optional[int] = Form(None),
+    focus_x: Optional[float] = Form(None),
+    focus_y: Optional[float] = Form(None),
     current_user: User = Depends(require_auth),
     db: Session = Depends(get_db)
 ):
@@ -1473,9 +1476,9 @@ async def update_image(
     try:
         # CSRF protection
         csrf_protection.require_csrf_token(request)
-        
+
         image_service = ImageService(db)
-        
+
         # Check if image exists
         image = image_service.get_image_by_id(image_id)
         if not image:
@@ -1483,14 +1486,47 @@ async def update_image(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Image not found"
             )
-        
+
+        # Build update kwargs, only including provided fields
+        update_kwargs = {}
+        if album_id is not None:
+            update_kwargs['album_id'] = album_id
+        if playlist_id is not None:
+            update_kwargs['playlist_id'] = playlist_id
+        if focus_x is not None:
+            # Validate focus_x is in range 0.0-1.0
+            if not (0.0 <= focus_x <= 1.0):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="focus_x must be between 0.0 and 1.0"
+                )
+            update_kwargs['focus_x'] = focus_x
+        if focus_y is not None:
+            # Validate focus_y is in range 0.0-1.0
+            if not (0.0 <= focus_y <= 1.0):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="focus_y must be between 0.0 and 1.0"
+                )
+            update_kwargs['focus_y'] = focus_y
+
         # Update image
         updated_image = image_service.update_image(
             image_id,
-            album_id=album_id,
-            playlist_id=playlist_id
+            **update_kwargs
         )
-        
+
+        # If focus point changed, broadcast to all connected devices
+        focus_changed = 'focus_x' in update_kwargs or 'focus_y' in update_kwargs
+        if focus_changed:
+            focus_updates = {}
+            if 'focus_x' in update_kwargs:
+                focus_updates['focus_x'] = update_kwargs['focus_x']
+            if 'focus_y' in update_kwargs:
+                focus_updates['focus_y'] = update_kwargs['focus_y']
+            # Broadcast to devices so they can update cached metadata
+            await connection_manager.broadcast_image_metadata_update(image_id, focus_updates)
+
         return {
             "message": "Image updated successfully",
             "data": updated_image.to_dict(),

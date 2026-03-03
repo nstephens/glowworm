@@ -295,6 +295,13 @@ class GlowwormDaemonV3:
             logger.info("Received playlist update notification")
             if self.playlist_manager:
                 asyncio.create_task(self.playlist_manager.fetch_playlist())
+        elif msg_type == "image_metadata_update":
+            # Image focus point or other metadata changed - update in-memory
+            image_id = payload.get("image_id")
+            updates = payload.get("updates", {})
+            if image_id and self.playlist_manager:
+                self.playlist_manager.update_image_metadata(image_id, updates)
+                logger.info(f"Applied image metadata update for image {image_id}")
 
     def _on_websocket_state(self, old_state: ConnectionState, new_state: ConnectionState):
         """Handle WebSocket state changes."""

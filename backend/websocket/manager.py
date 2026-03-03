@@ -170,6 +170,28 @@ class ConnectionManager:
             "timestamp": datetime.now().isoformat()
         }
         await self.send_to_all_devices(message)
+
+    async def broadcast_image_metadata_update(self, image_id: int, updates: dict):
+        """
+        Broadcast image metadata update to all connected devices.
+
+        Used when image properties change (e.g., focus_x, focus_y) so devices
+        can update their cached metadata without re-fetching the entire playlist.
+
+        Args:
+            image_id: The ID of the image that was updated
+            updates: Dict of changed fields (e.g., {"focus_x": 0.5, "focus_y": 0.3})
+        """
+        message = {
+            "type": "image_metadata_update",
+            "payload": {
+                "image_id": image_id,
+                "updates": updates,
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        await self.send_to_all_devices(message)
+        logger.info(f"Broadcast image metadata update for image {image_id}: {updates}")
     
     async def broadcast_image_processing_update(self, event_payload: dict):
         """

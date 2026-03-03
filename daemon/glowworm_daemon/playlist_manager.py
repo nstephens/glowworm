@@ -864,6 +864,39 @@ class PlaylistManager:
 
         return result
 
+    def update_image_metadata(self, image_id: int, updates: Dict[str, Any]) -> bool:
+        """
+        Update metadata for an image in the current playlist.
+
+        This is called when the backend notifies us of image changes (e.g., focus point).
+        Updates are applied in-memory without refetching the playlist.
+
+        Args:
+            image_id: The ID of the image to update
+            updates: Dict of fields to update (e.g., {"focus_x": 0.5, "focus_y": 0.3})
+
+        Returns:
+            True if image was found and updated, False otherwise
+        """
+        if not self._playlist or image_id not in self._playlist.images:
+            logger.debug(f"Image {image_id} not in current playlist, ignoring update")
+            return False
+
+        image = self._playlist.images[image_id]
+
+        # Apply updates to the dataclass
+        updated_fields = []
+        for key, value in updates.items():
+            if hasattr(image, key):
+                setattr(image, key, value)
+                updated_fields.append(f"{key}={value}")
+
+        if updated_fields:
+            logger.info(f"Updated image {image_id} metadata: {', '.join(updated_fields)}")
+            return True
+
+        return False
+
     def clear_state(self) -> None:
         """Clear persisted state and position."""
         self._position = None
