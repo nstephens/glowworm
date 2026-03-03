@@ -51,9 +51,6 @@ async def send_command_via_websocket(
         CommandType.CEC_POWER_OFF: "cec_power_off",
         CommandType.CEC_SET_INPUT: "cec_set_input",
         CommandType.CEC_SCAN_INPUTS: "cec_scan",
-        CommandType.REFRESH_BROWSER: "refresh",
-        CommandType.CLEAR_CACHE: "clear_cache",
-        CommandType.UPDATE_PLAYLIST: "update_playlist",
     }
 
     command_name = command_map.get(command_type, command_type.value)
