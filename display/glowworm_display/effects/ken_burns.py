@@ -109,6 +109,10 @@ class KenBurnsEffect:
         self._original_x: float | None = None
         self._original_y: float | None = None
 
+        # For stacked pair - store bottom sprite original position
+        self._bottom_original_x: float | None = None
+        self._bottom_original_y: float | None = None
+
         logger.debug(
             f"KenBurnsEffect created: duration={duration}s, "
             f"zoom={self.config.min_zoom}-{self.config.max_zoom}"
@@ -170,6 +174,8 @@ class KenBurnsEffect:
         self._original_scale = None
         self._original_x = None
         self._original_y = None
+        self._bottom_original_x = None
+        self._bottom_original_y = None
 
     @property
     def is_running(self) -> bool:
@@ -250,10 +256,7 @@ class KenBurnsEffect:
             return
 
         # Store original values on first apply
-        if self._original_scale is None:
-            # Get current scale - for Pi3D sprites this is more complex
-            # but for our use case we assume scale starts at 1.0
-            self._original_scale = 1.0
+        if self._original_x is None:
             # Get original position
             self._original_x = sprite.x() if callable(sprite.x) else sprite.x
             self._original_y = sprite.y() if callable(sprite.y) else sprite.y
@@ -264,19 +267,17 @@ class KenBurnsEffect:
         new_x = self._original_x + pan_x * display_width
         new_y = self._original_y + pan_y * display_height
 
-        # Apply scale
-        # For Pi3D sprites, we need to scale the width and height
-        # Since we can't easily modify the sprite's scale directly,
-        # we'll use the shader uniform approach or modify dimensions
-
-        # Get current sprite dimensions
-        sprite_w = getattr(sprite, 'width', getattr(sprite, 'w', display_width))
-        sprite_h = getattr(sprite, 'height', getattr(sprite, 'h', display_height))
-
-        # Calculate scaled dimensions
-        # Note: Pi3D Sprite uses scale() method, MockSprite might need different approach
-        if hasattr(sprite, 'scale'):
-            sprite.scale(zoom, zoom, 1.0)
+        # Apply scale - Pi3D's scale() multiplies, so we need to set absolute values
+        # We'll directly modify the sprite's scale matrix
+        if hasattr(sprite, 'sx'):
+            # Direct access to scale values (Pi3D Shape)
+            sprite.sx = zoom
+            sprite.sy = zoom
+            sprite.sz = 1.0
+        elif hasattr(sprite, 'scale'):
+            # Fallback: try to use scale() - but this may be cumulative
+            # For now, just set scale once and don't animate zoom
+            pass
 
         # Apply position
         # Get current z position to maintain layering
@@ -313,24 +314,31 @@ class KenBurnsEffect:
             display_width: Display width
             display_height: Display height (full, not half)
         """
+        if not self._is_running:
+            return
+
         # Apply main effect to top sprite
         if top_sprite is not None:
             self.apply(top_sprite, display_width, display_height // 2)
 
         # Apply inverted/offset effect to bottom sprite
-        # For simplicity, we apply the same effect with inverted pan
-        if bottom_sprite is not None and self._is_running:
+        if bottom_sprite is not None:
+            # Store original position on first call
+            if self._bottom_original_x is None:
+                self._bottom_original_x = bottom_sprite.x() if callable(bottom_sprite.x) else bottom_sprite.x
+                self._bottom_original_y = bottom_sprite.y() if callable(bottom_sprite.y) else bottom_sprite.y
+
             zoom, pan_x, pan_y = self.get_current_transform()
 
-            # Invert pan direction for variety
-            orig_x = bottom_sprite.x() if callable(bottom_sprite.x) else bottom_sprite.x
-            orig_y = bottom_sprite.y() if callable(bottom_sprite.y) else bottom_sprite.y
+            # Use stored original position, invert pan for variety
+            new_x = self._bottom_original_x - pan_x * display_width  # Inverted X
+            new_y = self._bottom_original_y + pan_y * (display_height // 2)  # Same Y direction
 
-            new_x = orig_x - pan_x * display_width  # Inverted X
-            new_y = orig_y + pan_y * (display_height // 2)  # Same Y direction
-
-            if hasattr(bottom_sprite, 'scale'):
-                bottom_sprite.scale(zoom, zoom, 1.0)
+            # Apply scale directly to prevent cumulative scaling
+            if hasattr(bottom_sprite, 'sx'):
+                bottom_sprite.sx = zoom
+                bottom_sprite.sy = zoom
+                bottom_sprite.sz = 1.0
 
             curr_z = 1.0
             if hasattr(bottom_sprite, 'z') and callable(bottom_sprite.z):
