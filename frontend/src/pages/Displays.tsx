@@ -30,6 +30,7 @@ interface DisplayDevice {
   screen_height?: number;
   device_pixel_ratio?: string;
   orientation: string;
+  browser_url?: string;
 }
 
 interface DisplaysProps {
@@ -730,8 +731,9 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                                 </div>
                                 
                                 {/* Daemon Control Panel */}
-                                <DeviceDaemonControl 
+                                <DeviceDaemonControl
                                   deviceId={device.id}
+                                  deviceToken={device.device_token}
                                   daemonEnabled={true}
                                   currentUrl={device.browser_url || `http://10.10.10.2:3003/display/${device.device_token}`}
                                 />
@@ -783,16 +785,6 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Refresh Button */}
-      <div className="mt-6">
-        <button
-          onClick={fetchDevices}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          Refresh
-        </button>
       </div>
 
       {/* Reject Confirmation Modal */}
@@ -1073,11 +1065,11 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                 <select
                   value={selectedPlaylistId || ''}
                   onChange={(e) => setSelectedPlaylistId(e.target.value ? parseInt(e.target.value) : null)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
-                  <option value="">No playlist (remove assignment)</option>
+                  <option value="" className="text-gray-900">No playlist (remove assignment)</option>
                   {playlists.map((playlist) => (
-                    <option key={playlist.id} value={playlist.id}>
+                    <option key={playlist.id} value={playlist.id} className="text-gray-900">
                       {playlist.name}
                     </option>
                   ))}

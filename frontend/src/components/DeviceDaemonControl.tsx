@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Power, MonitorPlay, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { Power, MonitorPlay, RefreshCw, Wifi, WifiOff, SkipBack, SkipForward, RotateCcw } from 'lucide-react';
 import { apiService } from '../services/api';
+import { urlResolver } from '../services/urlResolver';
 
 interface DeviceDaemonControlProps {
   deviceId: number;
+  deviceToken: string;
   daemonEnabled?: boolean;
   currentUrl?: string;
 }
@@ -16,6 +18,7 @@ interface CECInput {
 
 export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
   deviceId,
+  deviceToken,
   daemonEnabled = false,
   currentUrl = '',
 }) => {
@@ -103,6 +106,38 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
     }
   };
 
+  const sendSlideshowCommand = async (command: 'next' | 'previous' | 'reload_playlist') => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch(
+        urlResolver.getApiUrl(`/ws/device/${deviceToken}/command?command=${command}`),
+        {
+          method: 'POST',
+          credentials: 'include',
+        }
+      );
+
+      if (response.ok) {
+        const commandNames: Record<string, string> = {
+          next: 'Next image',
+          previous: 'Previous image',
+          reload_playlist: 'Restart playlist',
+        };
+        setSuccess(`${commandNames[command]} command sent`);
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        throw new Error(`Failed to send ${command} command`);
+      }
+    } catch (err: any) {
+      setError(err.message || `Failed to send ${command} command`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSelectInput = async () => {
     // Allow "self" for quick Pi switch, otherwise require selection
     if (!selectedInput && selectedInput !== 'self') {
@@ -142,15 +177,50 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
     <div className="space-y-4">
       {/* Status Messages */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
           {error}
         </div>
       )}
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded">
           {success}
         </div>
       )}
+
+      {/* Slideshow Controls */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+          <MonitorPlay className="w-4 h-4 mr-2" />
+          Slideshow Controls
+        </h4>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => sendSlideshowCommand('previous')}
+            disabled={loading}
+            className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center"
+          >
+            <SkipBack className="w-4 h-4 mr-1" />
+            Previous
+          </button>
+          <button
+            onClick={() => sendSlideshowCommand('next')}
+            disabled={loading}
+            className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 flex items-center justify-center"
+          >
+            Next
+            <SkipForward className="w-4 h-4 ml-1" />
+          </button>
+          <button
+            onClick={() => sendSlideshowCommand('reload_playlist')}
+            disabled={loading}
+            className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+            title="Restart playlist from beginning and fetch latest changes"
+          >
+            <RotateCcw className="w-4 h-4 mr-1" />
+            Restart
+          </button>
+        </div>
+      </div>
 
       {/* Browser URL Configuration */}
       <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -164,7 +234,7 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
             value={browserUrl}
             onChange={(e) => setBrowserUrl(e.target.value)}
             placeholder="http://10.10.10.2:3000/display/abc123"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
             onClick={handleUpdateUrl}
@@ -226,21 +296,21 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
               </button>
             </div>
 
-            {/* Advanced: Select specific device */}
+            {/* Advanced: Select specific input */}
             {cecInputs.length > 0 && (
               <details className="text-sm">
-                <summary className="cursor-pointer text-gray-600 hover:text-gray-900 mb-2">
-                  Advanced: Switch to Other Devices
+                <summary className="cursor-pointer text-gray-700 hover:text-gray-900 mb-2 font-medium">
+                  Advanced: Switch to Other Inputs
                 </summary>
                 <div className="space-y-2 mt-2">
                   <select
                     value={selectedInput}
                     onChange={(e) => setSelectedInput(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Select device...</option>
+                    <option value="" className="text-gray-900">Select input...</option>
                     {cecInputs.map((input) => (
-                      <option key={input.address} value={input.address}>
+                      <option key={input.address} value={input.address} className="text-gray-900">
                         {input.name} (Address: {input.address})
                       </option>
                     ))}
