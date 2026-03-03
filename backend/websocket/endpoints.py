@@ -5,7 +5,8 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from models.database import get_db, SessionLocal
+from models.database import get_db, ensure_database_initialized
+import models.database
 from models.display_device import DisplayDevice
 from models.device_daemon_status import DeviceDaemonStatus, DaemonStatus
 from services.display_device_service import DisplayDeviceService
@@ -32,7 +33,8 @@ async def update_device_cec_status(device_token: str, cec_info: dict) -> None:
         cec_info: Dict containing 'available' and 'devices' keys
     """
     try:
-        db = SessionLocal()
+        ensure_database_initialized()
+        db = models.database.SessionLocal()
         try:
             # Find the device by token
             device = db.query(DisplayDevice).filter(
@@ -132,7 +134,7 @@ async def websocket_device_endpoint(websocket: WebSocket):
                 # Receive message from device
                 data = await websocket.receive_text()
                 message = json.loads(data)
-                
+
                 # Handle different message types
                 await handle_device_message(connection_id, device_token, message)
                 
