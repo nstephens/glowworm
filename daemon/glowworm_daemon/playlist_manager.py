@@ -601,6 +601,7 @@ class PlaylistManager:
         # Store current values before fetching (fetch_playlist updates self._playlist)
         current_id = self._playlist.id
         current_hash = self._playlist.version_hash
+        current_computed_sequence = self._playlist.computed_sequence
 
         try:
             # Fetch the device's assigned playlist (may be different from current)
@@ -622,6 +623,16 @@ class PlaylistManager:
                     f"{new_playlist.version_hash}"
                 )
                 return True
+
+            # No changes - restore the computed_sequence that was lost when
+            # fetch_playlist replaced self._playlist with a new object.
+            # The backend doesn't send computed_sequence (it's computed locally),
+            # so we need to preserve it across update checks.
+            if current_computed_sequence and self._playlist:
+                self._playlist.computed_sequence = current_computed_sequence
+                logger.debug(
+                    f"Preserved computed_sequence with {len(current_computed_sequence)} entries"
+                )
 
             return False
 
