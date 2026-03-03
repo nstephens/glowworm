@@ -207,6 +207,8 @@ class GlowwormDaemonV3:
             cec_controller=self.cec_controller,
             config=cmd_config,
         )
+        await self.command_handler.start()
+        print("Command handler started", flush=True)
 
         # Start WebSocket connection
         print(f"Connecting to WebSocket: {ws_url}", flush=True)
@@ -305,6 +307,9 @@ class GlowwormDaemonV3:
         self._shutdown_event.set()
 
         # Stop components in reverse order
+        if self.command_handler:
+            await self.command_handler.stop()
+
         if self.status_reporter:
             await self.status_reporter.stop()
 

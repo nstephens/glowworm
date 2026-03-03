@@ -18,8 +18,63 @@ from models.playlist import Playlist
 from models.image import Image
 from services.device_daemon_service import DeviceDaemonService, DeviceCommandService
 from utils.rate_limiter import RateLimiter
+from websocket.manager import connection_manager
 
 logger = logging.getLogger(__name__)
+
+
+async def send_command_via_websocket(
+    device_token: str,
+    command_type: CommandType,
+    command_data: dict,
+    command_id: int,
+) -> bool:
+    """
+    Send a command to a device via WebSocket for real-time delivery.
+
+    This is used in addition to the database queue to support v3 Pi3D daemons
+    that communicate exclusively via WebSocket.
+
+    Args:
+        device_token: The device's token
+        command_type: Type of command (from CommandType enum)
+        command_data: Command parameters
+        command_id: Database command ID for tracking
+
+    Returns:
+        True if device is connected and message was sent
+    """
+    # Map CommandType to daemon command names
+    command_map = {
+        CommandType.UPDATE_URL: "update_url",
+        CommandType.CEC_POWER_ON: "cec_power_on",
+        CommandType.CEC_POWER_OFF: "cec_power_off",
+        CommandType.CEC_SET_INPUT: "cec_set_input",
+        CommandType.CEC_SCAN_INPUTS: "cec_scan",
+        CommandType.REFRESH_BROWSER: "refresh",
+        CommandType.CLEAR_CACHE: "clear_cache",
+        CommandType.UPDATE_PLAYLIST: "update_playlist",
+    }
+
+    command_name = command_map.get(command_type, command_type.value)
+
+    if connection_manager.get_device_connection_status(device_token):
+        await connection_manager.send_device_command(
+            device_token=device_token,
+            command=command_name,
+            data=command_data,
+            request_id=str(command_id),
+        )
+        logger.info(
+            f"Sent command '{command_name}' to device {device_token[:8]}... via WebSocket"
+        )
+        return True
+    else:
+        logger.info(
+            f"Device {device_token[:8]}... not connected via WebSocket, "
+            f"command '{command_name}' will wait in queue"
+        )
+        return False
 
 router = APIRouter(prefix="/api/device-daemon", tags=["device-daemon"])
 
@@ -399,24 +454,33 @@ async def update_browser_url(
             detail="Daemon control not enabled for this device"
         )
     
-    # Create command
+    # Create command in database
     command = DeviceCommandService.create_command(
         db=db,
         device_id=device_id,
         command_type=CommandType.UPDATE_URL,
         command_data={"url": request.url},
     )
-    
+
     # Update device's browser_url field
     device.browser_url = request.url
     db.commit()
-    
+
     logger.info(f"Queued URL update for device {device_id}: {request.url}")
-    
+
+    # Also send via WebSocket for real-time delivery
+    ws_sent = await send_command_via_websocket(
+        device_token=device.device_token,
+        command_type=CommandType.UPDATE_URL,
+        command_data={"url": request.url},
+        command_id=command.id,
+    )
+
     return {
-        "status": "queued",
-        "message": "URL update command queued",
+        "status": "sent" if ws_sent else "queued",
+        "message": "URL update command " + ("sent" if ws_sent else "queued"),
         "command_id": command.id,
+        "websocket_sent": ws_sent,
     }
 
 @router.post("/devices/{device_id}/display/power")
@@ -460,20 +524,29 @@ async def control_display_power(
             detail="Power must be 'on' or 'off'"
         )
     
-    # Create command
+    # Create command in database
     command = DeviceCommandService.create_command(
         db=db,
         device_id=device_id,
         command_type=command_type,
         command_data={},
     )
-    
+
     logger.info(f"Queued power {request.power} for device {device_id}")
-    
+
+    # Also send via WebSocket for real-time delivery to v3 daemon
+    ws_sent = await send_command_via_websocket(
+        device_token=device.device_token,
+        command_type=command_type,
+        command_data={},
+        command_id=command.id,
+    )
+
     return {
-        "status": "queued",
-        "message": f"Power {request.power} command queued",
+        "status": "sent" if ws_sent else "queued",
+        "message": f"Power {request.power} command {'sent' if ws_sent else 'queued'}",
         "command_id": command.id,
+        "websocket_sent": ws_sent,
     }
 
 @router.get("/devices/{device_id}/display/inputs")
@@ -544,31 +617,41 @@ async def select_display_input(
             detail="CEC control not available on this device"
         )
     
-    # Create command
+    # Create command in database
+    command_data = {
+        "input_address": request.input_address,
+        "input_name": request.input_name,
+    }
     command = DeviceCommandService.create_command(
         db=db,
         device_id=device_id,
         command_type=CommandType.CEC_SET_INPUT,
-        command_data={
-            "input_address": request.input_address,
-            "input_name": request.input_name,
-        },
+        command_data=command_data,
     )
-    
+
     # Update device's selected input
     device.cec_input_address = request.input_address
     device.cec_input_name = request.input_name
     db.commit()
-    
+
     logger.info(
         f"Queued input switch for device {device_id}: "
         f"{request.input_name or request.input_address}"
     )
-    
+
+    # Also send via WebSocket for real-time delivery
+    ws_sent = await send_command_via_websocket(
+        device_token=device.device_token,
+        command_type=CommandType.CEC_SET_INPUT,
+        command_data=command_data,
+        command_id=command.id,
+    )
+
     return {
-        "status": "queued",
-        "message": "Input switch command queued",
+        "status": "sent" if ws_sent else "queued",
+        "message": "Input switch command " + ("sent" if ws_sent else "queued"),
         "command_id": command.id,
+        "websocket_sent": ws_sent,
     }
 
 @router.post("/devices/{device_id}/display/scan-inputs")
@@ -593,20 +676,29 @@ async def scan_display_inputs(
             detail="Daemon control not enabled for this device"
         )
     
-    # Create command
+    # Create command in database
     command = DeviceCommandService.create_command(
         db=db,
         device_id=device_id,
         command_type=CommandType.CEC_SCAN_INPUTS,
         command_data={},
     )
-    
+
     logger.info(f"Queued CEC scan for device {device_id}")
-    
+
+    # Also send via WebSocket for real-time delivery
+    ws_sent = await send_command_via_websocket(
+        device_token=device.device_token,
+        command_type=CommandType.CEC_SCAN_INPUTS,
+        command_data={},
+        command_id=command.id,
+    )
+
     return {
-        "status": "queued",
-        "message": "CEC input scan command queued",
+        "status": "sent" if ws_sent else "queued",
+        "message": "CEC input scan command " + ("sent" if ws_sent else "queued"),
         "command_id": command.id,
+        "websocket_sent": ws_sent,
     }
 
 @router.get("/playlist")
