@@ -1131,6 +1131,16 @@ class Renderer:
                 "next_top_sprite": self._next_top_sprite is not None,
                 "next_bottom_sprite": self._next_bottom_sprite is not None,
                 "transition_running": self._transition is not None and self._transition.is_running if self._transition else False,
+                "top_sprite_pos": (
+                    (self._current_top_sprite.x(), self._current_top_sprite.y(), self._current_top_sprite.z())
+                    if self._current_top_sprite and hasattr(self._current_top_sprite, 'x')
+                    else None
+                ),
+                "bottom_sprite_pos": (
+                    (self._current_bottom_sprite.x(), self._current_bottom_sprite.y(), self._current_bottom_sprite.z())
+                    if self._current_bottom_sprite and hasattr(self._current_bottom_sprite, 'x')
+                    else None
+                ),
             },
         }
 
