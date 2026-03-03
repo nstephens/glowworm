@@ -1077,23 +1077,34 @@ class ImageLoader:
             else:  # DEG_0
                 y_offset = quarter_offset if position == 'top' else -quarter_offset
 
+        # For rotated displays, swap width/height for hardware coordinates
+        # The sprite dimensions need to be in hardware space, not visual space.
+        # After rotation, the visual dimensions will be correct.
+        if self.rotation in (Rotation.DEG_90, Rotation.DEG_270):
+            # Swap dimensions for hardware coordinates
+            hw_width = scaled_height  # Visual height becomes hardware width
+            hw_height = scaled_width  # Visual width becomes hardware height
+        else:
+            hw_width = scaled_width
+            hw_height = scaled_height
+
         # Debug output
         try:
             with open("/tmp/glowworm_stacked_debug.log", "a") as f:
                 f.write(
-                    f"  -> sprite: {scaled_width:.0f}x{scaled_height:.0f}, "
+                    f"  -> sprite: {hw_width:.0f}x{hw_height:.0f}, "
                     f"offset=({x_offset:.0f}, {y_offset:.0f})\n"
                 )
         except:
             pass
 
         return ImageDimensions(
-            width=scaled_width,
-            height=scaled_height,
+            width=hw_width,
+            height=hw_height,
             x_offset=x_offset,
             y_offset=y_offset,
-            scale_x=scaled_width / image_width if image_width > 0 else 1.0,
-            scale_y=scaled_height / image_height if image_height > 0 else 1.0,
+            scale_x=hw_width / image_width if image_width > 0 else 1.0,
+            scale_y=hw_height / image_height if image_height > 0 else 1.0,
         )
 
     def create_stacked_sprite(
