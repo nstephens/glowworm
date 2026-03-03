@@ -199,7 +199,7 @@ class DisplayDeviceService:
         self,
         device_token: str,
         status_payload: dict,
-        device_type: str = None,
+        device_type: str = "pi3d",
     ) -> Optional[DisplayDevice]:
         """
         Update device status from Pi3D daemon status report.
@@ -207,7 +207,7 @@ class DisplayDeviceService:
         Args:
             device_token: Device token
             status_payload: Status payload from daemon
-            device_type: Device type (pi3d or browser)
+            device_type: Device type (always pi3d for v3.0)
 
         Returns:
             Updated device or None if not found

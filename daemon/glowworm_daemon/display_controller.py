@@ -1034,6 +1034,86 @@ class DisplayController:
         response = await self._ipc_client.call("clear_error")
         return response.success and response.result.get("success", False)
 
+    async def set_image_info(
+        self,
+        filename: str | None = None,
+        exif_date: str | None = None,
+        show_filename: bool = True,
+        show_date: bool = True,
+    ) -> bool:
+        """
+        Set image info overlay on the display.
+
+        Args:
+            filename: Image filename to display
+            exif_date: EXIF date string (e.g., "2024:03:15 14:30:00")
+            show_filename: Whether to show the filename
+            show_date: Whether to show the date
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self._ipc_client or not self._ipc_client.is_connected:
+            return False
+
+        params = {
+            "filename": filename,
+            "exif_date": exif_date,
+            "show_filename": show_filename,
+            "show_date": show_date,
+        }
+
+        response = await self._ipc_client.call("set_image_info", params)
+        return response.success and response.result.get("success", False)
+
+    async def clear_image_info(self) -> bool:
+        """
+        Clear the image info overlay.
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self._ipc_client or not self._ipc_client.is_connected:
+            return False
+
+        response = await self._ipc_client.call("clear_image_info")
+        return response.success and response.result.get("success", False)
+
+    async def set_ken_burns(
+        self,
+        enabled: bool = True,
+        duration: float = 30.0,
+        min_zoom: float = 1.0,
+        max_zoom: float = 1.15,
+        max_pan: float = 0.08,
+    ) -> bool:
+        """
+        Configure Ken Burns zoom/pan effect.
+
+        Args:
+            enabled: Whether to enable the effect
+            duration: Duration of the effect in seconds
+            min_zoom: Minimum zoom level (1.0 = no zoom)
+            max_zoom: Maximum zoom level (1.15 = 15% zoom)
+            max_pan: Maximum pan as fraction of image size
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self._ipc_client or not self._ipc_client.is_connected:
+            return False
+
+        params = {
+            "enabled": enabled,
+            "duration": duration,
+            "min_zoom": min_zoom,
+            "max_zoom": max_zoom,
+            "max_pan": max_pan,
+        }
+
+        response = await self._ipc_client.call("set_ken_burns", params)
+        return response.success and response.result.get("success", False)
+
     # Context manager support
 
     async def __aenter__(self) -> "DisplayController":

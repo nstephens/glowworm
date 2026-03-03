@@ -30,7 +30,6 @@ interface DisplayDevice {
   screen_height?: number;
   device_pixel_ratio?: string;
   orientation: string;
-  browser_url?: string;
 }
 
 interface DisplaysProps {
@@ -425,26 +424,6 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
     }
   };
 
-  const handleRefreshBrowser = async (device: DisplayDevice) => {
-    try {
-      const response = await fetch(urlResolver.getApiUrl(`/ws/device/${device.device_token}/command?command=refresh_browser`), {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        displayLogger.info(`Refresh browser command sent to device ${device.device_name || device.id}`);
-      } else {
-        const errorText = await response.text();
-        displayLogger.error('Failed to send refresh command:', errorText);
-        throw new Error(`Failed to send refresh command: ${response.status}`);
-      }
-    } catch (err) {
-      displayLogger.error('Failed to refresh browser:', err);
-      setError('Failed to refresh browser');
-    }
-  };
-
   const handleRejectFromEdit = async () => {
     if (!deviceToRejectFromEdit) return;
     
@@ -632,8 +611,8 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                         <>
                           {/* Playlist Controls Section */}
                           <div className="mt-5 space-y-3">
-                            <p className="text-sm text-gray-700">
-                              <span className="font-medium">Playing:</span> <span className="text-gray-600">{device.playlist_name || 'None'}</span>
+                            <p className="text-sm text-gray-900">
+                              <span className="font-medium">Playing:</span> <span className="font-semibold">{device.playlist_name || 'None'}</span>
                             </p>
                             
                             <div className="flex flex-wrap gap-2">
@@ -642,12 +621,6 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                                 className="bg-purple-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-purple-700 transition-colors"
                               >
                                 {device.playlist_name ? 'Change' : 'Select'} Playlist
-                              </button>
-                              <button
-                                onClick={() => handleRefreshBrowser(device)}
-                                className="bg-orange-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-orange-700 transition-colors"
-                              >
-                                Refresh
                               </button>
                               <button
                                 onClick={() => openUpdateModal(device)}
@@ -735,7 +708,6 @@ const Displays: React.FC<DisplaysProps> = ({ onDisplaysLoad }) => {
                                   deviceId={device.id}
                                   deviceToken={device.device_token}
                                   daemonEnabled={true}
-                                  currentUrl={device.browser_url || `http://10.10.10.2:3003/display/${device.device_token}`}
                                 />
                               </div>
                             )}

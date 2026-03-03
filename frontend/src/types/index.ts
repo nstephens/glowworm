@@ -44,6 +44,9 @@ export interface Image {
   processing_attempts?: number;
   last_processing_attempt?: string | null;
   processing_completed_at?: string | null;
+  // Smart cropping focus point (0.0-1.0, percentage from top-left)
+  focus_x?: number;
+  focus_y?: number;
 }
 
 /**

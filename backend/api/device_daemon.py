@@ -46,7 +46,6 @@ async def send_command_via_websocket(
     """
     # Map CommandType to daemon command names
     command_map = {
-        CommandType.UPDATE_URL: "update_url",
         CommandType.CEC_POWER_ON: "cec_power_on",
         CommandType.CEC_POWER_OFF: "cec_power_off",
         CommandType.CEC_SET_INPUT: "cec_set_input",
@@ -415,10 +414,6 @@ async def daemon_heartbeat(
 # Device Control Endpoints
 # ============================================================================
 
-class URLUpdateRequest(BaseModel):
-    """Request to update device browser URL"""
-    url: str = Field(..., description="New browser URL")
-
 class PowerControlRequest(BaseModel):
     """Request to control display power"""
     power: str = Field(..., description="on or off")
@@ -427,58 +422,6 @@ class InputSelectRequest(BaseModel):
     """Request to select HDMI input"""
     input_address: str = Field(..., description="CEC input address")
     input_name: Optional[str] = Field(None, description="Human-readable input name")
-
-@router.put("/devices/{device_id}/browser-url")
-async def update_browser_url(
-    device_id: int,
-    request: URLUpdateRequest,
-    db: Session = Depends(get_db),
-):
-    """
-    Queue a browser URL update command for a device
-    
-    This endpoint allows admins to remotely update the browser URL
-    on a display device running the daemon.
-    """
-    # Verify device exists and has daemon enabled
-    device = db.query(DisplayDevice).filter(DisplayDevice.id == device_id).first()
-    if not device:
-        raise HTTPException(status_code=404, detail="Device not found")
-    
-    if not device.daemon_enabled:
-        raise HTTPException(
-            status_code=400,
-            detail="Daemon control not enabled for this device"
-        )
-    
-    # Create command in database
-    command = DeviceCommandService.create_command(
-        db=db,
-        device_id=device_id,
-        command_type=CommandType.UPDATE_URL,
-        command_data={"url": request.url},
-    )
-
-    # Update device's browser_url field
-    device.browser_url = request.url
-    db.commit()
-
-    logger.info(f"Queued URL update for device {device_id}: {request.url}")
-
-    # Also send via WebSocket for real-time delivery
-    ws_sent = await send_command_via_websocket(
-        device_token=device.device_token,
-        command_type=CommandType.UPDATE_URL,
-        command_data={"url": request.url},
-        command_id=command.id,
-    )
-
-    return {
-        "status": "sent" if ws_sent else "queued",
-        "message": "URL update command " + ("sent" if ws_sent else "queued"),
-        "command_id": command.id,
-        "websocket_sent": ws_sent,
-    }
 
 @router.post("/devices/{device_id}/display/power")
 async def control_display_power(
@@ -748,9 +691,19 @@ async def get_device_playlist(
 
         image = db.query(Image).filter(Image.id == image_id).first()
         if image:
+            # Extract EXIF date if available
+            exif_date = None
+            if image.exif:
+                # Try common EXIF date fields
+                exif_date = (
+                    image.exif.get("DateTimeOriginal")
+                    or image.exif.get("DateTime")
+                    or image.exif.get("DateTimeDigitized")
+                )
             images.append({
                 "id": image.id,
                 "filename": image.filename,
+                "original_filename": image.original_filename,
                 "width": image.width,
                 "height": image.height,
                 "focus_x": image.focus_x if image.focus_x is not None else 0.5,
@@ -758,6 +711,7 @@ async def get_device_playlist(
                 "display_time": display_time,
                 "transition": "crossfade",
                 "url": f"/api/images/{image.id}/display",
+                "exif_date": exif_date,
             })
 
     # Return in format expected by daemon's _parse_playlist_response
@@ -770,6 +724,8 @@ async def get_device_playlist(
             "sequence": sequence,  # Original sequence for the daemon
             "display_time_seconds": playlist.display_time_seconds or 30,
             "display_mode": playlist.display_mode.value if playlist.display_mode else "default",
+            "show_image_info": playlist.show_image_info or False,
+            "show_exif_date": playlist.show_exif_date or False,
         },
         "manifest": images,
     }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Clock, Settings, Zap, Star, ChevronLeft, ChevronRight, Check, AlertCircle, Play, Pause, RotateCcw, Save, Wifi, WifiOff } from 'lucide-react';
+import { Plus, Clock, Settings, Zap, Star, ChevronLeft, ChevronRight, Check, AlertCircle, Play, Pause, RotateCcw, Save, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { hapticPatterns } from '../../utils/hapticFeedback';
 import { Button } from '../ui/button';
@@ -658,11 +658,11 @@ const MobilePlaylistCreateModal: React.FC<MobilePlaylistCreateModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent 
+      <DialogContent
         ref={modalRef}
-        className="sm:max-w-md max-h-[90vh] overflow-hidden p-0"
+        className="sm:max-w-md max-h-[85vh] overflow-hidden p-0 flex flex-col"
       >
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col min-h-0 flex-1">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <div className="flex items-center gap-3">
@@ -710,14 +710,6 @@ const MobilePlaylistCreateModal: React.FC<MobilePlaylistCreateModalProps> = ({
                 )}
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-              className="h-8 w-8 p-0 touch-target"
-            >
-              <X className="w-4 h-4" />
-            </Button>
           </div>
 
           {/* Progress Steps */}
@@ -753,7 +745,7 @@ const MobilePlaylistCreateModal: React.FC<MobilePlaylistCreateModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4">
             <AnimatePresence mode="wait">
               {renderStepContent()}
             </AnimatePresence>

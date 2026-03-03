@@ -254,7 +254,7 @@ export const ImageOverlay: React.FC<ImageOverlayProps> = ({
         </div>
 
         {/* Center overlay for touch devices */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
           <div className="bg-white/10 backdrop-blur-sm rounded-full p-3">
             <ImageIcon className="h-6 w-6 text-white" />
           </div>

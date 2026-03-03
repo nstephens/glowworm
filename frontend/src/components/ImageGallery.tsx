@@ -723,9 +723,12 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200">
                   <div className="flex space-x-2">
                     <button
-                      onClick={(e) => handleViewFullSize(image, e)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onImageSelect?.(image);
+                      }}
                       className="p-2.5 bg-white/90 backdrop-blur-sm rounded-full text-gray-600 hover:text-blue-600 hover:bg-white shadow-lg transition-all duration-200 hover:scale-110"
-                      title="View full size"
+                      title="View details"
                     >
                       <Eye className="w-4 h-4" />
                     </button>

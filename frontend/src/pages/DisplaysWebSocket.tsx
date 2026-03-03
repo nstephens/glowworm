@@ -983,21 +983,6 @@ const DisplaysWebSocket: React.FC = () => {
                                 )}
                               </button>
                             )}
-                            {/* Browser-only: Refresh Browser */}
-                            {!isPi3dDevice(device) && (
-                              <button
-                                onClick={() => handleSendCommand(device.id, 'refresh_browser')}
-                                disabled={isCommandPending(device.device_token)}
-                                className="bg-orange-600 text-white p-1 rounded text-sm hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Refresh Browser"
-                              >
-                                {isCommandPending(device.device_token, 'refresh_browser') ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <RefreshCw className="w-4 h-4" />
-                                )}
-                              </button>
-                            )}
                           </div>
                         )}
                         {/* Offline indicator with disabled buttons */}

@@ -45,6 +45,8 @@ class PlaylistImage:
     mime_type: str = "image/jpeg"
     file_size: int = 0
     checksum: Optional[str] = None  # For cache invalidation
+    original_filename: Optional[str] = None  # Original filename for display
+    exif_date: Optional[str] = None  # EXIF date string (e.g., "2024:03:15 14:30:00")
 
 
 @dataclass
@@ -62,6 +64,8 @@ class PlaylistData:
     slug: str
     display_time_seconds: int = 30
     display_mode: str = "default"
+    show_image_info: bool = False  # Show image filename overlay
+    show_exif_date: bool = False  # Show EXIF date overlay
     sequence: List[int] = field(default_factory=list)
     computed_sequence: List[PlaylistEntry] = field(default_factory=list)
     images: Dict[int, PlaylistImage] = field(default_factory=dict)
@@ -523,6 +527,8 @@ class PlaylistManager:
                     mime_type=item.get("mime_type", "image/jpeg"),
                     file_size=item.get("file_size", 0),
                     checksum=item.get("checksum"),
+                    original_filename=item.get("original_filename"),
+                    exif_date=item.get("exif_date"),
                 )
 
         # If sequence is empty or incomplete, use all images from manifest
@@ -541,6 +547,8 @@ class PlaylistManager:
             slug=playlist.get("slug", f"playlist-{playlist_id}"),
             display_time_seconds=playlist.get("display_time_seconds", 30),
             display_mode=playlist.get("display_mode", "default"),
+            show_image_info=playlist.get("show_image_info", False),
+            show_exif_date=playlist.get("show_exif_date", False),
             sequence=sequence,
             computed_sequence=computed_sequence,
             images=images,

@@ -469,3 +469,202 @@ class TextRenderer:
     def current_error_message(self) -> str | None:
         """Get the current error message, if any."""
         return self._error_message
+
+    # =========================================================================
+    # Image Info Overlay
+    # =========================================================================
+
+    def set_image_info(
+        self,
+        filename: str | None = None,
+        exif_date: str | None = None,
+        show_filename: bool = True,
+        show_date: bool = True,
+    ) -> None:
+        """
+        Set image information to display as an overlay.
+
+        The overlay appears in the bottom-right corner of the display.
+
+        Args:
+            filename: Image filename to display (or original_filename)
+            exif_date: EXIF date string (e.g., "2024:03:15 14:30:00")
+            show_filename: Whether to show the filename
+            show_date: Whether to show the EXIF date
+        """
+        self._image_filename = filename if show_filename else None
+        self._image_date = self._format_exif_date(exif_date) if (show_date and exif_date) else None
+        self._image_info_visible = show_filename or show_date
+
+        # Create text objects if needed
+        if self._image_info_visible:
+            self._create_image_info_display()
+        else:
+            self._image_info_text = None
+            self._image_date_text = None
+
+        logger.debug(f"Image info set: filename={filename}, date={exif_date}")
+
+    def _format_exif_date(self, exif_date: str) -> str:
+        """
+        Format EXIF date string for display.
+
+        Converts "2024:03:15 14:30:00" to "March 15, 2024"
+
+        Args:
+            exif_date: Raw EXIF date string
+
+        Returns:
+            Formatted date string for display
+        """
+        if not exif_date:
+            return ""
+
+        try:
+            # EXIF dates are typically "YYYY:MM:DD HH:MM:SS"
+            from datetime import datetime
+
+            # Try parsing with time
+            try:
+                dt = datetime.strptime(exif_date, "%Y:%m:%d %H:%M:%S")
+            except ValueError:
+                # Try without time
+                dt = datetime.strptime(exif_date[:10], "%Y:%m:%d")
+
+            # Format as "March 15, 2024"
+            return dt.strftime("%B %d, %Y")
+        except Exception as e:
+            logger.warning(f"Failed to parse EXIF date '{exif_date}': {e}")
+            return exif_date  # Return original if parsing fails
+
+    def _get_info_font(self) -> "pi3d.Font | MockFont":
+        """Get or create font for image info overlay."""
+        if hasattr(self, "_info_font") and self._info_font is not None:
+            return self._info_font
+
+        if self.mock:
+            self._info_font = MockFont(font_size=32)
+        else:
+            import pi3d
+            self._info_font = pi3d.Font(
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                color=(1.0, 1.0, 1.0, 0.85),  # Slightly transparent white
+                font_size=32,
+            )
+
+        return self._info_font
+
+    def _create_image_info_display(self) -> None:
+        """Create text objects for image info overlay."""
+        info_font = self._get_info_font()
+
+        # Position in bottom-right corner with padding
+        padding = 30
+        right_x = (self.display_width / 2) - padding
+
+        # Calculate Y positions from bottom
+        bottom_y = -(self.display_height / 2) + padding
+
+        if self.mock:
+            # Date on bottom line (if present)
+            if self._image_date:
+                self._image_date_text = MockText(
+                    text=self._image_date,
+                    x=right_x,
+                    y=bottom_y,
+                    scale=0.8,
+                    color=(1.0, 1.0, 1.0, 0.85),
+                )
+                # Filename above date
+                filename_y = bottom_y + 40
+            else:
+                self._image_date_text = None
+                filename_y = bottom_y
+
+            # Filename (if present)
+            if self._image_filename:
+                self._image_info_text = MockText(
+                    text=self._image_filename,
+                    x=right_x,
+                    y=filename_y,
+                    scale=0.7,
+                    color=(0.9, 0.9, 0.9, 0.7),
+                )
+            else:
+                self._image_info_text = None
+        else:
+            import pi3d
+
+            # Create with right-justified text
+            if self._image_date:
+                self._image_date_text = pi3d.String(
+                    font=info_font,
+                    string=self._image_date,
+                    x=right_x,
+                    y=bottom_y,
+                    z=0.5,  # In front of images
+                    justify="R",  # Right-justified
+                )
+                self._image_date_text.set_shader(pi3d.Shader("uv_flat"))
+                filename_y = bottom_y + 40
+            else:
+                self._image_date_text = None
+                filename_y = bottom_y
+
+            if self._image_filename:
+                # Use slightly smaller/dimmer font for filename
+                filename_font = pi3d.Font(
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                    color=(0.8, 0.8, 0.8, 0.7),  # Dimmer than date
+                    font_size=28,
+                )
+                self._image_info_text = pi3d.String(
+                    font=filename_font,
+                    string=self._image_filename,
+                    x=right_x,
+                    y=filename_y,
+                    z=0.5,
+                    justify="R",
+                )
+                self._image_info_text.set_shader(pi3d.Shader("uv_flat"))
+            else:
+                self._image_info_text = None
+
+        logger.debug("Image info display created")
+
+    def clear_image_info(self) -> None:
+        """Clear the image info overlay."""
+        self._image_filename = None
+        self._image_date = None
+        self._image_info_visible = False
+        self._image_info_text = None
+        self._image_date_text = None
+        logger.debug("Image info cleared")
+
+    def render_image_info(self) -> bool:
+        """
+        Render the image info overlay.
+
+        Should be called each frame when image info should be displayed.
+        Draws on top of images (lower z-value).
+
+        Returns:
+            True if there is info to display, False otherwise
+        """
+        if not getattr(self, "_image_info_visible", False):
+            return False
+
+        # Draw filename
+        if hasattr(self, "_image_info_text") and self._image_info_text is not None:
+            self._image_info_text.draw()
+
+        # Draw date
+        if hasattr(self, "_image_date_text") and self._image_date_text is not None:
+            self._image_date_text.draw()
+
+        return True
+
+    @property
+    def has_image_info(self) -> bool:
+        """Check if image info is currently set."""
+        return getattr(self, "_image_info_visible", False)

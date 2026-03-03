@@ -326,6 +326,9 @@ class SlideshowOrchestrator:
             # Compute image pairing sequence based on display orientation
             await self._compute_pairing()
 
+            # Configure display effects based on playlist settings
+            await self._configure_display_mode()
+
             # Start slideshow loop
             self._slideshow_task = asyncio.create_task(self._slideshow_loop())
 
@@ -371,6 +374,38 @@ class SlideshowOrchestrator:
         # Compute pairing sequence
         self.playlist.compute_pairing_sequence(orientation)
         logger.info(f"Computed pairing sequence for {orientation} display")
+
+    async def _configure_display_mode(self) -> None:
+        """
+        Configure display effects based on playlist display_mode setting.
+
+        Maps playlist display modes to renderer effects:
+        - ken_burns_plus: Enable Ken Burns zoom/pan effect
+        - default: Simple crossfade (no Ken Burns)
+        - Other modes: Future implementation
+        """
+        playlist_data = self.playlist.playlist
+        if not playlist_data:
+            return
+
+        display_mode = playlist_data.display_mode
+        display_time = playlist_data.display_time_seconds or 30
+
+        # Configure Ken Burns based on display mode
+        if display_mode == "ken_burns_plus":
+            # Enable Ken Burns with playlist's display time
+            await self.display.set_ken_burns(
+                enabled=True,
+                duration=float(display_time),
+                min_zoom=1.0,
+                max_zoom=1.15,
+                max_pan=0.08,
+            )
+            logger.info(f"Ken Burns enabled: duration={display_time}s")
+        else:
+            # Disable Ken Burns for other modes
+            await self.display.set_ken_burns(enabled=False)
+            logger.info(f"Ken Burns disabled (mode={display_mode})")
 
     async def stop(self) -> None:
         """Stop the slideshow."""
@@ -753,6 +788,10 @@ class SlideshowOrchestrator:
             self._stats.transitions_completed += 1
             self._set_state(SlideshowState.PLAYING)
             logger.info(f"Displayed image {image.id}")
+
+            # Set image info overlay if enabled in playlist
+            await self._update_image_info_overlay(image)
+
             return True
         else:
             print(f"_display_images: display.load_image failed for {image_path}", flush=True)
@@ -765,6 +804,43 @@ class SlideshowOrchestrator:
             )
             self._set_state(SlideshowState.PLAYING)
             return False
+
+    async def _update_image_info_overlay(
+        self,
+        image: "PlaylistImage",
+        secondary_image: "PlaylistImage | None" = None,
+    ) -> None:
+        """
+        Update image info overlay if enabled in playlist settings.
+
+        Args:
+            image: Primary image (or top image for pairs)
+            secondary_image: Bottom image for pairs (optional)
+        """
+        playlist_data = self.playlist.playlist
+        if not playlist_data:
+            return
+
+        show_filename = playlist_data.show_image_info
+        show_date = playlist_data.show_exif_date
+
+        if not show_filename and not show_date:
+            # Clear any existing overlay
+            await self.display.clear_image_info()
+            return
+
+        # Use original filename if available, otherwise use filename
+        display_name = image.original_filename or image.filename
+
+        # For paired images, could show both or just the first
+        # Currently showing just the primary image info
+
+        await self.display.set_image_info(
+            filename=display_name,
+            exif_date=image.exif_date,
+            show_filename=show_filename,
+            show_date=show_date,
+        )
 
     async def _display_image_pair(
         self,
@@ -836,6 +912,11 @@ class SlideshowOrchestrator:
             self._stats.transitions_completed += 1
             self._set_state(SlideshowState.PLAYING)
             logger.info(f"Displayed image pair {top_image.id}, {bottom_image.id}")
+
+            # Set image info overlay if enabled in playlist
+            # For pairs, show the top image's info
+            await self._update_image_info_overlay(top_image, bottom_image)
+
             return True
         else:
             print(f"_display_image_pair: display.load_image_pair failed", flush=True)

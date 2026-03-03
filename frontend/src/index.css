@@ -454,7 +454,7 @@ textarea:focus-visible {
     --background: #fafafa; /* Warm white */
     --foreground: #1f2937; /* Charcoal */
     --muted: #f3f4f6; /* Light gray */
-    --muted-foreground: #6b7280; /* Medium gray */
+    --muted-foreground: #374151; /* Even darker gray for better placeholder contrast */
 
     /* Accent Colors - Photo-inspired (WCAG AA compliant) */
     --accent: #db2777; /* Darker pink for better contrast */
@@ -547,7 +547,7 @@ textarea:focus-visible {
     
     /* Neutral Palette */
     --muted: #1e293b; /* Slate */
-    --muted-foreground: #94a3b8; /* Light slate */
+    --muted-foreground: #cbd5e1; /* Lighter slate for better contrast in dark mode */
     
     /* Accent Colors */
     --accent: #f472b6; /* Lighter pink for dark mode */
@@ -589,9 +589,27 @@ textarea:focus-visible {
   * {
     @apply border-border;
   }
-  
+
   body {
     @apply bg-background text-foreground antialiased;
+  }
+
+  /* Ensure readable text in all form inputs */
+  input,
+  select,
+  textarea {
+    color: #111827 !important; /* gray-900 for maximum readability */
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #6b7280 !important; /* gray-500 for readable placeholders */
+  }
+
+  /* Ensure dropdown options are readable */
+  select option {
+    color: #111827 !important;
+    background-color: #ffffff !important;
   }
   
   /* Smooth theme transitions */

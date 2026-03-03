@@ -149,7 +149,7 @@ const Login: React.FC = () => {
                   placeholder="Enter your username"
                   value={credentials.username}
                   onChange={handleInputChange}
-                  className="h-11 bg-input/50 border-border/50 focus:bg-background transition-colors"
+                  className="h-11"
                   required
                   autoComplete="username"
                 />
@@ -166,7 +166,7 @@ const Login: React.FC = () => {
                   placeholder="Enter your password"
                   value={credentials.password}
                   onChange={handleInputChange}
-                  className="h-11 bg-input/50 border-border/50 focus:bg-background transition-colors"
+                  className="h-11"
                   required
                   autoComplete="current-password"
                 />

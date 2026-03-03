@@ -39,14 +39,13 @@ class DisplayDevice(Base):
     device_pixel_ratio = Column(String(10), nullable=True)  # e.g., "2.0", "1.5"
     orientation = Column(String(20), nullable=False, server_default='portrait')  # 'portrait' or 'landscape'
     
-    # Daemon and remote control
-    browser_url = Column(String(512), nullable=True, comment="Current browser URL for remote updates")
+    # Daemon and remote control (CEC)
     cec_input_name = Column(String(64), nullable=True, comment="Selected CEC input name")
     cec_input_address = Column(String(16), nullable=True, comment="Selected CEC input address")
     daemon_enabled = Column(Boolean, default=False, nullable=False, comment="Whether daemon control is enabled")
 
     # Pi3D daemon status fields (cached from last WebSocket status)
-    device_type = Column(String(20), nullable=True, default="browser", comment="Device type: browser or pi3d")
+    device_type = Column(String(20), nullable=True, default="pi3d", comment="Device type: pi3d")
     last_state = Column(String(32), nullable=True, comment="Last reported state: playing, paused, stopped, error")
     last_image_id = Column(Integer, nullable=True, comment="ID of currently displayed image")
     last_cache_size_mb = Column(Float, nullable=True, comment="Cache size in MB")
@@ -93,7 +92,7 @@ class DisplayDevice(Base):
             "device_pixel_ratio": self.device_pixel_ratio,
             "orientation": self.orientation,
             # Pi3D daemon status fields
-            "device_type": self.device_type or "browser",
+            "device_type": self.device_type or "pi3d",
             "last_state": self.last_state,
             "last_image_id": self.last_image_id,
             "last_cache_size_mb": self.last_cache_size_mb,

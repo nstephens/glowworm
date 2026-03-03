@@ -119,6 +119,9 @@ class IPCServer:
             "hide_registration": self._handle_hide_registration,
             "show_error": self._handle_show_error,
             "clear_error": self._handle_clear_error,
+            "set_image_info": self._handle_set_image_info,
+            "clear_image_info": self._handle_clear_image_info,
+            "set_ken_burns": self._handle_set_ken_burns,
         }
 
         # Notification listeners (for sending async notifications)
@@ -802,6 +805,101 @@ class IPCServer:
             "message": message,
             "code": code,
         })
+
+    async def _handle_set_image_info(
+        self,
+        filename: str | None = None,
+        exif_date: str | None = None,
+        show_filename: bool = True,
+        show_date: bool = True,
+    ) -> dict[str, Any]:
+        """
+        Set image info overlay to display.
+
+        Args:
+            filename: Image filename to show
+            exif_date: EXIF date string (e.g., "2024:03:15 14:30:00")
+            show_filename: Whether to display the filename
+            show_date: Whether to display the EXIF date
+
+        Returns:
+            Dict with success status
+        """
+        if not self.renderer:
+            return {"success": False, "error": "Renderer not initialized"}
+
+        try:
+            self.renderer.set_image_info(
+                filename=filename,
+                exif_date=exif_date,
+                show_filename=show_filename,
+                show_date=show_date,
+            )
+            return {
+                "success": True,
+                "filename": filename,
+                "exif_date": exif_date,
+            }
+        except Exception as e:
+            logger.error(f"Failed to set image info: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def _handle_clear_image_info(self) -> dict[str, Any]:
+        """
+        Clear image info overlay.
+
+        Returns:
+            Dict with success status
+        """
+        if not self.renderer:
+            return {"success": False, "error": "Renderer not initialized"}
+
+        self.renderer.clear_image_info()
+        return {"success": True}
+
+    async def _handle_set_ken_burns(
+        self,
+        enabled: bool = True,
+        duration: float = 30.0,
+        min_zoom: float = 1.0,
+        max_zoom: float = 1.15,
+        max_pan: float = 0.08,
+    ) -> dict[str, Any]:
+        """
+        Configure Ken Burns zoom/pan effect.
+
+        Args:
+            enabled: Whether to enable the effect
+            duration: Duration of the effect in seconds
+            min_zoom: Minimum zoom level (1.0 = no zoom)
+            max_zoom: Maximum zoom level (1.15 = 15% zoom)
+            max_pan: Maximum pan as fraction of image size
+
+        Returns:
+            Dict with success status
+        """
+        if not self.renderer:
+            return {"success": False, "error": "Renderer not initialized"}
+
+        try:
+            self.renderer.set_ken_burns(
+                enabled=enabled,
+                duration=duration,
+                min_zoom=min_zoom,
+                max_zoom=max_zoom,
+                max_pan=max_pan,
+            )
+            return {
+                "success": True,
+                "enabled": enabled,
+                "duration": duration,
+                "min_zoom": min_zoom,
+                "max_zoom": max_zoom,
+                "max_pan": max_pan,
+            }
+        except Exception as e:
+            logger.error(f"Failed to set Ken Burns: {e}")
+            return {"success": False, "error": str(e)}
 
 
 async def create_ipc_server(

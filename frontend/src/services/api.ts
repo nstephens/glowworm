@@ -196,7 +196,13 @@ class ApiService {
     if (data.playlist_id !== undefined) {
       formData.append('playlist_id', data.playlist_id.toString());
     }
-    
+    if (data.focus_x !== undefined) {
+      formData.append('focus_x', data.focus_x.toString());
+    }
+    if (data.focus_y !== undefined) {
+      formData.append('focus_y', data.focus_y.toString());
+    }
+
     const response = await this.api.put(`/images/${id}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -774,16 +780,7 @@ class ApiService {
     };
   }
 
-  // ==================== Device Daemon Control ====================
-  
-  async updateDeviceBrowserUrl(deviceId: number, url: string): Promise<ApiResponse<any>> {
-    const response = await this.api.put(`/device-daemon/devices/${deviceId}/browser-url`, { url });
-    return {
-      message: "Browser URL update queued",
-      data: response.data,
-      status_code: 200
-    };
-  }
+  // ==================== Device Daemon Control (CEC) ====================
 
   async controlDevicePower(deviceId: number, power: 'on' | 'off'): Promise<ApiResponse<any>> {
     const response = await this.api.post(`/device-daemon/devices/${deviceId}/display/power`, { power });

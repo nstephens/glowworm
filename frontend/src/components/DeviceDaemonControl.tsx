@@ -7,7 +7,6 @@ interface DeviceDaemonControlProps {
   deviceId: number;
   deviceToken: string;
   daemonEnabled?: boolean;
-  currentUrl?: string;
 }
 
 interface CECInput {
@@ -20,9 +19,7 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
   deviceId,
   deviceToken,
   daemonEnabled = false,
-  currentUrl = '',
 }) => {
-  const [browserUrl, setBrowserUrl] = useState(currentUrl || '');
   const [cecInputs, setCecInputs] = useState<CECInput[]>([]);
   const [selectedInput, setSelectedInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,27 +45,6 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
       }
     } catch (err) {
       console.error('Failed to load CEC inputs:', err);
-    }
-  };
-
-  const handleUpdateUrl = async () => {
-    if (!browserUrl.trim()) {
-      setError('URL cannot be empty');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      await apiService.updateDeviceBrowserUrl(deviceId, browserUrl);
-      setSuccess('Browser URL update queued');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to update URL');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -222,30 +198,6 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
         </div>
       </div>
 
-      {/* Browser URL Configuration */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-          <MonitorPlay className="w-4 h-4 mr-2" />
-          Browser URL Configuration
-        </h4>
-        <div className="space-y-2">
-          <input
-            type="url"
-            value={browserUrl}
-            onChange={(e) => setBrowserUrl(e.target.value)}
-            placeholder="http://10.10.10.2:3000/display/abc123"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={handleUpdateUrl}
-            disabled={loading}
-            className="w-full bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Updating...' : 'Update Browser URL'}
-          </button>
-        </div>
-      </div>
-
       {/* CEC Power Control */}
       {cecAvailable && (
         <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -347,7 +299,7 @@ export const DeviceDaemonControl: React.FC<DeviceDaemonControlProps> = ({
               <p className="font-medium">HDMI CEC Not Available</p>
               <p className="mt-1">
                 CEC control requires cec-utils to be installed on the device.
-                URL updates are still available.
+                Slideshow controls are still available.
               </p>
             </div>
           </div>

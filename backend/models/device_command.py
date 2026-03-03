@@ -10,8 +10,7 @@ import enum
 
 
 class CommandType(str, enum.Enum):
-    """Available command types"""
-    UPDATE_URL = "update_url"
+    """Available command types for CEC control"""
     CEC_POWER_ON = "cec_power_on"
     CEC_POWER_OFF = "cec_power_off"
     CEC_SET_INPUT = "cec_set_input"

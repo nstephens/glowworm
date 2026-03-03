@@ -78,7 +78,7 @@ export const ScheduleWidget: React.FC<ScheduleWidgetProps> = ({
         {activeSchedule.is_default ? (
           <>
             <Badge variant="outline" className="text-xs">Default</Badge>
-            <span className="text-muted-foreground">{activeSchedule.playlist_name}</span>
+            <span className="text-gray-900 font-medium">{activeSchedule.playlist_name}</span>
           </>
         ) : (
           <>
@@ -86,7 +86,7 @@ export const ScheduleWidget: React.FC<ScheduleWidgetProps> = ({
               <Calendar className="h-3 w-3 mr-1" />
               Scheduled
             </Badge>
-            <span className="text-muted-foreground">{activeSchedule.schedule_name}</span>
+            <span className="text-gray-900 font-medium">{activeSchedule.schedule_name}</span>
           </>
         )}
       </div>
@@ -99,7 +99,7 @@ export const ScheduleWidget: React.FC<ScheduleWidgetProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold">
+            <span className="text-sm font-semibold text-gray-900">
               {activeSchedule.is_default ? 'Default Playlist' : 'Active Schedule'}
             </span>
           </div>
@@ -111,14 +111,14 @@ export const ScheduleWidget: React.FC<ScheduleWidgetProps> = ({
         <div className="space-y-1.5">
           {!activeSchedule.is_default && activeSchedule.schedule_name && (
             <div className="text-sm">
-              <span className="text-muted-foreground">Schedule: </span>
-              <span className="font-medium">{activeSchedule.schedule_name}</span>
+              <span className="text-gray-700">Schedule: </span>
+              <span className="font-semibold text-gray-900">{activeSchedule.schedule_name}</span>
             </div>
           )}
-          
+
           <div className="text-sm">
-            <span className="text-muted-foreground">Playlist: </span>
-            <span className="font-medium">{activeSchedule.playlist_name || 'None'}</span>
+            <span className="text-gray-700">Playlist: </span>
+            <span className="font-semibold text-gray-900">{activeSchedule.playlist_name || 'None'}</span>
           </div>
 
           {!activeSchedule.is_default && (

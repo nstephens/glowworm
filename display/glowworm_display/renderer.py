@@ -16,6 +16,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Callable
 
 from glowworm_display.display import Display
+from glowworm_display.effects import KenBurnsEffect, KenBurnsConfig
 from glowworm_display.image_loader import ImageLoader, ImageLoadError, ScaleMode
 from glowworm_display.performance import PerformanceMonitor, PerformanceConfig
 from glowworm_display.text_renderer import TextRenderer
@@ -205,6 +206,12 @@ class Renderer:
         # Track last image display time for GC scheduling
         self._last_image_change: float = 0.0
         self._gc_scheduled: bool = False
+
+        # Ken Burns effect
+        self._ken_burns_enabled: bool = False
+        self._ken_burns_effect: KenBurnsEffect | None = None
+        self._ken_burns_config: KenBurnsConfig = KenBurnsConfig()
+        self._ken_burns_duration: float = 30.0  # Default, overridden by image display time
 
         logger.info("Renderer initialized")
 
@@ -592,6 +599,9 @@ class Renderer:
                 self._set_state(RendererState.DISPLAYING)
                 self.stats.images_displayed += 2  # Count both images
 
+                # Start Ken Burns effect for stacked images
+                self._start_ken_burns_effect()
+
                 logger.debug("Stacked transition complete, now displaying paired images")
             else:
                 # Single image transition complete - swap sprites
@@ -600,6 +610,9 @@ class Renderer:
                 self._transition = None
                 self._set_state(RendererState.DISPLAYING)
                 self.stats.images_displayed += 1
+
+                # Start Ken Burns effect for single image
+                self._start_ken_burns_effect()
 
                 logger.debug("Transition complete, now displaying new image")
 
@@ -635,6 +648,15 @@ class Renderer:
 
         elif self._state == RendererState.DISPLAYING:
             if self._stacked_mode:
+                # Apply Ken Burns effect to stacked images
+                if self._ken_burns_effect and self._ken_burns_effect.is_running:
+                    self._ken_burns_effect.apply_to_pair(
+                        self._current_top_sprite,
+                        self._current_bottom_sprite,
+                        self.display.width,
+                        self.display.height,
+                    )
+
                 # Draw both stacked images
                 if self._current_top_sprite:
                     self._current_top_sprite.set_alpha(1.0)
@@ -643,6 +665,14 @@ class Renderer:
                     self._current_bottom_sprite.set_alpha(1.0)
                     self._current_bottom_sprite.draw()
             else:
+                # Apply Ken Burns effect to single image
+                if self._ken_burns_effect and self._ken_burns_effect.is_running:
+                    self._ken_burns_effect.apply(
+                        self._current_sprite,
+                        self.display.width,
+                        self.display.height,
+                    )
+
                 # Draw current image (alpha should already be 1.0 from transition completion)
                 if self._current_sprite:
                     self._current_sprite.draw()
@@ -685,6 +715,10 @@ class Renderer:
         elif self._state == RendererState.ERROR:
             # Draw error message
             self._text_renderer.render_error()
+
+        # Render image info overlay on top of images (but not registration/error screens)
+        if self._state in (RendererState.DISPLAYING, RendererState.TRANSITIONING, RendererState.PAUSED):
+            self._text_renderer.render_image_info()
 
     def pause(self) -> None:
         """
@@ -851,6 +885,95 @@ class Renderer:
             self._set_state(RendererState.IDLE)
 
         logger.info("Error display cleared")
+
+    def set_image_info(
+        self,
+        filename: str | None = None,
+        exif_date: str | None = None,
+        show_filename: bool = True,
+        show_date: bool = True,
+    ) -> None:
+        """
+        Set image info overlay to display on top of images.
+
+        Args:
+            filename: Image filename to display
+            exif_date: EXIF date string (e.g., "2024:03:15 14:30:00")
+            show_filename: Whether to show the filename
+            show_date: Whether to show the date
+        """
+        self._text_renderer.set_image_info(
+            filename=filename,
+            exif_date=exif_date,
+            show_filename=show_filename,
+            show_date=show_date,
+        )
+
+    def clear_image_info(self) -> None:
+        """Clear the image info overlay."""
+        self._text_renderer.clear_image_info()
+
+    def set_ken_burns(
+        self,
+        enabled: bool,
+        duration: float = 30.0,
+        min_zoom: float = 1.0,
+        max_zoom: float = 1.15,
+        max_pan: float = 0.08,
+    ) -> None:
+        """
+        Configure Ken Burns zoom/pan effect.
+
+        Args:
+            enabled: Whether to enable the effect
+            duration: Duration of the effect in seconds (typically = display time)
+            min_zoom: Minimum zoom level (1.0 = no zoom)
+            max_zoom: Maximum zoom level (1.15 = 15% zoom)
+            max_pan: Maximum pan as fraction of image size (0.08 = 8%)
+        """
+        self._ken_burns_enabled = enabled
+        self._ken_burns_duration = duration
+        self._ken_burns_config = KenBurnsConfig(
+            min_zoom=min_zoom,
+            max_zoom=max_zoom,
+            max_pan_x=max_pan,
+            max_pan_y=max_pan,
+        )
+
+        if enabled:
+            logger.info(
+                f"Ken Burns enabled: duration={duration}s, "
+                f"zoom={min_zoom}-{max_zoom}, pan={max_pan}"
+            )
+        else:
+            logger.info("Ken Burns disabled")
+            self._ken_burns_effect = None
+
+    def _start_ken_burns_effect(self, duration: float | None = None) -> None:
+        """
+        Start the Ken Burns effect for the current image.
+
+        Called when transitioning to DISPLAYING state with Ken Burns enabled.
+
+        Args:
+            duration: Override duration (uses config default if None)
+        """
+        if not self._ken_burns_enabled:
+            return
+
+        effect_duration = duration or self._ken_burns_duration
+        self._ken_burns_effect = KenBurnsEffect(
+            duration=effect_duration,
+            config=self._ken_burns_config,
+        )
+        self._ken_burns_effect.start()
+        logger.debug(f"Ken Burns effect started: duration={effect_duration}s")
+
+    def _stop_ken_burns_effect(self) -> None:
+        """Stop the current Ken Burns effect."""
+        if self._ken_burns_effect:
+            self._ken_burns_effect.stop()
+            self._ken_burns_effect = None
 
     @property
     def is_showing_registration(self) -> bool:
