@@ -585,23 +585,27 @@ class PlaylistManager:
         if not self._playlist:
             return True  # No playlist loaded
 
+        # Store current values before fetching (fetch_playlist updates self._playlist)
+        current_id = self._playlist.id
+        current_hash = self._playlist.version_hash
+
         try:
             # Fetch the device's assigned playlist (may be different from current)
-            # Pass None to force re-fetching from device endpoint
+            # Note: fetch_playlist updates self._playlist as a side effect
             new_playlist = await self.fetch_playlist(playlist_id=None)
 
             # Check if playlist ID changed (device was reassigned)
-            if new_playlist.id != self._playlist.id:
+            if new_playlist.id != current_id:
                 logger.info(
                     f"Device reassigned to different playlist: "
-                    f"{self._playlist.id} -> {new_playlist.id}"
+                    f"{current_id} -> {new_playlist.id}"
                 )
                 return True
 
             # Compare version hashes for content changes
-            if new_playlist.version_hash != self._playlist.version_hash:
+            if new_playlist.version_hash != current_hash:
                 logger.info(
-                    f"Playlist updated: {self._playlist.version_hash} -> "
+                    f"Playlist updated: {current_hash} -> "
                     f"{new_playlist.version_hash}"
                 )
                 return True
