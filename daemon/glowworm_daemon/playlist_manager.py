@@ -401,6 +401,17 @@ class PlaylistManager:
                 sequence = []
                 for item in images_list:
                     image_id = int(item["id"])
+
+                    # Extract EXIF date if available
+                    exif_date = None
+                    exif_data = item.get("exif", {})
+                    if exif_data:
+                        # Try DateTimeOriginal first, then DateTime
+                        exif_date = (
+                            exif_data.get("DateTimeOriginal")
+                            or exif_data.get("DateTime")
+                        )
+
                     images[image_id] = PlaylistImage(
                         id=image_id,
                         url=item.get("url", f"/api/images/{image_id}/file"),
@@ -412,6 +423,8 @@ class PlaylistManager:
                         mime_type=item.get("mime_type", "image/jpeg"),
                         file_size=item.get("file_size", 0),
                         checksum=item.get("file_hash"),
+                        original_filename=item.get("original_filename"),
+                        exif_date=exif_date,
                     )
                     sequence.append(image_id)
 
