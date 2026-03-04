@@ -472,6 +472,10 @@ class Renderer:
             logger.warning("No next sprite to transition to")
             return
 
+        # Prepare Ken Burns effect BEFORE transition starts
+        # This allows us to position the sprite at its start position during fade-in
+        self._prepare_ken_burns_effect()
+
         self._transition = CrossfadeTransition(duration=duration)
         self._transition.start()
         self._set_state(RendererState.TRANSITIONING)
@@ -485,6 +489,10 @@ class Renderer:
         if self._next_top_sprite is None and self._next_bottom_sprite is None:
             logger.warning("No next sprites to transition to")
             return
+
+        # Prepare Ken Burns effect BEFORE transition starts
+        # This allows us to position sprites at their start positions during fade-in
+        self._prepare_ken_burns_effect()
 
         self._transition = StackedRevealTransition(
             duration=duration,
@@ -681,6 +689,16 @@ class Renderer:
             # Render transition
             if self._transition:
                 if self._stacked_mode and isinstance(self._transition, StackedRevealTransition):
+                    # Apply Ken Burns initial position to incoming sprites during fade-in
+                    # This ensures sprites are already at their start position when they appear
+                    if self._ken_burns_effect:
+                        self._ken_burns_effect.apply_initial_to_pair(
+                            self._next_top_sprite,
+                            self._next_bottom_sprite,
+                            self.display.width,
+                            self.display.height,
+                        )
+
                     # Render stacked transition with staggered timing
                     self._transition.render_stacked(
                         self._current_top_sprite,
@@ -690,6 +708,14 @@ class Renderer:
                         self.display.height,
                     )
                 else:
+                    # Apply Ken Burns initial position to incoming sprite during fade-in
+                    if self._ken_burns_effect and self._next_sprite:
+                        self._ken_burns_effect.apply_initial(
+                            self._next_sprite,
+                            self.display.width,
+                            self.display.height,
+                        )
+
                     # Render single image transition
                     self._transition.render(self._current_sprite, self._next_sprite)
 
@@ -949,11 +975,12 @@ class Renderer:
             logger.info("Ken Burns disabled")
             self._ken_burns_effect = None
 
-    def _start_ken_burns_effect(self, duration: float | None = None) -> None:
+    def _prepare_ken_burns_effect(self, duration: float | None = None) -> None:
         """
-        Start the Ken Burns effect for the current image.
+        Prepare the Ken Burns effect BEFORE starting a transition.
 
-        Called when transitioning to DISPLAYING state with Ken Burns enabled.
+        This generates the animation parameters so sprites can be positioned
+        at their start position during the fade-in transition.
 
         Args:
             duration: Override duration (uses config default if None)
@@ -966,8 +993,36 @@ class Renderer:
             duration=effect_duration,
             config=self._ken_burns_config,
         )
-        self._ken_burns_effect.start()
-        logger.debug(f"Ken Burns effect started: duration={effect_duration}s")
+        self._ken_burns_effect.prepare()
+        logger.debug(f"Ken Burns effect prepared: duration={effect_duration}s")
+
+    def _start_ken_burns_effect(self, duration: float | None = None) -> None:
+        """
+        Start the Ken Burns effect for the current image.
+
+        Called when transitioning to DISPLAYING state with Ken Burns enabled.
+        If prepare was called earlier, starts from the prepared state.
+        Otherwise creates a new effect.
+
+        Args:
+            duration: Override duration (uses config default if None)
+        """
+        if not self._ken_burns_enabled:
+            return
+
+        if self._ken_burns_effect:
+            # Already prepared - start from prepared state
+            self._ken_burns_effect.start_from_prepared()
+            logger.debug("Ken Burns effect started from prepared state")
+        else:
+            # Not prepared - create and start fresh
+            effect_duration = duration or self._ken_burns_duration
+            self._ken_burns_effect = KenBurnsEffect(
+                duration=effect_duration,
+                config=self._ken_burns_config,
+            )
+            self._ken_burns_effect.start()
+            logger.debug(f"Ken Burns effect started: duration={effect_duration}s")
 
     def _stop_ken_burns_effect(self) -> None:
         """Stop the current Ken Burns effect."""
